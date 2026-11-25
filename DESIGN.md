@@ -8,7 +8,8 @@ and make the current slideshow state easy to understand at a glance.
   generous spacing, following the supplied overview prototype.
 - Use the system UI font and consistent shared controls; reserve bright accents
   for the primary action, focus indicators, and active navigation.
-- Organize the application into Overview, Folders, and Settings. Show loading,
+- Organize the application into Overview, Folders, Gallery, Monitors, History,
+  and Settings. Show loading,
   empty, error, and saved states explicitly; do not present planned features as
   working controls.
 - Support keyboard navigation, visible focus, accessible labels, and reduced motion.

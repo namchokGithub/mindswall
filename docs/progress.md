@@ -24,7 +24,7 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 | 1     | Wallpaper core library and CLI         | P1                | In progress |
 | 2     | Slideshow engine and configuration     | P1                | In progress |
 | 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | In progress |
-| 4     | Wallpaper utilities                    | P2                | Not started |
+| 4     | Wallpaper utilities                    | P2                | In progress |
 | 5     | Release hardening and distribution     | Quality, release  | Not started |
 | 6     | Extended features                      | P3                | Not started |
 
@@ -36,15 +36,15 @@ GUI-independent Rust core so the CLI and the desktop app share the same code.
 Goal: be comfortable with the Rust concepts the core needs, and shape the
 repository so later phases do not require a large restructure.
 
-- [x] Install Rust and Cargo
+- [X] Install Rust and Cargo
 - [ ] Learn ownership, borrowing, and references
 - [ ] Learn structs, enums, and traits
 - [ ] Learn `Result`, `Option`, and error handling with `thiserror`
 - [ ] Learn modules, crates, and filesystem APIs
-- [x] Convert the repository to the Cargo workspace from D1, with
-      `crates/core` and `crates/cli`
-- [x] Move the scanner from `main.rs` into a `scanner` module in
-      `mindswall-core`
+- [X] Convert the repository to the Cargo workspace from D1, with
+  `crates/core` and `crates/cli`
+- [X] Move the scanner from `main.rs` into a `scanner` module in
+  `mindswall-core`
 
 Done when: `cargo check`, `cargo fmt --check`, and `cargo clippy` pass for the
 whole workspace, and the scanner lives in its own module in the core crate.
@@ -55,22 +55,26 @@ The workspace checks pass; the learning items remain for the developer to comple
 Goal: a reusable core that can find images and set one as the desktop
 wallpaper, driven from a CLI.
 
-- [x] **Scanner**: scan multiple roots, optionally recursive; match
-      `jpg`/`jpeg`/`png`/`bmp` case-insensitively; keep `PathBuf`s without
-      assuming valid Unicode; report unreadable entries instead of dropping
-      them silently
+- [X] **Scanner**: scan multiple roots, optionally recursive; match
+  `jpg`/`jpeg`/`png`/`bmp` case-insensitively; keep `PathBuf`s without
+  assuming valid Unicode; report unreadable entries instead of dropping
+  them silently
+
 - [~] **Wallpaper service**: define a platform-neutral `WallpaperSetter` trait
-      in `wallpaper/mod.rs`; implement it for Windows in `wallpaper/windows.rs`
-      using the `windows` crate (`IDesktopWallpaper`, with
-      `SystemParametersInfoW` as a fallback); validate the file exists before
-      calling the API
-- [x] **Random pick**: choose one random image from the scan result with `rand`
+  in `wallpaper/mod.rs`; implement it for Windows in `wallpaper/windows.rs`
+  using the `windows` crate (`IDesktopWallpaper`, with
+  `SystemParametersInfoW` as a fallback); validate the file exists before
+  calling the API
+
+- [X] **Random pick**: choose one random image from the scan result with `rand`
+
 - [~] **Error model**: one `thiserror` error enum for scan, config, and Windows
-      API failures, with paths included in messages
+  API failures, with paths included in messages
 - [~] **CLI (`clap`)**: `scan <folder>...`, `set <file>`, `random <folder>...`,
-      and `--recursive` / `--no-recursive`
-- [x] **Tests**: scanner tests using temporary directories (extensions, case,
-      nesting, non-image files, missing folder)
+  and `--recursive` / `--no-recursive`
+
+- [X] **Tests**: scanner tests using temporary directories (extensions, case,
+  nesting, non-image files, missing folder)
 
 Done when: on Windows 11, `mindswall random <folder>` changes the wallpaper
 without administrator rights, scanner tests pass, and the README documents the
@@ -85,30 +89,34 @@ The fallback currently retains the existing fit setting rather than forcing Fill
 Goal: a background slideshow that rotates wallpapers on a timer, with a shuffle
 queue that avoids repeats and persisted settings.
 
-- [x] **Multiple folders**: config holds a list of folders with per-folder
-      enable flag and recursive flag; deduplicate images found through
-      overlapping folders
-- [x] **Shuffle queue**: shuffle the full set, play it through without repeats,
-      reshuffle when exhausted, and avoid showing the last image of the old
-      cycle first in the new one; sequential order when shuffle is off
+- [X] **Multiple folders**: config holds a list of folders with per-folder
+  enable flag and recursive flag; deduplicate images found through
+  overlapping folders
+- [X] **Shuffle queue**: shuffle the full set, play it through without repeats,
+  reshuffle when exhausted, and avoid showing the last image of the old
+  cycle first in the new one; sequential order when shuffle is off
+
 - [~] **History cursor**: keep a short in-memory history so `Previous` returns
-      to the actual previous image
+  to the actual previous image
 - [~] **Scheduler**: interval-based timer (for example 1 min to 24 h) that
-      sleeps until the next change instead of polling; supports pause, resume,
-      next, and previous; tolerates sleep/resume of the PC
-- [x] **JSON configuration**: `serde` + `serde_json`; stored in the per-user
-      config directory (for example `%APPDATA%\MindsWall\config.json`); a
-      `version` field for future migrations; atomic writes (temp file +
-      rename); fall back to defaults with a logged warning on invalid JSON
-- [x] **`config.example.json`** in the repository root
+  sleeps until the next change instead of polling; supports pause, resume,
+  next, and previous; tolerates sleep/resume of the PC
+
+- [X] **JSON configuration**: `serde` + `serde_json`; stored in the per-user
+  config directory (for example `%APPDATA%\MindsWall\config.json`); a
+  `version` field for future migrations; atomic writes (temp file +
+  rename); fall back to defaults with a logged warning on invalid JSON
+- [X] **`config.example.json`** in the repository root
+
 - [~] **Logging**: `tracing` with a file log in the per-user data directory
 - [~] **Single instance and IPC (D2)**: `run` refuses to start a second
-      slideshow; it serves control requests over a per-user named pipe
+  slideshow; it serves control requests over a per-user named pipe
 - [~] **CLI**: `run` (foreground slideshow), `next`, `previous`, `pause`,
-      `resume`, `status` (sent to the running instance), `config show`
-- [x] **Tests**: shuffle no-repeat guarantee, reshuffle boundary, previous/next
-      behavior, scheduler logic with an injectable clock, config round-trip and
-      invalid-file handling
+  `resume`, `status` (sent to the running instance), `config show`
+
+- [X] **Tests**: shuffle no-repeat guarantee, reshuffle boundary, previous/next
+  behavior, scheduler logic with an injectable clock, config round-trip and
+  invalid-file handling
 
 Done when: a slideshow runs for multiple cycles with no repeat inside a cycle,
 settings survive restarts, and unit tests cover shuffle, scheduler, and config.
@@ -124,23 +132,24 @@ Goal: a Tauri 2 + React + TypeScript app that wraps the core, with tray control
 and Windows startup.
 
 - [~] **Setup**: Tauri 2 project, React + TypeScript (Vite), shadcn/ui; the
-      Tauri backend depends on the core crate rather than duplicating logic
+  Tauri backend depends on the core crate rather than duplicating logic
 - [~] **Command layer**: Tauri commands for status, next/previous/pause,
-      folder CRUD, and settings; events from core to UI for wallpaper changes
+  folder CRUD, and settings; events from core to UI for wallpaper changes
 - [~] **Overview dashboard**: current wallpaper preview, Previous / Next /
-      Pause controls, interval, shuffle, include subfolders, prevent repeats
+  Pause controls, interval, shuffle, include subfolders, prevent repeats
 - [~] **Folder management**: add via native folder picker, remove, enable or
-      disable, recursive toggle, image count per folder, rescan
+  disable, recursive toggle, image count per folder, rescan
 - [~] **Settings page**: general options, start with Windows, log location
 - [~] **System tray**: icon with Next, Previous, Pause/Resume, Open, Quit;
-      closing the window hides to tray; slideshow keeps running in background
+  closing the window hides to tray; slideshow keeps running in background
 - [~] **Start with Windows**: per-user registration (`HKCU\...\Run` or the
-      Tauri autostart plugin) so no administrator rights are needed
+  Tauri autostart plugin) so no administrator rights are needed
 - [~] **Single instance (D2)**: a second launch focuses the existing window;
-      the app takes over the named pipe server so CLI control commands work
-      while it runs
+  the app takes over the named pipe server so CLI control commands work
+  while it runs
+
 - [ ] **Resource check**: destroy or suspend the WebView when hidden so the
-      background process can approach the RAM target
+  background process can approach the RAM target
 
 Done when: the app runs from the tray on Windows 11, all P1 controls work from
 both the UI and the tray, settings persist, and startup registration works for
@@ -156,47 +165,57 @@ handoff from a running CLI instance remain open.
 
 Goal: complete the P2 feature set.
 
-- [ ] **Multi-monitor**: enumerate monitors via `IDesktopWallpaper`; same image
-      on all monitors or a separate image (and optionally separate folders) per
-      monitor; handle monitors being connected or disconnected; Monitors page
-- [ ] **Fit mode (D3)**: Fill, Fit, Stretch, Center, Tile, and Span setting
-- [ ] **Image gallery**: grid of discovered images with cached, downscaled
-      thumbnails (`image` crate, stored in the local cache directory); lazy
-      loading or virtualized list for large libraries; set-as-wallpaper and
-      exclude actions
+- [~] **Multi-monitor**: enumerate monitors via `IDesktopWallpaper`; same image
+  on all monitors or a separate image (and optionally separate folders) per
+  monitor; handle monitors being connected or disconnected; Monitors page
+- [~] **Fit mode (D3)**: Fill, Fit, Stretch, Center, Tile, and Span setting
+- [~] **Image gallery**: grid of discovered images with cached, downscaled
+  thumbnails (`image` crate, stored in the local cache directory); lazy
+  loading or virtualized list for large libraries; set-as-wallpaper and
+  exclude actions
+
 - [ ] **Folder watcher**: `notify` with debouncing; update the image set and
-      shuffle queue on add/remove/rename without a full rescan; skip images
-      still being written
-- [ ] **Resolution / aspect ratio filtering**: read image dimensions from
-      headers only; filter by minimum resolution and orientation or aspect
-      ratio tolerance; cache dimensions to avoid re-reading files
-- [ ] **Wallpaper history**: persisted, size-limited list of shown images with
-      timestamps and monitor; History page with re-apply action; handle files
-      that no longer exist
-- [ ] **Tests**: filter rules, history limits, watcher event-to-queue mapping
+  shuffle queue on add/remove/rename without a full rescan; skip images
+  still being written
+
+- [~] **Resolution / aspect ratio filtering**: read image dimensions from
+  headers only; filter by minimum resolution and orientation or aspect
+  ratio tolerance; cache dimensions to avoid re-reading files
+- [~] **Wallpaper history**: persisted, size-limited list of shown images with
+  timestamps and monitor; History page with re-apply action; handle files
+  that no longer exist
+- [~] **Tests**: filter rules, history limits, watcher event-to-queue mapping
 
 Done when: each P2 feature works on Windows 11 (multi-monitor verified on a
 real multi-monitor setup), and gallery browsing stays responsive with a large
 folder (for example 5,000+ images).
+
+The GUI now includes paged thumbnails, manual per-monitor images, filters, fit
+modes, and local history. Automatic folder watching, per-monitor slideshow
+folders, automatic display-change handling, and watcher tests remain open.
+The fixed aspect ratio tolerance is 5%. Gallery scale, fit modes, and monitor
+behavior need interactive verification on Windows 11 with real displays.
+Reapplying history outside the active collection changes the desktop directly;
+the running slideshow may replace it at its next change.
 
 ## Phase 5 — Release and Optimization
 
 Goal: measured performance, robust error recovery, and repeatable releases.
 
 - [ ] **Benchmarks**: measure idle CPU and background RAM with the window
-      hidden and with it open; record method and results in `docs/`
+  hidden and with it open; record method and results in `docs/`
 - [ ] **Optimization**: fix whatever the measurements show exceeds the targets
 - [ ] **Test coverage**: fill gaps in core unit tests; add integration tests
-      for CLI commands
+  for CLI commands
 - [ ] **Error recovery**: missing or offline folders, deleted images, corrupt
-      images, corrupt config, Windows API failures; the slideshow skips bad
-      items and keeps running
+  images, corrupt config, Windows API failures; the slideshow skips bad
+  items and keeps running
 - [ ] **Packaging (D4)**: per-user NSIS installer through the Tauri bundler
-      and a portable ZIP; neither needs administrator rights
+  and a portable ZIP; neither needs administrator rights
 - [ ] **CI**: GitHub Actions on Windows for `fmt`, `clippy`, `test`, frontend
-      lint and type-check, and build
+  lint and type-check, and build
 - [ ] **Release workflow**: tag-triggered build that produces release
-      artifacts; changelog; version bump process
+  artifacts; changelog; version bump process
 - [ ] **Docs**: README with installation, usage, and screenshots
 
 Done when: performance targets are measured and met (or the gap is documented),
@@ -208,13 +227,13 @@ artifacts.
 Planned after the first release; order may change based on feedback.
 
 - [ ] **Wallpaper profiles**: named sets of folders and settings with quick
-      switching from the UI and tray
+  switching from the UI and tray
 - [ ] **Image editor**: crop, resize, blur, and dim applied to a generated copy
-      in the cache; never modify original files
+  in the cache; never modify original files
 - [ ] **Global hotkeys**: configurable shortcuts for next, previous, and pause
-      with conflict detection
+  with conflict detection
 - [ ] **Import / export**: back up and restore configuration and profiles as
-      JSON, with validation on import
+  JSON, with validation on import
 
 ## Cross-Cutting Requirements
 

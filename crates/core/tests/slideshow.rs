@@ -27,6 +27,17 @@ fn history_replays_before_advancing_queue() {
 }
 
 #[test]
+fn choosing_image_updates_history_and_skips_it_in_current_queue() {
+    let mut show = Slideshow::new(vec!["a".into(), "b".into(), "c".into()], false).unwrap();
+    assert_eq!(show.next(), PathBuf::from("a"));
+    show.select(PathBuf::from("c")).unwrap();
+    assert_eq!(show.current().unwrap(), PathBuf::from("c"));
+    assert_eq!(show.previous().unwrap(), PathBuf::from("a"));
+    assert_eq!(show.next(), PathBuf::from("c"));
+    assert_eq!(show.next(), PathBuf::from("b"));
+}
+
+#[test]
 fn scheduler_pauses_resumes_and_handles_elapsed_deadline() {
     let now = Instant::now();
     let mut timer = Scheduler::new(Duration::from_secs(60), now);

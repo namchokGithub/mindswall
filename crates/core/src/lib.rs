@@ -1,9 +1,11 @@
 pub mod config;
+pub mod history;
 pub mod ipc;
 pub mod scanner;
 pub mod scheduler;
 pub mod service;
 pub mod slideshow;
+pub mod utilities;
 pub mod wallpaper;
 use std::path::PathBuf;
 use thiserror::Error;

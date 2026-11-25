@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Command {
     Next,
@@ -9,6 +9,7 @@ pub enum Command {
     Resume,
     Status,
     Reload,
+    Set(std::path::PathBuf),
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Response {

@@ -2,6 +2,7 @@ use mindswall_core::{
     config::Config,
     ipc::{self, Command},
     scanner,
+    wallpaper::{SystemWallpaper, WallpaperSetter},
 };
 use std::{
     path::PathBuf,
@@ -21,6 +22,125 @@ use tauri_plugin_autostart::ManagerExt;
 struct ServiceState {
     starting: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
+}
+
+#[derive(Default)]
+struct GalleryState(Mutex<Vec<PathBuf>>);
+
+#[derive(serde::Serialize)]
+struct GalleryPage {
+    paths: Vec<PathBuf>,
+    total: usize,
+}
+
+#[tauri::command]
+fn gallery_images(
+    state: tauri::State<'_, GalleryState>,
+    offset: usize,
+) -> Result<GalleryPage, String> {
+    let mut images = state.0.lock().map_err(|e| e.to_string())?;
+    if offset == 0 {
+        *images = get_config()?.images().map_err(|e| e.to_string())?;
+    }
+    Ok(GalleryPage {
+        total: images.len(),
+        paths: images.iter().skip(offset).take(48).cloned().collect(),
+    })
+}
+
+#[tauri::command]
+fn gallery_thumbnail(
+    state: tauri::State<'_, GalleryState>,
+    path: PathBuf,
+) -> Result<Vec<u8>, String> {
+    if !state.0.lock().map_err(|e| e.to_string())?.contains(&path) {
+        return Err("Image is not in the current collection".into());
+    }
+    let cache = directories::ProjectDirs::from("", "", "MindsWall")
+        .ok_or("Cache directory unavailable")?
+        .cache_dir()
+        .join("thumbnails");
+    let thumb = mindswall_core::utilities::thumbnail(&path, &cache).map_err(|e| e.to_string())?;
+    std::fs::read(thumb).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn apply_image(state: tauri::State<'_, GalleryState>, path: PathBuf) -> Result<(), String> {
+    if !state.0.lock().map_err(|e| e.to_string())?.contains(&path) {
+        return Err("Image is not in the current collection".into());
+    }
+    if ipc::send(Command::Status).is_ok() {
+        let result = ipc::send(Command::Set(path.clone())).map_err(|e| e.to_string())?;
+        return if result.ok {
+            Ok(())
+        } else {
+            Err(result.message)
+        };
+    }
+    SystemWallpaper
+        .set_wallpaper(&path)
+        .map_err(|e| e.to_string())?;
+    mindswall_core::history::History::record(&path, None)
+        .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
+}
+
+#[tauri::command]
+fn get_history() -> Result<Vec<mindswall_core::history::HistoryEntry>, String> {
+    mindswall_core::history::History::load(
+        &mindswall_core::history::History::default_path().map_err(|e| e.to_string())?,
+    )
+    .map(|h| h.entries)
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn reapply_history(path: PathBuf, monitor: Option<String>) -> Result<(), String> {
+    let history = mindswall_core::history::History::load(
+        &mindswall_core::history::History::default_path().map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    if !history
+        .entries
+        .iter()
+        .any(|entry| entry.path == path && entry.monitor == monitor)
+    {
+        return Err("Image is not in the wallpaper history".into());
+    }
+    if monitor.is_none()
+        && get_config()?
+            .images()
+            .map_err(|e| e.to_string())?
+            .contains(&path)
+        && ipc::send(Command::Status).is_ok()
+    {
+        let response = ipc::send(Command::Set(path.clone())).map_err(|e| e.to_string())?;
+        return if response.ok {
+            Ok(())
+        } else {
+            Err(response.message)
+        };
+    }
+    if let Some(id) = &monitor {
+        mindswall_core::wallpaper::set_monitor_wallpaper(id, &path)?;
+    } else {
+        SystemWallpaper
+            .set_wallpaper(&path)
+            .map_err(|e| e.to_string())?;
+    }
+    mindswall_core::history::History::record(&path, monitor)
+        .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
+}
+
+#[tauri::command]
+fn monitors() -> Result<Vec<mindswall_core::wallpaper::MonitorInfo>, String> {
+    mindswall_core::wallpaper::list_monitors()
+}
+
+#[tauri::command]
+fn set_monitor_image(monitor: String, path: PathBuf) -> Result<(), String> {
+    mindswall_core::wallpaper::set_monitor_wallpaper(&monitor, &path)?;
+    mindswall_core::history::History::record(&path, Some(monitor))
+        .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
 }
 
 #[tauri::command]
@@ -147,6 +267,7 @@ pub fn run() {
                 .build(),
         )
         .manage(ServiceState::default())
+        .manage(GalleryState::default())
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
@@ -156,7 +277,14 @@ pub fn run() {
             service_error,
             current_preview,
             get_autostart,
-            set_autostart
+            set_autostart,
+            gallery_images,
+            gallery_thumbnail,
+            apply_image,
+            get_history,
+            reapply_history,
+            monitors,
+            set_monitor_image
         ])
         .setup(|app| {
             let open = MenuItem::with_id(app, "open", "Open MindsWall", true, None::<&str>)?;

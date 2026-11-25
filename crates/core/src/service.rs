@@ -6,9 +6,18 @@ use crate::{
     wallpaper::{SystemWallpaper, WallpaperSetter},
 };
 use std::{
+    path::Path,
     sync::mpsc,
     time::{Duration, Instant},
 };
+
+fn apply(path: &Path) -> Result<(), crate::Error> {
+    SystemWallpaper.set_wallpaper(path)?;
+    if let Err(error) = crate::history::History::record(path, None) {
+        tracing::warn!(%error, "could not record wallpaper history");
+    }
+    Ok(())
+}
 
 pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
     let dirs = directories::ProjectDirs::from("", "", "MindsWall")
@@ -29,7 +38,7 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
         format!("cannot start slideshow control listener (another instance may be running): {e}")
     })?;
     let mut timer = Scheduler::new(Duration::from_secs(config.interval_seconds), Instant::now());
-    SystemWallpaper.set_wallpaper(show.next())?;
+    apply(show.next())?;
     println!("Slideshow running. Press Ctrl+C to stop.");
     loop {
         let event = match timer.wait(Instant::now()) {
@@ -68,9 +77,7 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                             config.shuffle,
                         )
                         .map_err(|e| e.to_string())?;
-                        SystemWallpaper
-                            .set_wallpaper(candidate.next())
-                            .map_err(|e| e.to_string())?;
+                        apply(candidate.next()).map_err(|e| e.to_string())?;
                         show = candidate;
                         let paused = timer.is_paused();
                         timer = Scheduler::new(Duration::from_secs(config.interval_seconds), now);
@@ -79,11 +86,21 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok("settings reloaded".into())
                     })(),
+                    Control::Set(path) => {
+                        let mut candidate = show.clone();
+                        match candidate.select(path.clone()).and_then(|()| apply(&path)) {
+                            Ok(()) => {
+                                show = candidate;
+                                timer.reset(now);
+                                Ok(path.display().to_string())
+                            }
+                            Err(error) => Err(error.to_string()),
+                        }
+                    }
                     Control::Next => {
                         let mut candidate = show.clone();
                         let path = candidate.next();
-                        let result = SystemWallpaper
-                            .set_wallpaper(path)
+                        let result = apply(path)
                             .map(|()| path.display().to_string())
                             .map_err(|e| e.to_string());
                         if result.is_ok() {
@@ -96,8 +113,7 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                         let mut candidate = show.clone();
                         match candidate.previous() {
                             Some(path) => {
-                                let result = SystemWallpaper
-                                    .set_wallpaper(path)
+                                let result = apply(path)
                                     .map(|()| path.display().to_string())
                                     .map_err(|e| e.to_string());
                                 if result.is_ok() {
@@ -121,7 +137,7 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let mut candidate = show.clone();
-                match SystemWallpaper.set_wallpaper(candidate.next()) {
+                match apply(candidate.next()) {
                     Ok(()) => show = candidate,
                     Err(error) => tracing::warn!(%error, "wallpaper update failed"),
                 };

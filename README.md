@@ -85,6 +85,17 @@ startup option. The app and the CLI use the same local configuration and control
 pipe. Desktop interactions and startup behavior still require interactive
 Windows verification.
 
+The desktop **Gallery** loads images in pages and keeps local thumbnails. You
+can set or exclude an image, and restore exclusions in **Settings**. Settings
+also contains fit, resolution, orientation, and aspect-ratio filters. **History**
+keeps the most recent 100 applied images locally, and **Monitors** lists
+connected displays and can apply an image to one display. A running slideshow
+can replace a per-monitor selection at its next change.
+
+These utilities remain in development. Folder watching and per-monitor slideshow
+sources are not yet implemented. Multi-monitor behavior and the gallery with a
+large collection still need interactive Windows verification.
+
 ดูขอบเขตฟีเจอร์ สถาปัตยกรรม และแผนการพัฒนาเพิ่มเติมได้ที่ [Requirement](docs/requirements/requirement.md)
 
 ---

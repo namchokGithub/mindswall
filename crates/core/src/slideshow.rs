@@ -63,4 +63,33 @@ impl Slideshow {
     pub fn current(&self) -> Option<&Path> {
         self.cursor.map(|i| self.history[i].as_path())
     }
+    pub fn select(&mut self, path: PathBuf) -> Result<(), Error> {
+        if !self.images.contains(&path) {
+            return Err(Error::InvalidFile(path));
+        }
+        if self.queue.is_empty() {
+            self.queue = self.images.clone();
+            if self.shuffle {
+                self.queue.shuffle(&mut rand::rng());
+            }
+        }
+        if let Some(position) = self
+            .queue
+            .iter()
+            .enumerate()
+            .skip(self.index)
+            .find_map(|(i, image)| (image == &path).then_some(i))
+        {
+            self.queue.remove(position);
+        }
+        if let Some(cursor) = self.cursor {
+            self.history.truncate(cursor + 1);
+        }
+        self.history.push(path);
+        if self.history.len() > 100 {
+            self.history.remove(0);
+        }
+        self.cursor = Some(self.history.len() - 1);
+        Ok(())
+    }
 }

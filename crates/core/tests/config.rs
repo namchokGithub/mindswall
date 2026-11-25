@@ -24,6 +24,12 @@ fn config_roundtrips_and_invalid_json_falls_back() {
     assert_eq!(Config::load(&path).unwrap(), updated);
     std::fs::write(&path, "not json").unwrap();
     assert_eq!(Config::load(&path).unwrap(), Config::default());
+    std::fs::write(
+        &path,
+        r#"{"version":1,"folders":[],"interval_seconds":600,"shuffle":true}"#,
+    )
+    .unwrap();
+    assert_eq!(Config::load(&path).unwrap(), Config::default());
 }
 
 #[test]

@@ -18,6 +18,12 @@ pub struct Config {
     pub folders: Vec<Folder>,
     pub interval_seconds: u64,
     pub shuffle: bool,
+    #[serde(default)]
+    pub filter: crate::utilities::ImageFilter,
+    #[serde(default)]
+    pub excluded: Vec<PathBuf>,
+    #[serde(default)]
+    pub fit_mode: crate::utilities::FitMode,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -26,6 +32,9 @@ impl Default for Config {
             folders: Vec::new(),
             interval_seconds: 600,
             shuffle: true,
+            filter: Default::default(),
+            excluded: Vec::new(),
+            fit_mode: Default::default(),
         }
     }
 }
@@ -73,6 +82,16 @@ impl Config {
         for folder in self.folders.iter().filter(|f| f.enabled) {
             for image in scanner::scan(std::slice::from_ref(&folder.path), folder.recursive)? {
                 let identity = fs::canonicalize(&image).unwrap_or_else(|_| image.clone());
+                if self.excluded.contains(&image) {
+                    continue;
+                }
+                let filtered = self.filter != Default::default();
+                if filtered
+                    && !crate::utilities::dimensions(&image)
+                        .is_ok_and(|(w, h)| crate::utilities::matches_filter(w, h, &self.filter))
+                {
+                    continue;
+                }
                 if seen.insert(identity) {
                     images.push(image);
                 }
