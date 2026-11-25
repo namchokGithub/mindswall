@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, ArrowRight, Check, ChevronRight, FolderOpen, History, Image, LayoutGrid, Monitor, Pause, Play, Plus, RefreshCw, Settings, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronRight, FolderOpen, History, Image, LayoutGrid, Monitor, Pause, Play, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
+import logo from "./assets/mindswall.png";
 import { Gallery, HistoryPage, MonitorsPage, type UtilityConfig } from "./Utilities";
 import "./style.css";
 
@@ -84,7 +85,7 @@ function App() {
     { id: "overview", label: "Overview", icon: LayoutGrid }, { id: "folders", label: "Folders", icon: FolderOpen }, { id: "gallery", label: "Gallery", icon: Image }, { id: "monitors", label: "Monitors", icon: Monitor }, { id: "history", label: "History", icon: History }, { id: "settings", label: "Settings", icon: Settings },
   ];
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><span className="brand-icon"><Sparkles size={17}/></span><div><strong>MindsWall</strong><small>YOUR DESKTOP, CURATED</small></div></div>
+    <aside className="sidebar"><div className="brand"><img className="brand-logo" src={logo} alt=""/><div><strong>MindsWall</strong><small>YOUR DESKTOP, CURATED</small></div></div>
       <div className="nav-caption">WORKSPACE</div><nav aria-label="Main navigation">{nav.map(({ id, label, icon: Icon }) => <button key={id} className={page === id ? "nav active" : "nav"} onClick={() => setPage(id)} aria-current={page === id ? "page" : undefined}><Icon size={17}/>{label}{page === id && <ChevronRight size={15} className="nav-arrow"/>}</button>)}</nav>
       <div className="sidebar-bottom"><span className="local-dot"/> LOCAL MODE <small>Made for your space.</small></div>
     </aside>
