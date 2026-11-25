@@ -68,6 +68,23 @@ Press Ctrl+C in the slideshow terminal to stop it. Logs are stored under
 `%APPDATA%\MindsWall\data\mindswall.log`. The slideshow and Windows wallpaper
 integration still need end-to-end testing in an interactive Windows session.
 
+### Desktop app (development)
+
+Install Node.js, Rust, and the Tauri Windows prerequisites (including WebView2
+and the MSVC build tools), then from the project root run:
+
+```powershell
+npm.cmd --prefix ui install
+npm.cmd --prefix ui run tauri dev
+```
+
+Use **Folders** to select image directories, then start the slideshow from
+**Overview**. Closing the window hides it to the system tray; use the tray
+menu to open or quit the app. **Settings** includes the per-user Windows
+startup option. The app and the CLI use the same local configuration and control
+pipe. Desktop interactions and startup behavior still require interactive
+Windows verification.
+
 ดูขอบเขตฟีเจอร์ สถาปัตยกรรม และแผนการพัฒนาเพิ่มเติมได้ที่ [Requirement](docs/requirements/requirement.md)
 
 ---

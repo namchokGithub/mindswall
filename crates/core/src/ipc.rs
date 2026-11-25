@@ -8,6 +8,7 @@ pub enum Command {
     Pause,
     Resume,
     Status,
+    Reload,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Response {

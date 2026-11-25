@@ -12,8 +12,9 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 - The CLI provides `scan`, `set`, and `random` commands using the shared core.
   Scanning supports multiple folders and reports unreadable entries.
 - The slideshow engine, JSON configuration, control commands and Windows named
-  pipe are implemented. Interactive Windows 11 slideshow and wallpaper API
-  verification remains. CI and the desktop UI do not exist yet.
+  pipe are implemented. A Tauri desktop app is under development. Interactive
+  Windows 11 slideshow, desktop and wallpaper API verification remains; CI does
+  not exist yet.
 
 ## Phase Overview
 
@@ -22,7 +23,7 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 | 0     | Rust fundamentals and project skeleton | Foundation        | In progress |
 | 1     | Wallpaper core library and CLI         | P1                | In progress |
 | 2     | Slideshow engine and configuration     | P1                | In progress |
-| 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | Not started |
+| 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | In progress |
 | 4     | Wallpaper utilities                    | P2                | Not started |
 | 5     | Release hardening and distribution     | Quality, release  | Not started |
 | 6     | Extended features                      | P3                | Not started |
@@ -122,20 +123,20 @@ do not advance history; skipping unavailable images is planned for Phase 5.
 Goal: a Tauri 2 + React + TypeScript app that wraps the core, with tray control
 and Windows startup.
 
-- [ ] **Setup**: Tauri 2 project, React + TypeScript (Vite), shadcn/ui; the
+- [~] **Setup**: Tauri 2 project, React + TypeScript (Vite), shadcn/ui; the
       Tauri backend depends on the core crate rather than duplicating logic
-- [ ] **Command layer**: Tauri commands for status, next/previous/pause,
+- [~] **Command layer**: Tauri commands for status, next/previous/pause,
       folder CRUD, and settings; events from core to UI for wallpaper changes
-- [ ] **Overview dashboard**: current wallpaper preview, Previous / Next /
+- [~] **Overview dashboard**: current wallpaper preview, Previous / Next /
       Pause controls, interval, shuffle, include subfolders, prevent repeats
-- [ ] **Folder management**: add via native folder picker, remove, enable or
+- [~] **Folder management**: add via native folder picker, remove, enable or
       disable, recursive toggle, image count per folder, rescan
-- [ ] **Settings page**: general options, start with Windows, log location
-- [ ] **System tray**: icon with Next, Previous, Pause/Resume, Open, Quit;
+- [~] **Settings page**: general options, start with Windows, log location
+- [~] **System tray**: icon with Next, Previous, Pause/Resume, Open, Quit;
       closing the window hides to tray; slideshow keeps running in background
-- [ ] **Start with Windows**: per-user registration (`HKCU\...\Run` or the
+- [~] **Start with Windows**: per-user registration (`HKCU\...\Run` or the
       Tauri autostart plugin) so no administrator rights are needed
-- [ ] **Single instance (D2)**: a second launch focuses the existing window;
+- [~] **Single instance (D2)**: a second launch focuses the existing window;
       the app takes over the named pipe server so CLI control commands work
       while it runs
 - [ ] **Resource check**: destroy or suspend the WebView when hidden so the
@@ -144,6 +145,12 @@ and Windows startup.
 Done when: the app runs from the tray on Windows 11, all P1 controls work from
 both the UI and the tray, settings persist, and startup registration works for
 a standard user.
+
+An initial Tauri/React implementation has overview, folders, settings, tray,
+startup registration and a shared slideshow service. These are not yet
+verified in an interactive desktop session. The UI uses custom controls rather
+than shadcn/ui; resource suspension when hidden, event-driven updates, and
+handoff from a running CLI instance remain open.
 
 ## Phase 4 — Wallpaper Utilities
 

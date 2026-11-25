@@ -26,3 +26,8 @@ rustc-ice-*.txt
 
 .vscode
 example.wallpaper
+
+# Frontend
+ui/node_modules/
+ui/dist/
+src-tauri/gen/
