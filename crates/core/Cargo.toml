@@ -1,0 +1,8 @@
+[package]
+name = "mindswall-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+walkdir = "2.5.1"

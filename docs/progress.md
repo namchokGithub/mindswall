@@ -9,23 +9,23 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 
 ## Current State (2026-11-25)
 
-- `src/main.rs` scans a hard-coded folder recursively with `walkdir` and prints
-  JPG, JPEG, PNG, and BMP paths. Unreadable entries are silently skipped.
-- `Cargo.toml` declares `clap`, `rand`, `thiserror`, and `walkdir`; only
-  `walkdir` is used so far.
-- No tests, configuration, wallpaper switching, CI, or desktop UI exist yet.
+- The workspace contains `mindswall-core` and the `mindswall` CLI. The CLI
+  scans a hard-coded folder using the core scanner and prints image paths.
+  Unreadable entries are silently skipped.
+- The core uses `walkdir` and has a scanner integration test. Configuration,
+  wallpaper switching, CI, and the desktop UI do not exist yet.
 
 ## Phase Overview
 
-| Phase | Goal                                    | Priority coverage | Status      |
-| ----- | --------------------------------------- | ----------------- | ----------- |
-| 0     | Rust fundamentals and project skeleton  | Foundation        | In progress |
-| 1     | Wallpaper core library and CLI          | P1                | Not started |
-| 2     | Slideshow engine and configuration      | P1                | Not started |
-| 3     | Tauri desktop app and system tray       | P1, P2 (startup)  | Not started |
-| 4     | Wallpaper utilities                     | P2                | Not started |
-| 5     | Release hardening and distribution      | Quality, release  | Not started |
-| 6     | Extended features                       | P3                | Not started |
+| Phase | Goal                                   | Priority coverage | Status      |
+| ----- | -------------------------------------- | ----------------- | ----------- |
+| 0     | Rust fundamentals and project skeleton | Foundation        | In progress |
+| 1     | Wallpaper core library and CLI         | P1                | Not started |
+| 2     | Slideshow engine and configuration     | P1                | Not started |
+| 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | Not started |
+| 4     | Wallpaper utilities                    | P2                | Not started |
+| 5     | Release hardening and distribution     | Quality, release  | Not started |
+| 6     | Extended features                      | P3                | Not started |
 
 Each phase builds on the previous one. Phases 1 and 2 keep all logic in a
 GUI-independent Rust core so the CLI and the desktop app share the same code.
@@ -40,13 +40,14 @@ repository so later phases do not require a large restructure.
 - [ ] Learn structs, enums, and traits
 - [ ] Learn `Result`, `Option`, and error handling with `thiserror`
 - [ ] Learn modules, crates, and filesystem APIs
-- [ ] Convert the repository to the Cargo workspace from D1, with
+- [x] Convert the repository to the Cargo workspace from D1, with
       `crates/core` and `crates/cli`
-- [ ] Move the scanner from `main.rs` into a `scanner` module in
+- [x] Move the scanner from `main.rs` into a `scanner` module in
       `mindswall-core`
 
 Done when: `cargo check`, `cargo fmt --check`, and `cargo clippy` pass for the
 whole workspace, and the scanner lives in its own module in the core crate.
+The workspace checks pass; the learning items remain for the developer to complete.
 
 ## Phase 1 — Wallpaper Core
 
@@ -214,11 +215,11 @@ These apply to every phase:
 
 ## Performance Targets
 
-| Metric                   | Target         | Status       |
-| ------------------------ | -------------- | ------------ |
-| Idle CPU                 | < 0.1% average | Not measured |
-| Background core RAM      | < 30 MB        | Not measured |
-| Network usage            | 0              | Not measured |
+| Metric              | Target         | Status       |
+| ------------------- | -------------- | ------------ |
+| Idle CPU            | < 0.1% average | Not measured |
+| Background core RAM | < 30 MB        | Not measured |
+| Network usage       | 0              | Not measured |
 
 Targets are reported as achieved only after measurement (Phase 5).
 

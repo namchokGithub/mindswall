@@ -15,8 +15,10 @@ administrator privileges. Keep these goals in mind when making changes.
 
 - `docs/requirements/requirement.md`: feature priorities, planned architecture,
   technology stack, roadmap, and performance targets.
-- `src/main.rs`: current Rust entry point and early recursive image scanner
-  example. Its folder path is currently hard-coded for local experimentation.
+- `crates/cli/src/main.rs`: CLI entry point; the scanner example currently uses
+  a hard-coded folder path for local experimentation.
+- `crates/core/src/scanner.rs`: reusable recursive image scanner.
+- `docs/progress.md`: phase checklist and project decisions.
 - `Cargo.toml` and `Cargo.lock`: Rust package metadata and dependencies.
 - `README.md`: project overview and current development instructions.
 - `LICENSE`: MIT license.
