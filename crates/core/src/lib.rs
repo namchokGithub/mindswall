@@ -1,4 +1,8 @@
+pub mod config;
+pub mod ipc;
 pub mod scanner;
+pub mod scheduler;
+pub mod slideshow;
 pub mod wallpaper;
 use std::path::PathBuf;
 use thiserror::Error;

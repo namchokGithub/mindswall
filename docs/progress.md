@@ -11,8 +11,9 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 
 - The CLI provides `scan`, `set`, and `random` commands using the shared core.
   Scanning supports multiple folders and reports unreadable entries.
-- Windows wallpaper API calls are implemented but require an interactive Windows
-  11 verification. Configuration, CI, and the desktop UI do not exist yet.
+- The slideshow engine, JSON configuration, control commands and Windows named
+  pipe are implemented. Interactive Windows 11 slideshow and wallpaper API
+  verification remains. CI and the desktop UI do not exist yet.
 
 ## Phase Overview
 
@@ -20,7 +21,7 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 | ----- | -------------------------------------- | ----------------- | ----------- |
 | 0     | Rust fundamentals and project skeleton | Foundation        | In progress |
 | 1     | Wallpaper core library and CLI         | P1                | In progress |
-| 2     | Slideshow engine and configuration     | P1                | Not started |
+| 2     | Slideshow engine and configuration     | P1                | In progress |
 | 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | Not started |
 | 4     | Wallpaper utilities                    | P2                | Not started |
 | 5     | Release hardening and distribution     | Quality, release  | Not started |
@@ -83,33 +84,38 @@ The fallback currently retains the existing fit setting rather than forcing Fill
 Goal: a background slideshow that rotates wallpapers on a timer, with a shuffle
 queue that avoids repeats and persisted settings.
 
-- [ ] **Multiple folders**: config holds a list of folders with per-folder
+- [x] **Multiple folders**: config holds a list of folders with per-folder
       enable flag and recursive flag; deduplicate images found through
       overlapping folders
-- [ ] **Shuffle queue**: shuffle the full set, play it through without repeats,
+- [x] **Shuffle queue**: shuffle the full set, play it through without repeats,
       reshuffle when exhausted, and avoid showing the last image of the old
       cycle first in the new one; sequential order when shuffle is off
-- [ ] **History cursor**: keep a short in-memory history so `Previous` returns
+- [~] **History cursor**: keep a short in-memory history so `Previous` returns
       to the actual previous image
-- [ ] **Scheduler**: interval-based timer (for example 1 min to 24 h) that
+- [~] **Scheduler**: interval-based timer (for example 1 min to 24 h) that
       sleeps until the next change instead of polling; supports pause, resume,
       next, and previous; tolerates sleep/resume of the PC
-- [ ] **JSON configuration**: `serde` + `serde_json`; stored in the per-user
+- [x] **JSON configuration**: `serde` + `serde_json`; stored in the per-user
       config directory (for example `%APPDATA%\MindsWall\config.json`); a
       `version` field for future migrations; atomic writes (temp file +
       rename); fall back to defaults with a logged warning on invalid JSON
-- [ ] **`config.example.json`** in the repository root
-- [ ] **Logging**: `tracing` with a file log in the per-user data directory
-- [ ] **Single instance and IPC (D2)**: `run` refuses to start a second
+- [x] **`config.example.json`** in the repository root
+- [~] **Logging**: `tracing` with a file log in the per-user data directory
+- [~] **Single instance and IPC (D2)**: `run` refuses to start a second
       slideshow; it serves control requests over a per-user named pipe
-- [ ] **CLI**: `run` (foreground slideshow), `next`, `previous`, `pause`,
+- [~] **CLI**: `run` (foreground slideshow), `next`, `previous`, `pause`,
       `resume`, `status` (sent to the running instance), `config show`
-- [ ] **Tests**: shuffle no-repeat guarantee, reshuffle boundary, previous/next
+- [x] **Tests**: shuffle no-repeat guarantee, reshuffle boundary, previous/next
       behavior, scheduler logic with an injectable clock, config round-trip and
       invalid-file handling
 
 Done when: a slideshow runs for multiple cycles with no repeat inside a cycle,
 settings survive restarts, and unit tests cover shuffle, scheduler, and config.
+
+The engine and control pipe have automated tests. Full slideshow behavior,
+including multiple cycles, pause/resume and wallpaper changes, needs an
+interactive Windows 11 verification. Failed wallpaper changes are logged and
+do not advance history; skipping unavailable images is planned for Phase 5.
 
 ## Phase 3 — Desktop App
 
