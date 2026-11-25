@@ -4,7 +4,7 @@
 
 ## สถานะโปรเจกต์
 
-โปรเจกต์อยู่ระหว่างเริ่มต้นพัฒนา ปัจจุบันมีตัวอย่างโค้ด Rust สำหรับค้นหาไฟล์ภาพในโฟลเดอร์และโฟลเดอร์ย่อย โดยกำหนด path ไว้ใน `crates/cli/src/main.rs` ฟีเจอร์ด้านล่างเป็นเป้าหมายในการพัฒนา ยังไม่ใช่ความสามารถที่พร้อมใช้งานทั้งหมด
+The project is in early development. The Rust CLI can scan folders and set or randomly select a wallpaper on Windows. The desktop interface and slideshow are planned.
 
 ## ฟีเจอร์ที่วางแผนไว้
 
@@ -23,13 +23,20 @@
 
 ## เริ่มต้นพัฒนา
 
-ติดตั้ง Rust และ Cargo จากนั้นแก้ path ของโฟลเดอร์ภาพใน `crates/cli/src/main.rs` แล้วรัน:
+Install Rust and Cargo, then run the CLI from the repository root:
 
 ```powershell
-cargo run
+cargo run -p mindswall-cli -- scan "C:\Pictures"
+cargo run -p mindswall-cli -- scan --no-recursive "C:\Pictures" "D:\Wallpapers"
+cargo run -p mindswall-cli -- set "C:\Pictures\wallpaper.jpg"
+cargo run -p mindswall-cli -- random "C:\Pictures"
 ```
 
-ตัวอย่างปัจจุบันจะแสดง path ของไฟล์ JPG, JPEG, PNG และ BMP ที่พบในโฟลเดอร์และโฟลเดอร์ย่อย
+Scanning includes subfolders by default; use `--no-recursive` to restrict it to
+the supplied folders or `--recursive` to make the default explicit. Supported
+extensions are JPG, JPEG, PNG, and BMP. Errors are reported to stderr. Wallpaper
+commands require Windows. The Windows fallback uses the existing fit setting if
+the desktop wallpaper API is unavailable.
 
 ดูขอบเขตฟีเจอร์ สถาปัตยกรรม และแผนการพัฒนาเพิ่มเติมได้ที่ [Requirement](docs/requirements/requirement.md)
 

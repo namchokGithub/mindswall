@@ -9,18 +9,17 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 
 ## Current State (2026-11-25)
 
-- The workspace contains `mindswall-core` and the `mindswall` CLI. The CLI
-  scans a hard-coded folder using the core scanner and prints image paths.
-  Unreadable entries are silently skipped.
-- The core uses `walkdir` and has a scanner integration test. Configuration,
-  wallpaper switching, CI, and the desktop UI do not exist yet.
+- The CLI provides `scan`, `set`, and `random` commands using the shared core.
+  Scanning supports multiple folders and reports unreadable entries.
+- Windows wallpaper API calls are implemented but require an interactive Windows
+  11 verification. Configuration, CI, and the desktop UI do not exist yet.
 
 ## Phase Overview
 
 | Phase | Goal                                   | Priority coverage | Status      |
 | ----- | -------------------------------------- | ----------------- | ----------- |
 | 0     | Rust fundamentals and project skeleton | Foundation        | In progress |
-| 1     | Wallpaper core library and CLI         | P1                | Not started |
+| 1     | Wallpaper core library and CLI         | P1                | In progress |
 | 2     | Slideshow engine and configuration     | P1                | Not started |
 | 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | Not started |
 | 4     | Wallpaper utilities                    | P2                | Not started |
@@ -54,26 +53,30 @@ The workspace checks pass; the learning items remain for the developer to comple
 Goal: a reusable core that can find images and set one as the desktop
 wallpaper, driven from a CLI.
 
-- [ ] **Scanner**: scan multiple roots, optionally recursive; match
+- [x] **Scanner**: scan multiple roots, optionally recursive; match
       `jpg`/`jpeg`/`png`/`bmp` case-insensitively; keep `PathBuf`s without
       assuming valid Unicode; report unreadable entries instead of dropping
       them silently
-- [ ] **Wallpaper service**: define a platform-neutral `WallpaperSetter` trait
+- [~] **Wallpaper service**: define a platform-neutral `WallpaperSetter` trait
       in `wallpaper/mod.rs`; implement it for Windows in `wallpaper/windows.rs`
       using the `windows` crate (`IDesktopWallpaper`, with
       `SystemParametersInfoW` as a fallback); validate the file exists before
       calling the API
-- [ ] **Random pick**: choose one random image from the scan result with `rand`
-- [ ] **Error model**: one `thiserror` error enum for scan, config, and Windows
+- [x] **Random pick**: choose one random image from the scan result with `rand`
+- [~] **Error model**: one `thiserror` error enum for scan, config, and Windows
       API failures, with paths included in messages
-- [ ] **CLI (`clap`)**: `scan <folder>...`, `set <file>`, `random <folder>...`,
+- [~] **CLI (`clap`)**: `scan <folder>...`, `set <file>`, `random <folder>...`,
       and `--recursive` / `--no-recursive`
-- [ ] **Tests**: scanner tests using temporary directories (extensions, case,
+- [x] **Tests**: scanner tests using temporary directories (extensions, case,
       nesting, non-image files, missing folder)
 
 Done when: on Windows 11, `mindswall random <folder>` changes the wallpaper
 without administrator rights, scanner tests pass, and the README documents the
 CLI.
+
+Implementation is in progress: CLI and scanner tests exist, but actual wallpaper
+changes and the fallback path still need interactive Windows 11 verification.
+The fallback currently retains the existing fit setting rather than forcing Fill.
 
 ## Phase 2 — Slideshow Engine
 

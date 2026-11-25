@@ -9,4 +9,5 @@ name = "mindswall"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.6.10", features = ["derive"] }
 mindswall-core = { path = "../core" }

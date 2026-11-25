@@ -15,8 +15,7 @@ administrator privileges. Keep these goals in mind when making changes.
 
 - `docs/requirements/requirement.md`: feature priorities, planned architecture,
   technology stack, roadmap, and performance targets.
-- `crates/cli/src/main.rs`: CLI entry point; the scanner example currently uses
-  a hard-coded folder path for local experimentation.
+- `crates/cli/src/main.rs`: CLI entry point for scanning and setting wallpapers.
 - `crates/core/src/scanner.rs`: reusable recursive image scanner.
 - `docs/progress.md`: phase checklist and project decisions.
 - `Cargo.toml` and `Cargo.lock`: Rust package metadata and dependencies.
@@ -46,7 +45,7 @@ not imply that those components or the proposed project structure exist yet.
 Run commands from the repository root with Rust and Cargo installed:
 
 ```powershell
-cargo run          # Run the current scanner example after setting its folder path
+cargo run -p mindswall-cli -- --help  # Show CLI commands
 cargo fmt --check  # Check Rust formatting
 cargo check        # Check compilation
 cargo test         # Run Rust tests
