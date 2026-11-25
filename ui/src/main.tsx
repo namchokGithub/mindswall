@@ -1,15 +1,17 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, ArrowRight, Check, ChevronRight, FolderOpen, History, Image, LayoutGrid, Monitor, Pause, Play, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronRight, FolderOpen, History, Image, LayoutGrid, Layers, Monitor, Paintbrush, Pause, Play, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
 import logo from "./assets/mindswall.png";
 import { Gallery, HistoryPage, MonitorsPage, type UtilityConfig } from "./Utilities";
+import { Editor, HotkeySettings, Profiles } from "./Extended";
 import "./style.css";
 
 type Folder = { path: string; enabled: boolean; recursive: boolean };
-type Config = { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean } & UtilityConfig;
-type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "settings";
+type Config = { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
+type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings";
 
 function App() {
   const [page, setPage] = useState<Page>("overview");
@@ -38,6 +40,12 @@ function App() {
     refreshStatus();
     const timer = window.setInterval(refreshStatus, 3000);
     return () => window.clearInterval(timer);
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined; let active = true;
+    listen("config-changed", () => { invoke<Config>("get_config").then(setConfig).catch(e => setError(String(e))); refreshStatus(); }).then(dispose => { if (active) unlisten = dispose; else dispose(); }).catch(() => {});
+    return () => { active = false; unlisten?.(); };
   }, [refreshStatus]);
 
   useEffect(() => {
@@ -82,7 +90,7 @@ function App() {
   const fileName = imagePath.split(/[\\/]/).pop();
   const running = status === "running";
   const nav: { id: Page; label: string; icon: typeof LayoutGrid }[] = [
-    { id: "overview", label: "Overview", icon: LayoutGrid }, { id: "folders", label: "Folders", icon: FolderOpen }, { id: "gallery", label: "Gallery", icon: Image }, { id: "monitors", label: "Monitors", icon: Monitor }, { id: "history", label: "History", icon: History }, { id: "settings", label: "Settings", icon: Settings },
+    { id: "overview", label: "Overview", icon: LayoutGrid }, { id: "folders", label: "Folders", icon: FolderOpen }, { id: "gallery", label: "Gallery", icon: Image }, { id: "monitors", label: "Monitors", icon: Monitor }, { id: "history", label: "History", icon: History }, { id: "profiles", label: "Profiles", icon: Layers }, { id: "editor", label: "Editor", icon: Paintbrush }, { id: "settings", label: "Settings", icon: Settings },
   ];
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><img className="brand-logo" src={logo} alt=""/><div><strong>MindsWall</strong><small>YOUR DESKTOP, CURATED</small></div></div>
@@ -104,8 +112,11 @@ function App() {
         {page === "gallery" && <Gallery exclude={async path => { await save({ ...config, excluded: [...config.excluded, path] }); }}/>}
         {page === "history" && <HistoryPage/>}
         {page === "monitors" && <MonitorsPage/>}
+        {page === "profiles" && <Profiles config={config} refresh={async () => { setConfig(await invoke<Config>("get_config")); await refreshStatus(); }}/>}
+        {page === "editor" && <Editor/>}
         {page === "settings" && <><div className="section-title"><div><span className="eyebrow">SLIDESHOW</span><h2>Find your rhythm</h2></div></div><div className="panel settings-panel"><div className="setting-row"><div><strong>Change picture every</strong><small>How long each wallpaper stays on your desktop.</small></div><select aria-label="Change picture every" value={config.interval_seconds} disabled={busy} onChange={e => save({ ...config, interval_seconds: Number(e.target.value) })}>{[60,300,600,900,1800,3600,21600,43200,86400].map(n => <option key={n} value={n}>{n >= 3600 ? `${n / 3600} ${n === 3600 ? "hour" : "hours"}` : `${n / 60} ${n === 60 ? "minute" : "minutes"}`}</option>)}</select></div><div className="setting-row"><div><strong>Shuffle wallpapers</strong><small>Enjoy your collection in a different order each time. Images do not repeat within a cycle.</small></div><label className="switch"><input type="checkbox" aria-label="Shuffle wallpapers" checked={config.shuffle} disabled={busy} onChange={e => save({ ...config, shuffle: e.target.checked })}/><span/></label></div><div className="setting-row"><div><strong>Start with Windows</strong><small>Open MindsWall when you sign in to this account.</small></div><label className="switch"><input type="checkbox" aria-label="Start with Windows" checked={autostart} disabled={busy} onChange={async e => { const enabled = e.target.checked; setBusy(true); try { await invoke("set_autostart", { enabled }); setAutostart(enabled); setMessage("Startup preference saved."); } catch (err) { setError(String(err)); } finally { setBusy(false); } }}/><span/></label></div></div><div className="footnote"><span className="local-dot"/> Your settings and images stay on this device.</div></>}
         {page === "settings" && <UtilitySettings config={config} busy={busy} save={save}/>}
+        {page === "settings" && <HotkeySettings hotkeys={config.hotkeys} refresh={async () => { setConfig(await invoke<Config>("get_config")); }}/>}
         </>}
       </div><footer>MINDSWALL <span>•</span> A LITTLE SPACE OF YOUR OWN <span className="footer-version">VERSION 0.1.0</span></footer>
     </main>

@@ -13,6 +13,27 @@ pub struct Folder {
     pub recursive: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProfileSettings {
+    pub folders: Vec<Folder>,
+    pub interval_seconds: u64,
+    pub shuffle: bool,
+    pub filter: crate::utilities::ImageFilter,
+    pub excluded: Vec<PathBuf>,
+    pub fit_mode: crate::utilities::FitMode,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Profile {
+    pub name: String,
+    pub settings: ProfileSettings,
+}
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Hotkeys {
+    pub next: String,
+    pub previous: String,
+    pub pause: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
     pub version: u32,
     pub folders: Vec<Folder>,
@@ -24,6 +45,12 @@ pub struct Config {
     pub excluded: Vec<PathBuf>,
     #[serde(default)]
     pub fit_mode: crate::utilities::FitMode,
+    #[serde(default)]
+    pub profiles: Vec<Profile>,
+    #[serde(default)]
+    pub active_profile: Option<String>,
+    #[serde(default)]
+    pub hotkeys: Hotkeys,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -35,10 +62,128 @@ impl Default for Config {
             filter: Default::default(),
             excluded: Vec::new(),
             fit_mode: Default::default(),
+            profiles: Vec::new(),
+            active_profile: None,
+            hotkeys: Hotkeys::default(),
         }
     }
 }
 impl Config {
+    pub fn validate(&self) -> io::Result<()> {
+        let mut shortcuts = std::collections::HashSet::new();
+        for key in [
+            &self.hotkeys.next,
+            &self.hotkeys.previous,
+            &self.hotkeys.pause,
+        ] {
+            if key.len() > 80
+                || (!key.trim().is_empty() && !shortcuts.insert(key.trim().to_lowercase()))
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid or duplicate hotkey",
+                ));
+            }
+        }
+        if self.version != 1
+            || !(60..=86400).contains(&self.interval_seconds)
+            || self.profiles.len() > 100
+            || self.folders.len() > 1000
+            || self.excluded.len() > 100000
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid configuration version, interval, or collection size",
+            ));
+        }
+        let mut names = std::collections::HashSet::new();
+        for profile in &self.profiles {
+            let name = profile.name.trim();
+            if name.is_empty()
+                || name.len() > 80
+                || !names.insert(name.to_lowercase())
+                || !(60..=86400).contains(&profile.settings.interval_seconds)
+                || profile.settings.folders.len() > 1000
+                || profile.settings.excluded.len() > 100000
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid or duplicate profile",
+                ));
+            }
+        }
+        if self
+            .active_profile
+            .as_ref()
+            .is_some_and(|name| !self.profiles.iter().any(|p| &p.name == name))
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Active profile does not exist",
+            ));
+        }
+        Ok(())
+    }
+    pub fn parse_backup(bytes: &[u8]) -> io::Result<Self> {
+        if bytes.len() > 16 * 1024 * 1024 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Backup is too large",
+            ));
+        }
+        let config: Self = serde_json::from_slice(bytes).map_err(io::Error::other)?;
+        config.validate()?;
+        Ok(config)
+    }
+    pub fn save_profile(&mut self, name: &str) -> io::Result<()> {
+        let name = name.trim();
+        if name.is_empty() || name.len() > 80 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Profile name must contain 1–80 characters",
+            ));
+        }
+        if self
+            .profiles
+            .iter()
+            .any(|p| p.name.eq_ignore_ascii_case(name))
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "Profile name already exists",
+            ));
+        }
+        let profile = Profile {
+            name: name.to_owned(),
+            settings: ProfileSettings {
+                folders: self.folders.clone(),
+                interval_seconds: self.interval_seconds,
+                shuffle: self.shuffle,
+                filter: self.filter.clone(),
+                excluded: self.excluded.clone(),
+                fit_mode: self.fit_mode,
+            },
+        };
+        self.profiles.push(profile);
+        self.active_profile = Some(name.to_owned());
+        self.validate()
+    }
+    pub fn apply_profile(&mut self, name: &str) -> io::Result<()> {
+        let profile = self
+            .profiles
+            .iter()
+            .find(|p| p.name == name)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Profile not found"))?
+            .clone();
+        self.folders = profile.settings.folders;
+        self.interval_seconds = profile.settings.interval_seconds;
+        self.shuffle = profile.settings.shuffle;
+        self.filter = profile.settings.filter;
+        self.excluded = profile.settings.excluded;
+        self.fit_mode = profile.settings.fit_mode;
+        self.active_profile = Some(profile.name);
+        Ok(())
+    }
     pub fn default_path() -> io::Result<PathBuf> {
         directories::ProjectDirs::from("", "", "MindsWall")
             .map(|d| d.config_dir().join("config.json"))
@@ -52,12 +197,8 @@ impl Config {
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Self::default()),
             Err(e) => return Err(e),
         };
-        match serde_json::from_slice::<Self>(&contents) {
-            Ok(config)
-                if config.version == 1 && (60..=86400).contains(&config.interval_seconds) =>
-            {
-                Ok(config)
-            }
+        match Self::parse_backup(&contents) {
+            Ok(config) => Ok(config),
             _ => {
                 tracing::warn!(path = ?path, "invalid configuration; using defaults");
                 Ok(Self::default())
@@ -65,6 +206,7 @@ impl Config {
         }
     }
     pub fn save(&self, path: &Path) -> io::Result<()> {
+        self.validate()?;
         let parent = path.parent().ok_or_else(|| {
             io::Error::new(io::ErrorKind::InvalidInput, "configuration has no parent")
         })?;

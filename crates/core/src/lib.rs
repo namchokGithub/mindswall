@@ -1,4 +1,5 @@
 pub mod config;
+pub mod editor;
 pub mod history;
 pub mod ipc;
 pub mod scanner;

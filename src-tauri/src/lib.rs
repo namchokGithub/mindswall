@@ -12,16 +12,155 @@ use std::{
     },
 };
 use tauri::{
-    Manager,
-    menu::{Menu, MenuItem},
+    Emitter, Manager,
+    menu::{Menu, MenuBuilder, SubmenuBuilder},
     tray::TrayIconBuilder,
 };
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+#[derive(Default)]
+struct HotkeyState {
+    registered: Mutex<std::collections::HashMap<u32, (Shortcut, &'static str)>>,
+    error: Mutex<Option<String>>,
+}
+
+fn configure_hotkeys(
+    app: &tauri::AppHandle,
+    hotkeys: &mindswall_core::config::Hotkeys,
+    persist: bool,
+) -> Result<(), String> {
+    let next = parse_hotkeys(hotkeys)?;
+    let state = app.state::<HotkeyState>();
+    let mut current = state.registered.lock().map_err(|e| e.to_string())?;
+    let mut added = Vec::new();
+    for (id, (shortcut, _)) in &next {
+        if !current.contains_key(id) {
+            if let Err(error) = app.global_shortcut().register(*shortcut) {
+                for item in added {
+                    let _ = app.global_shortcut().unregister(item);
+                }
+                return Err(format!(
+                    "Shortcut is unavailable or already in use: {error}"
+                ));
+            }
+            added.push(*shortcut);
+        }
+    }
+    if persist {
+        let result = (|| {
+            let mut config = get_config()?;
+            config.hotkeys = hotkeys.clone();
+            config
+                .save(&Config::default_path().map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())
+        })();
+        if let Err(error) = result {
+            for item in added {
+                let _ = app.global_shortcut().unregister(item);
+            }
+            return Err(error);
+        }
+    }
+    for (id, (shortcut, _)) in current.iter() {
+        if !next.contains_key(id) {
+            let _ = app.global_shortcut().unregister(*shortcut);
+        }
+    }
+    *current = next;
+    if let Ok(mut error) = state.error.lock() {
+        *error = None;
+    }
+    Ok(())
+}
+
+fn parse_hotkeys(
+    hotkeys: &mindswall_core::config::Hotkeys,
+) -> Result<std::collections::HashMap<u32, (Shortcut, &'static str)>, String> {
+    let mut next = std::collections::HashMap::new();
+    for (value, action) in [
+        (&hotkeys.next, "next"),
+        (&hotkeys.previous, "previous"),
+        (&hotkeys.pause, "pause"),
+    ] {
+        if value.trim().is_empty() {
+            continue;
+        }
+        let shortcut: Shortcut = value
+            .trim()
+            .parse()
+            .map_err(|e| format!("Invalid shortcut {value}: {e}"))?;
+        if next.insert(shortcut.id(), (shortcut, action)).is_some() {
+            return Err("Shortcuts must be different".into());
+        }
+    }
+    Ok(next)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn rejects_invalid_and_equivalent_shortcuts() {
+        let mut hotkeys = mindswall_core::config::Hotkeys {
+            next: "Ctrl+Alt+Right".into(),
+            previous: "Alt+Control+ArrowRight".into(),
+            pause: String::new(),
+        };
+        assert!(parse_hotkeys(&hotkeys).is_err());
+        hotkeys.previous = "invalid shortcut".into();
+        assert!(parse_hotkeys(&hotkeys).is_err());
+        hotkeys.previous = "Ctrl+Alt+Left".into();
+        assert_eq!(parse_hotkeys(&hotkeys).unwrap().len(), 2);
+    }
+}
+
+#[tauri::command]
+fn hotkey_error(state: tauri::State<'_, HotkeyState>) -> Option<String> {
+    state.error.lock().ok().and_then(|e| e.clone())
+}
+
+#[tauri::command]
+async fn set_hotkeys(
+    app: tauri::AppHandle,
+    hotkeys: mindswall_core::config::Hotkeys,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || configure_hotkeys(&app, &hotkeys, true))
+        .await
+        .map_err(|e| e.to_string())?
+}
 
 #[derive(Default)]
 struct ServiceState {
     starting: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
+}
+
+fn tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let mut builder = MenuBuilder::new(app)
+        .text("open", "Open MindsWall")
+        .text("previous", "Previous")
+        .text("next", "Next")
+        .text("pause", "Pause")
+        .text("resume", "Resume");
+    if let Ok(config) = get_config()
+        && !config.profiles.is_empty()
+    {
+        let mut submenu = SubmenuBuilder::new(app, "Profiles");
+        for (index, profile) in config.profiles.iter().enumerate() {
+            submenu = submenu.text(format!("profile_{index}"), &profile.name);
+        }
+        builder = builder.item(&submenu.build()?);
+    }
+    builder.text("quit", "Quit").build()
+}
+
+fn refresh_tray(app: &tauri::AppHandle) {
+    if let Some(tray) = app.tray_by_id("main")
+        && let Ok(menu) = tray_menu(app)
+    {
+        let _ = tray.set_menu(Some(menu));
+    }
 }
 
 #[derive(Default)]
@@ -31,6 +170,133 @@ struct GalleryState(Mutex<Vec<PathBuf>>);
 struct GalleryPage {
     paths: Vec<PathBuf>,
     total: usize,
+}
+
+#[tauri::command]
+fn save_profile(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    let mut config = get_config()?;
+    config.save_profile(&name).map_err(|e| e.to_string())?;
+    config
+        .save(&Config::default_path().map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    refresh_tray(&app);
+    Ok("Profile saved.".into())
+}
+
+#[tauri::command]
+fn apply_profile(name: String) -> Result<String, String> {
+    let mut config = get_config()?;
+    config.apply_profile(&name).map_err(|e| e.to_string())?;
+    save_config(config)
+}
+
+#[tauri::command]
+fn delete_profile(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    let mut config = get_config()?;
+    config.profiles.retain(|profile| profile.name != name);
+    if config.active_profile.as_deref() == Some(&name) {
+        config.active_profile = None;
+    }
+    config
+        .save(&Config::default_path().map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    refresh_tray(&app);
+    Ok("Profile removed.".into())
+}
+
+#[tauri::command]
+fn export_backup(path: PathBuf) -> Result<(), String> {
+    get_config()?.save(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn import_backup(app: tauri::AppHandle, path: PathBuf) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || import_backup_inner(app, path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn import_backup_inner(app: tauri::AppHandle, path: PathBuf) -> Result<String, String> {
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > 16 * 1024 * 1024 {
+        return Err("Backup is too large".into());
+    }
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let config = Config::parse_backup(&bytes).map_err(|e| format!("Invalid backup: {e}"))?;
+    let previous = get_config()?;
+    let destination = Config::default_path().map_err(|e| e.to_string())?;
+    configure_hotkeys(&app, &config.hotkeys, false)?;
+    if let Err(error) = config.save(&destination) {
+        let _ = configure_hotkeys(&app, &previous.hotkeys, false);
+        return Err(error.to_string());
+    }
+    refresh_tray(&app);
+    if ipc::send(Command::Status).is_ok() {
+        let response = ipc::send(Command::Reload)
+            .map_err(|e| format!("Backup imported, but slideshow reload failed: {e}"))?;
+        if !response.ok {
+            return Err(format!(
+                "Backup imported, but slideshow reload failed: {}",
+                response.message
+            ));
+        }
+    }
+    Ok("Backup imported.".into())
+}
+
+#[derive(serde::Serialize)]
+struct EditedImage {
+    path: PathBuf,
+    preview: Vec<u8>,
+}
+
+fn edited_cache() -> Result<PathBuf, String> {
+    directories::ProjectDirs::from("", "", "MindsWall")
+        .map(|d| d.cache_dir().join("edits"))
+        .ok_or_else(|| "Cache directory unavailable".into())
+}
+
+#[tauri::command]
+async fn edit_image(
+    path: PathBuf,
+    options: mindswall_core::editor::EditOptions,
+) -> Result<EditedImage, String> {
+    tauri::async_runtime::spawn_blocking(move || edit_image_inner(path, options))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn edit_image_inner(
+    path: PathBuf,
+    options: mindswall_core::editor::EditOptions,
+) -> Result<EditedImage, String> {
+    let output = mindswall_core::editor::render(&path, &edited_cache()?, &options)
+        .map_err(|e| e.to_string())?;
+    let image = image::open(&output)
+        .map_err(|e| e.to_string())?
+        .thumbnail(800, 500);
+    let mut preview = std::io::Cursor::new(Vec::new());
+    image
+        .write_to(&mut preview, image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+    Ok(EditedImage {
+        path: output,
+        preview: preview.into_inner(),
+    })
+}
+
+#[tauri::command]
+fn apply_edited(path: PathBuf) -> Result<(), String> {
+    let cache = std::fs::canonicalize(edited_cache()?).map_err(|e| e.to_string())?;
+    let source = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
+    if !source.starts_with(cache) || source.extension().is_none_or(|e| e != "png") {
+        return Err("Image must be an edited copy".into());
+    }
+    SystemWallpaper
+        .set_wallpaper(&source)
+        .map_err(|e| e.to_string())?;
+    mindswall_core::history::History::record(&source, None)
+        .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
 }
 
 #[tauri::command]
@@ -150,9 +416,7 @@ fn get_config() -> Result<Config, String> {
 
 #[tauri::command]
 fn save_config(config: Config) -> Result<String, String> {
-    if config.version != 1 || !(60..=86400).contains(&config.interval_seconds) {
-        return Err("Choose an interval between 60 seconds and 24 hours.".into());
-    }
+    config.validate().map_err(|e| e.to_string())?;
     config
         .save(&Config::default_path().map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
@@ -262,12 +526,44 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+                    let action = app
+                        .state::<HotkeyState>()
+                        .registered
+                        .try_lock()
+                        .ok()
+                        .and_then(|keys| keys.get(&shortcut.id()).map(|(_, action)| *action));
+                    if let Some(action) = action {
+                        std::thread::spawn(move || {
+                            let command = match action {
+                                "next" => Command::Next,
+                                "previous" => Command::Previous,
+                                "pause" => match ipc::send(Command::Status) {
+                                    Ok(status) if status.message.starts_with("paused:") => {
+                                        Command::Resume
+                                    }
+                                    _ => Command::Pause,
+                                },
+                                _ => return,
+                            };
+                            let _ = ipc::send(command);
+                        });
+                    }
+                })
+                .build(),
+        )
+        .plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("MindsWall")
                 .build(),
         )
         .manage(ServiceState::default())
         .manage(GalleryState::default())
+        .manage(HotkeyState::default())
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
@@ -284,17 +580,20 @@ pub fn run() {
             get_history,
             reapply_history,
             monitors,
-            set_monitor_image
+            set_monitor_image,
+            save_profile,
+            apply_profile,
+            delete_profile,
+            export_backup,
+            import_backup,
+            edit_image,
+            apply_edited,
+            set_hotkeys,
+            hotkey_error
         ])
         .setup(|app| {
-            let open = MenuItem::with_id(app, "open", "Open MindsWall", true, None::<&str>)?;
-            let previous = MenuItem::with_id(app, "previous", "Previous", true, None::<&str>)?;
-            let next = MenuItem::with_id(app, "next", "Next", true, None::<&str>)?;
-            let pause = MenuItem::with_id(app, "pause", "Pause", true, None::<&str>)?;
-            let resume = MenuItem::with_id(app, "resume", "Resume", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &previous, &next, &pause, &resume, &quit])?;
-            let mut tray = TrayIconBuilder::new()
+            let menu = tray_menu(app.handle())?;
+            let mut tray = TrayIconBuilder::with_id("main")
                 .menu(&menu)
                 .tooltip("MindsWall")
                 .on_menu_event(|app, event| match event.id().as_ref() {
@@ -306,6 +605,24 @@ pub fn run() {
                     }
                     "quit" => app.exit(0),
                     action => {
+                        if let Some(index) = action
+                            .strip_prefix("profile_")
+                            .and_then(|value| value.parse::<usize>().ok())
+                        {
+                            let handle = app.clone();
+                            std::thread::spawn(move || {
+                                if let Ok(config) = get_config()
+                                    && let Some(profile) = config.profiles.get(index)
+                                {
+                                    if let Err(error) = apply_profile(profile.name.clone()) {
+                                        eprintln!("Could not apply profile: {error}");
+                                    }
+                                    refresh_tray(&handle);
+                                    let _ = handle.emit("config-changed", ());
+                                }
+                            });
+                            return;
+                        }
                         let command = match action {
                             "next" => Some(Command::Next),
                             "previous" => Some(Command::Previous),
@@ -324,6 +641,15 @@ pub fn run() {
                 tray = tray.icon(icon.clone());
             }
             tray.build(app)?;
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if let Ok(config) = get_config()
+                    && let Err(error) = configure_hotkeys(&handle, &config.hotkeys, false)
+                    && let Ok(mut slot) = handle.state::<HotkeyState>().error.lock()
+                {
+                    *slot = Some(format!("Could not register shortcuts: {error}"));
+                }
+            });
             if get_config().is_ok_and(|config| config.folders.iter().any(|folder| folder.enabled)) {
                 let _ = start_service(app.state());
             }

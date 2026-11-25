@@ -10,7 +10,7 @@ and make the current slideshow state easy to understand at a glance.
   for the primary action, focus indicators, and active navigation.
 - Use the MindsWall mascot from `src/images/` for the app identity and icons.
 - Organize the application into Overview, Folders, Gallery, Monitors, History,
-  and Settings. Show loading,
+  Profiles, Editor, and Settings. Show loading,
   empty, error, and saved states explicitly; do not present planned features as
   working controls.
 - Support keyboard navigation, visible focus, accessible labels, and reduced motion.

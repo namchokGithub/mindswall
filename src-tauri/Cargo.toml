@@ -25,3 +25,5 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 mindswall-core = { path = "../crates/core" }
 directories = "6"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "bmp"] }
+tauri-plugin-global-shortcut = "2.4.1"

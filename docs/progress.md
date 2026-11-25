@@ -26,7 +26,7 @@ Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
 | 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | In progress |
 | 4     | Wallpaper utilities                    | P2                | In progress |
 | 5     | Release hardening and distribution     | Quality, release  | Not started |
-| 6     | Extended features                      | P3                | Not started |
+| 6     | Extended features                      | P3                | In progress |
 
 Each phase builds on the previous one. Phases 1 and 2 keep all logic in a
 GUI-independent Rust core so the CLI and the desktop app share the same code.
@@ -224,16 +224,21 @@ artifacts.
 
 ## Phase 6 — Extended Features (P3)
 
-Planned after the first release; order may change based on feedback.
+Development started before release at the user's request.
 
-- [ ] **Wallpaper profiles**: named sets of folders and settings with quick
+- [~] **Wallpaper profiles**: named sets of folders and settings with quick
   switching from the UI and tray
-- [ ] **Image editor**: crop, resize, blur, and dim applied to a generated copy
+- [~] **Image editor**: crop, resize, blur, and dim applied to a generated copy
   in the cache; never modify original files
-- [ ] **Global hotkeys**: configurable shortcuts for next, previous, and pause
+- [~] **Global hotkeys**: configurable shortcuts for next, previous, and pause
   with conflict detection
-- [ ] **Import / export**: back up and restore configuration and profiles as
+- [~] **Import / export**: back up and restore configuration and profiles as
   JSON, with validation on import
+
+The GUI and core implementation are in place, but interactive Windows testing
+of profile switching, tray, hotkey conflicts, image editing, and backup dialogs
+is still required. Edited images are applied from the local cache; a running
+slideshow may replace one on its next change. No release work is included.
 
 ## Cross-Cutting Requirements
 
