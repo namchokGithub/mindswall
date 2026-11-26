@@ -17,18 +17,30 @@ Completed items move from the phase checklists to the
   pipe are implemented. A Tauri desktop app is under development with the
   Phase 4 utilities (gallery, filters, fit modes, history, monitors) and the
   Phase 6 extended features (profiles, editor, hotkeys, import/export).
-- Interactive Windows 11 slideshow, desktop and wallpaper API verification
-  remains; CI does not exist yet.
+- The [Windows 11 manual checklist](testing/windows-11-checklist.md) records
+  passing checks for core CLI, slideshow, desktop, utilities, and hotkeys at
+  commit `2bf16d4`. Some checks remain incomplete or need clarification;
+  CI does not exist yet.
 
 ## Remaining Work (2026-11-26)
 
 ### Gaps
 
-- **Windows 11 verification**: most features are implemented but stay `[~]`
-  until they are checked in an interactive Windows 11 session.
+- **Windows 11 verification**: checked items in the manual checklist are
+  recorded as passed. The environment summary says administrator and one
+  1920×1080 monitor at 100% scaling, while checked items include standard-user
+  startup and multi-monitor scenarios; clarify which account and monitor setup
+  were used for those checks. Fallback, offline operation, the 5,000-image
+  gallery check, and other unchecked cases remain open.
+- **Performance notes**: the checklist reports 9–10 MB RAM without a process or
+  open/hidden breakdown, so it does not establish the performance target.
+- **Logging discrepancy**: the checklist marks wallpaper-change logging as
+  passed, but the current slideshow service logs failures and does not log
+  successful changes. Confirm the observed log and address any gap.
 - **Not implemented**:
   - WebView is not released or suspended when the window is hidden (RAM).
-  - No event-driven updates from the core to the UI.
+  - No event-driven wallpaper updates from the core to the UI; profile changes
+    do emit a configuration event.
   - No named pipe handoff from a running CLI instance to the app.
   - No folder watcher.
   - No per-monitor slideshow folders.
@@ -43,22 +55,23 @@ Completed items move from the phase checklists to the
 
 ### Next steps (in order)
 
-1. Verify P1 to P3 on Windows 11 with the
+1. Complete and clarify the outstanding Windows 11 checks in the
    [manual test checklist](testing/windows-11-checklist.md).
 2. Set up CI on Windows.
 3. Make the slideshow skip broken or missing images and keep running.
 4. Finish the remaining Phase 3 work.
 5. Implement the folder watcher.
 6. Measure performance, then optimize.
-7. Packaging and release.
+7. Packaging and release when the user decides to proceed with release work.
 
-Hold new P3 features until P1 and P2 pass Windows verification.
+Phase 6 development began before release at the user's request. Continue to
+track its untested features alongside the remaining P1 and P2 work.
 
 ## Phase Overview
 
 | Phase | Goal                                   | Priority coverage | Status      |
 | ----- | -------------------------------------- | ----------------- | ----------- |
-| 0     | Rust fundamentals and project skeleton | Foundation        | In progress |
+| 0     | Rust fundamentals and project skeleton | Foundation        | Complete    |
 | 1     | Wallpaper core library and CLI         | P1                | In progress |
 | 2     | Slideshow engine and configuration     | P1                | In progress |
 | 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | In progress |
@@ -74,14 +87,11 @@ GUI-independent Rust core so the CLI and the desktop app share the same code.
 Goal: be comfortable with the Rust concepts the core needs, and shape the
 repository so later phases do not require a large restructure.
 
-- [x] Learn ownership, borrowing, and references
-- [x] Learn structs, enums, and traits
-- [x] Learn `Result`, `Option`, and error handling with `thiserror`
-- [x] Learn modules, crates, and filesystem APIs
-
 Done when: `cargo check`, `cargo fmt --check`, and `cargo clippy` pass for the
 whole workspace, and the scanner lives in its own module in the core crate.
-The workspace checks pass; the learning items remain for the developer to complete.
+The learning items were marked complete, the scanner is in the core crate, and
+workspace `cargo check`, `cargo fmt --all --check`, and `cargo clippy` passed
+on 2026-11-26.
 
 ## Phase 1 — Wallpaper Core
 
@@ -95,40 +105,33 @@ wallpaper, driven from a CLI.
   calling the API
 - [~] **Error model**: one `thiserror` error enum for scan, config, and Windows
   API failures, with paths included in messages
-- [~] **CLI (`clap`)**: `scan <folder>...`, `set <file>`, `random <folder>...`,
-  and `--recursive` / `--no-recursive`
 
 Done when: on Windows 11, `mindswall random <folder>` changes the wallpaper
 without administrator rights, scanner tests pass, and the README documents the
 CLI.
 
-Implementation is in progress: CLI and scanner tests exist, but actual wallpaper
-changes and the fallback path still need interactive Windows 11 verification.
-The fallback currently retains the existing fit setting rather than forcing Fill.
+The checklist records passing CLI and wallpaper-change checks, including the
+corrupt-image case. Its environment summary lists an administrator account;
+clarify the account used when documenting the standard-user requirement. The
+fallback checks are unchecked and may be marked skipped with a reason if the
+COM failure cannot be triggered. The fallback currently retains the existing fit
+setting rather than forcing Fill; the D3 decision remains open.
 
 ## Phase 2 — Slideshow Engine
 
 Goal: a background slideshow that rotates wallpapers on a timer, with a shuffle
 queue that avoids repeats and persisted settings.
 
-- [~] **History cursor**: keep a short in-memory history so `Previous` returns
-  to the actual previous image
-- [~] **Scheduler**: interval-based timer (for example 1 min to 24 h) that
-  sleeps until the next change instead of polling; supports pause, resume,
-  next, and previous; tolerates sleep/resume of the PC
 - [~] **Logging**: `tracing` with a file log in the per-user data directory
-- [~] **Single instance and IPC (D2)**: `run` refuses to start a second
-  slideshow; it serves control requests over a per-user named pipe
-- [~] **CLI**: `run` (foreground slideshow), `next`, `previous`, `pause`,
-  `resume`, `status` (sent to the running instance), `config show`
 
 Done when: a slideshow runs for multiple cycles with no repeat inside a cycle,
 settings survive restarts, and unit tests cover shuffle, scheduler, and config.
 
-The engine and control pipe have automated tests. Full slideshow behavior,
-including multiple cycles, pause/resume and wallpaper changes, needs an
-interactive Windows 11 verification. Failed wallpaper changes are logged and
-do not advance history; skipping unavailable images is planned for Phase 5.
+The checklist records passing interactive checks for slideshow cycles, timing,
+sleep/resume, history navigation, and control commands. Missing-image and
+disconnected-folder cases remain unchecked. Failed wallpaper changes are logged
+and do not advance history; skipping unavailable images is planned for Phase 5.
+Phase 2 remains in progress while the logging discrepancy above is resolved.
 
 ## Phase 3 — Desktop App
 
@@ -144,10 +147,6 @@ and Windows startup.
 - [~] **Folder management**: add via native folder picker, remove, enable or
   disable, recursive toggle, image count per folder, rescan
 - [~] **Settings page**: general options, start with Windows, log location
-- [~] **System tray**: icon with Next, Previous, Pause/Resume, Open, Quit;
-  closing the window hides to tray; slideshow keeps running in background
-- [~] **Start with Windows**: per-user registration (`HKCU\...\Run` or the
-  Tauri autostart plugin) so no administrator rights are needed
 - [~] **Single instance (D2)**: a second launch focuses the existing window;
   the app takes over the named pipe server so CLI control commands work
   while it runs
@@ -159,11 +158,13 @@ Done when: the app runs from the tray on Windows 11, all P1 controls work from
 both the UI and the tray, settings persist, and startup registration works for
 a standard user.
 
-An initial Tauri/React implementation has overview, folders, settings, tray,
-startup registration and a shared slideshow service. These are not yet
-verified in an interactive desktop session. The UI uses custom controls rather
-than shadcn/ui; resource suspension when hidden, event-driven updates, and
-handoff from a running CLI instance remain open.
+The checklist records passing desktop, tray, CLI control, and startup checks,
+including the checked standard-user startup scenario. Clarify the account used
+because the environment summary lists administrator. The UI uses custom controls
+rather than shadcn/ui; resource suspension when hidden, event-driven updates,
+and handoff from a running CLI instance remain open.
+The checked folder-management and overview actions passed; a dedicated rescan
+control and the remaining settings and overview requirements still need review.
 
 ## Phase 4 — Wallpaper Utilities
 
@@ -172,7 +173,6 @@ Goal: complete the P2 feature set.
 - [~] **Multi-monitor**: enumerate monitors via `IDesktopWallpaper`; same image
   on all monitors or a separate image (and optionally separate folders) per
   monitor; handle monitors being connected or disconnected; Monitors page
-- [~] **Fit mode (D3)**: Fill, Fit, Stretch, Center, Tile, and Span setting
 - [~] **Image gallery**: grid of discovered images with cached, downscaled
   thumbnails (`image` crate, stored in the local cache directory); lazy
   loading or virtualized list for large libraries; set-as-wallpaper and
@@ -182,12 +182,6 @@ Goal: complete the P2 feature set.
       shuffle queue on add/remove/rename without a full rescan; skip images
       still being written
 
-- [~] **Resolution / aspect ratio filtering**: read image dimensions from
-  headers only; filter by minimum resolution and orientation or aspect
-  ratio tolerance; cache dimensions to avoid re-reading files
-- [~] **Wallpaper history**: persisted, size-limited list of shown images with
-  timestamps and monitor; History page with re-apply action; handle files
-  that no longer exist
 - [~] **Tests**: filter rules, history limits, watcher event-to-queue mapping
 
 Done when: each P2 feature works on Windows 11 (multi-monitor verified on a
@@ -197,8 +191,9 @@ folder (for example 5,000+ images).
 The GUI now includes paged thumbnails, manual per-monitor images, filters, fit
 modes, and local history. Automatic folder watching, per-monitor slideshow
 folders, automatic display-change handling, and watcher tests remain open.
-The fixed aspect ratio tolerance is 5%. Gallery scale, fit modes, and monitor
-behavior need interactive verification on Windows 11 with real displays.
+The fixed aspect ratio tolerance is 5%. Gallery scale remains untested. The
+checklist marks multi-monitor, mixed-scaling, and Span checks as passed; clarify
+the setup used because the environment summary lists one monitor.
 Reapplying history outside the active collection changes the desktop directly;
 the running slideshow may replace it at its next change.
 
@@ -234,14 +229,12 @@ Development started before release at the user's request.
   switching from the UI and tray
 - [~] **Image editor**: crop, resize, blur, and dim applied to a generated copy
   in the cache; never modify original files
-- [~] **Global hotkeys**: configurable shortcuts for next, previous, and pause
-  with conflict detection
 - [~] **Import / export**: back up and restore configuration and profiles as
   JSON, with validation on import
 
-The GUI and core implementation are in place, but interactive Windows testing
-of profile switching, tray, hotkey conflicts, image editing, and backup dialogs
-is still required. Edited images are applied from the local cache; a running
+The checklist records passing global hotkey checks, including conflicts and
+restart. Interactive testing of profiles, image editing, and backup dialogs is
+still required. Edited images are applied from the local cache; a running
 slideshow may replace one on its next change. No release work is included.
 
 ## Cross-Cutting Requirements
@@ -339,7 +332,13 @@ mindswall/
 ## Completed Log
 
 Items moved here from the phase checklists once done. Dates are taken from the
-commit that delivered them.
+commit that delivered them, except for learning items without a recorded date.
+
+### Learning items — date not recorded
+
+- **Phase 0**: Ownership, borrowing, references, structs, enums, traits,
+  `Result`, `Option`, error handling, modules, crates, and filesystem APIs were
+  marked complete.
 
 ### 2026-11-25
 
@@ -356,6 +355,9 @@ commit that delivered them.
   `rand` (`af68080`).
 - **Phase 1 — Tests**: scanner tests using temporary directories (extensions,
   case, nesting, non-image files, missing folder) (`af68080`).
+- **Phase 1 — CLI (`clap`)**: scan, set, random, recursive options, error cases,
+  and non-ASCII paths were marked passed in the `2bf16d4` manual checklist
+  (`af68080`).
 - **Phase 2 — Multiple folders**: config holds a list of folders with
   per-folder enable and recursive flags; images found through overlapping
   folders are deduplicated (`36a4142`).
@@ -371,3 +373,17 @@ commit that delivered them.
 - **Phase 2 — Tests**: shuffle no-repeat guarantee, reshuffle boundary,
   previous/next behavior, scheduler logic with an injectable clock, config
   round-trip and invalid-file handling (`36a4142`).
+- **Phase 2 — History cursor and scheduler**: previous/next navigation,
+  pause/resume, interval timing, and sleep/resume; manual checks recorded for
+  `2bf16d4` (`36a4142`).
+- **Phase 2 — Single instance, IPC, and CLI controls**: standalone slideshow
+  control and second-instance checks recorded for `2bf16d4` (`36a4142`).
+- **Phase 4 — Resolution and aspect-ratio filtering**: resolution, orientation,
+  5% aspect-ratio tolerance, and empty-result checks recorded for `2bf16d4`
+  (`7fdc651`).
+- **Phase 3 — System tray and startup**: tray controls, hide, quit, and startup
+  scenarios were marked passed in the `2bf16d4` manual checklist (`5e82fdb`).
+- **Phase 4 — Fit modes and wallpaper history**: all listed modes and history
+  checks were marked passed in the `2bf16d4` manual checklist (`7fdc651`).
+- **Phase 6 — Global hotkeys**: next, previous, pause/resume, conflict handling,
+  hidden-window behavior, and restart checks recorded for `2bf16d4` (`c0acdf7`).
