@@ -4,6 +4,7 @@ import { FolderOpen, Download, Upload, X } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { useLoadedImage } from "./useLoadedImage";
 import { aspectLabel, isStretched, linkedSide, sharedScale, type Size } from "./editorSize";
+import { Spinner } from "./Spinner";
 import { displayShortcut, shortcutFromKey } from "./shortcutCapture";
 
 type Profile = { name: string };
@@ -100,8 +101,8 @@ export function Editor({ active }: { active: boolean }) {
         const boxHeight = compare ? 220 : 300;
         const box = scale ? { aspectRatio: `${scale.aspect}`, width: `min(100%, ${Math.round(boxHeight * scale.aspect)}px)` } : undefined;
         return <div className={`editor-previews${compare ? " compare" : ""}`}>
-          <figure><div className={`editor-image${scale ? " scaled" : ""}`} style={box}>{original.src ? <img key={original.src} className="loaded-image" src={original.src} style={scale?.images[0]} alt="Preview of the chosen image"/> : <div className="thumbnail-placeholder">{original.failed ? "No preview" : "Loading…"}</div>}{original.loading && original.src && <span className="image-loading" aria-hidden="true"/>}</div><figcaption>Original{size && ` · ${size[0]} × ${size[1]}`}</figcaption></figure>
-          {compare && <figure><div className={`editor-image scaled${busy ? " updating" : ""}`} style={box}><img className="loaded-image" src={preview} style={scale?.images[1]} alt="Preview of the edited image"/>{busy && <span className="image-loading" aria-hidden="true"/>}</div><figcaption>Edited · {editedSize![0]} × {editedSize![1]}</figcaption></figure>}
+          <figure><div className={`editor-image${scale ? " scaled" : ""}`} style={box}>{original.src ? <img key={original.src} className="loaded-image" src={original.src} style={scale?.images[0]} alt="Preview of the chosen image"/> : <div className="thumbnail-placeholder">{original.failed ? "No preview" : <Spinner label="Loading the image"/>}</div>}{original.loading && original.src && <Spinner size="small" tone="light" overlay label="Loading the image"/>}</div><figcaption>Original{size && ` · ${size[0]} × ${size[1]}`}</figcaption></figure>
+          {compare && <figure><div className={`editor-image scaled${busy ? " updating" : ""}`} style={box}><img className="loaded-image" src={preview} style={scale?.images[1]} alt="Preview of the edited image"/>{busy && <Spinner size="small" tone="light" overlay/>}</div><figcaption>Edited · {editedSize![0]} × {editedSize![1]}</figcaption></figure>}
         </div>;
       })()}
       <fieldset className="editor-controls" disabled={busy} aria-busy={busy}>
@@ -110,7 +111,7 @@ export function Editor({ active }: { active: boolean }) {
       {stretched && <p className="editor-warning" role="status">Stretched: the shape changes from {aspectLabel(base!)} to {aspectLabel(target!)}.</p>}
       <label className="inline-check"><input type="checkbox" checked={crop} onChange={e => setCrop(e.target.checked)}/> Crop image before resizing</label>{crop && <div className="editor-fields">{[["Left (px)", x, setX], ["Top (px)", y, setY], ["Crop width", cropWidth, setCropWidth], ["Crop height", cropHeight, setCropHeight]].map(([label, value, setter]) => <label key={label as string}>{label as string}<input type="number" min="0" value={value as string} onChange={e => (setter as (s: string) => void)(e.target.value)}/></label>)}</div>}
       </fieldset>
-      <div className="profile-create"><button className="primary" disabled={busy} aria-busy={busy} title="Large images may take a moment." onClick={generate}>{busy && <span className="button-spinner" aria-hidden="true"/>}<span role="status">{busy ? "Creating preview…" : "Create preview"}</span></button><button className="secondary" disabled={busy || !edited} onClick={async () => { try { await invoke("apply_edited", { path: edited }); setNotice("Edited image applied to your desktop."); } catch (e) { setError(String(e)); } }}>Set as wallpaper</button></div>
+      <div className="profile-create"><button className="primary" disabled={busy} aria-busy={busy} title="Large images may take a moment." onClick={generate}>{busy && <Spinner size="small" tone="dark"/>}<span role="status">{busy ? "Creating preview…" : "Create preview"}</span></button><button className="secondary" disabled={busy || !edited} onClick={async () => { try { await invoke("apply_edited", { path: edited }); setNotice("Edited image applied to your desktop."); } catch (e) { setError(String(e)); } }}>Set as wallpaper</button></div>
       <small>Edits are written to a local cache; the original is never changed.</small></div></>}
   </>;
 }

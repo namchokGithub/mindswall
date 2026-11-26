@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { monitorLabel, useMonitors, type MonitorPlayback } from "./Monitors";
 import type { UtilityConfig } from "./Utilities";
+import { Spinner } from "./Spinner";
 import { useLoadedImage } from "./useLoadedImage";
 
 /** What the main slideshow shows now. */
@@ -21,7 +22,7 @@ function ScreenCard({ card, open, step, busy }: { card: Card; open: () => void; 
   const { src: preview, loading } = usePreview(card.display || card.current);
   return <div className="preview screen-card">
     {preview && <><div className="screen-card-backdrop" style={{ backgroundImage: `url("${preview}")` }}/><img key={preview} className="screen-card-image loaded-image" src={preview} alt=""/></>}
-    {loading && <span className="image-loading" role="status" aria-label="Loading preview"/>}
+    {loading && <Spinner size="small" tone="light" overlay label="Loading preview"/>}
     <div className="screen-card-shade"/>
     {card.current && <button type="button" className="preview-open" aria-label={`Show image details for ${card.label}`} title="Show image details" onClick={open}/>}
     {step && <div className="screen-card-actions"><button className="icon-button" disabled={busy} aria-label={`Previous wallpaper on ${card.label}`} title="Previous on this monitor" onClick={() => step("previous")}><ArrowLeft size={15}/></button><button className="icon-button" disabled={busy} aria-label={`Next wallpaper on ${card.label}`} title="Next on this monitor" onClick={() => step("next")}><ArrowRight size={15}/></button></div>}

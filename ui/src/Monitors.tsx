@@ -9,6 +9,7 @@ import { Select } from "./Select";
 import { PathCopy } from "./PathCopy";
 import { maskFolderPath } from "./maskPath";
 import { ConfirmDialog, type Confirmation } from "./ConfirmDialog";
+import { LoadingBlock, Spinner } from "./Spinner";
 import type { MonitorFolders, UtilityConfig } from "./Utilities";
 
 export type Monitor = { id: string; name: string | null; x: number; y: number; width: number; height: number; primary: boolean; current: string | null };
@@ -64,7 +65,7 @@ export function MonitorThumb({ monitor }: { monitor: Monitor }) {
   const { src, loading, failed } = useLoadedImage(`${monitor.id}|${monitor.current ?? ""}`, monitor.current
     ? isActive => loadMonitorThumbnail(() => invoke<ArrayBuffer>("monitor_thumbnail", { monitor: monitor.id }), isActive)
     : null, "image/png");
-  return <>{src ? <img key={src} className="loaded-image" src={src} alt=""/> : <div className="thumbnail-placeholder">{failed ? "No preview" : "Loading…"}</div>}{loading && src && <span className="image-loading" role="status" aria-label="Loading preview"/>}</>;
+  return <>{src ? <img key={src} className="loaded-image" src={src} alt=""/> : <div className="thumbnail-placeholder">{failed ? "No preview" : <Spinner size="small" label="Loading preview"/>}</div>}{loading && src && <Spinner size="small" tone="light" overlay label="Loading preview"/>}</>;
 }
 
 /** Monitor arrangement drawn to scale, like Windows display settings. */
@@ -166,7 +167,7 @@ export function MonitorsPage({ config, busy, saveMonitors }: { config: UtilityCo
   const moveTargets = monitors.filter(monitor => foldersOf(monitor.id).length === 0);
 
   return <>{confirm && <ConfirmDialog request={confirm} close={() => setConfirm(null)}/>}<div className="section-title"><div><span className="eyebrow">YOUR SCREENS</span><h2>Connected monitors</h2></div><button className="icon-button" aria-label="Refresh monitors" disabled={loading} onClick={refresh}><RefreshCw size={16}/></button></div>
-    {loading && monitors.length === 0 ? <p role="status">Finding monitors…</p> : error && monitors.length === 0 ? <div className="panel empty"><h3>Could not load monitors.</h3><p>Try refreshing the list.</p><button className="secondary" onClick={refresh}>Try again</button></div> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <>
+    {loading && monitors.length === 0 ? <LoadingBlock label="Finding monitors"/> : error && monitors.length === 0 ? <div className="panel empty"><h3>Could not load monitors.</h3><p>Try refreshing the list.</p><button className="secondary" onClick={refresh}>Try again</button></div> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <>
       <MonitorLayout monitors={monitors} names={config.monitor_names} selected={selected} select={select}/>
       <div className="panel">{monitors.map((monitor, index) => <div className={`history-row monitor-card${selected === monitor.id ? " selected" : ""}`} key={monitor.id} ref={element => { cards.current[monitor.id] = element; }}>
         <div className="history-thumbnail monitor-thumbnail"><MonitorThumb monitor={monitor}/></div>

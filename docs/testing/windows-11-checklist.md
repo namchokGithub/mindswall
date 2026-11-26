@@ -258,6 +258,11 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
       open; the choice persists after restart
 - [ ] In Light, every page is readable (text, buttons, badges, snackbars, the
       Overview preview text over the image, and Monitors tiles)
+- [ ] Every loading state is the same spinning circle, with no "Loading…" text:
+      app start, Gallery (first load and **Load more**), thumbnails, History,
+      Folders image counts, Monitors (finding monitors and thumbnails),
+      Overview cards, image details, the log viewer, and the Editor (image,
+      edited preview, and the **Create preview** button)
 - [ ] The top bar (**YOUR PERSONAL WALLPAPER MANAGER**, profile, **Offline by
       design**) and the footer have the same height on every page, short or
       long (Overview, Gallery with many images, Settings)
