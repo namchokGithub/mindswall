@@ -296,10 +296,8 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
       dates, without opening Gallery first; Escape closes it
 - [ ] With a combined wallpaper, the details list the other images under
       **Shown with**
-- [ ] With a monitor that has its own folders, clicking a monitor on Overview
-      opens the details of that monitor's image (a shared monitor opens the
-      main slideshow's image); the Previous/Next buttons on a monitor still
-      change the image without opening details
+- [ ] Clicking a monitor's card opens the details of that monitor's image;
+      its Previous/Next buttons change the image without opening details
 
 ### Tray
 
@@ -462,16 +460,20 @@ Use a folder with several portrait images (for example 948×2048 and
 - [ ] With a saved monitor disconnected, **Move** its settings to a connected
       monitor without folders: the folders and name move, and that monitor
       starts its own slideshow
-- [ ] With a monitor that has its own folders, Overview labels the large
-      preview **Main slideshow** and draws the monitor arrangement with each
-      monitor's wallpaper; a monitor with its own folders shows its position
-      (for example **3 / 20**), the others show **Main**
-- [ ] Point at a monitor with its own folders on Overview: Previous and Next
-      appear and change only that monitor; other monitors and the countdown to
-      the next change are not affected; Previous at the first image shows an
-      error
-- [ ] Monitors that share the main slideshow show no buttons; with the Span
-      fit mode or a stopped slideshow, no monitor shows buttons
+- [ ] Overview cards (each shows the whole image over a blurred copy, the
+      file name, and its position):
+  - [ ] 1 monitor on the main slideshow: one main card
+  - [ ] 1 monitor with its own folders: only that monitor's card, no main card
+  - [ ] 2 monitors on the main slideshow: one main card
+  - [ ] 2 monitors, one with its own folders: the main card (naming the
+        shared monitor) and that monitor's card side by side
+  - [ ] 2 monitors, both with their own folders: two monitor cards, no main card
+  - [ ] 3 or more cards: three columns, wrapping onto more rows
+- [ ] Point at a monitor's card: Previous and Next appear and change only that
+      monitor; other monitors and the countdown to the next change are not
+      affected; Previous at the first image shows an error
+- [ ] The main card shows no Previous/Next; with the Span fit mode or a
+      stopped slideshow, no card shows them
 - [ ] History names the monitor of each entry, and the filter shows only the
       main slideshow or one monitor
 - [ ] Remove the last folder of a monitor: it returns to the main slideshow

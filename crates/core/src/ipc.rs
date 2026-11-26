@@ -55,6 +55,9 @@ pub struct MonitorPlayback {
     /// Images combined with `current` in the shown wallpaper.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub combined: Vec<std::path::PathBuf>,
+    /// The combined wallpaper file, when `current` is shown with other images.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<std::path::PathBuf>,
 }
 
 #[cfg(windows)]

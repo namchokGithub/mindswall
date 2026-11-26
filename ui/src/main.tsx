@@ -8,7 +8,8 @@ import { Select } from "./Select";
 import { applyTheme, type ThemeSetting } from "./theme";
 import { Gallery, HistoryPage, type UtilityConfig } from "./Utilities";
 import { GalleryPreview } from "./GalleryPreview";
-import { MonitorStrip, MonitorsPage, type MonitorPlayback } from "./Monitors";
+import { MonitorsPage, type MonitorPlayback } from "./Monitors";
+import { ScreenCards } from "./Overview";
 import { Editor, HotkeySettings, Profiles } from "./Extended";
 import { maskUserName } from "./maskPath";
 import { SnackbarProvider, useSnackbar } from "./Snackbar";
@@ -33,7 +34,6 @@ function App() {
   // and the gallery reload without a page change.
   const [collectionVersion, setCollectionVersion] = useState(0);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>({ active: null, changed: false });
-  const [preview, setPreview] = useState("");
   const [imagePath, setImagePath] = useState("");
   // A combined wallpaper: the images shown next to `imagePath` and the file shown.
   const [combined, setCombined] = useState<string[]>([]);
@@ -90,17 +90,6 @@ function App() {
     return () => { active = false; unlisten?.(); };
   }, [refreshStatus, setError]);
 
-  useEffect(() => {
-    const shown = displayPath || imagePath;
-    if (!shown) { setPreview(""); return; }
-    let active = true; let url = "";
-    setPreview("");
-    invoke<ArrayBuffer>("current_preview", { path: shown }).then(bytes => {
-      if (!active) return;
-      url = URL.createObjectURL(new Blob([new Uint8Array(bytes)])); setPreview(url);
-    }).catch(() => { if (active) setPreview(""); });
-    return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [imagePath, displayPath]);
 
   const scanFolders = useCallback(async (folders: Folder[]) => {
     const entries = await Promise.all(folders.map(async f => {
@@ -141,9 +130,7 @@ function App() {
   // The active profile is shown on every page, so reload it after each config change.
   useEffect(() => { if (config) invoke<ProfileStatus>("profile_status").then(setProfileStatus).catch(() => {}); }, [config]);
   useEffect(() => applyTheme(config?.theme ?? "system"), [config?.theme]);
-  const ownMonitors = !!config?.monitor_folders.some(entry => entry.folders.some(folder => folder.enabled));
   function navigatePage(next: Page) { navigate(next); setPage(next); }
-  const fileName = imagePath.split(/[\\/]/).pop();
   const running = status === "running";
   const filtersActive = config && (config.excluded.length > 0 || config.filter.min_width > 0 || config.filter.min_height > 0 || config.filter.orientation !== "any" || config.filter.aspect_ratio !== "any");
   const nav: { id: Page; label: string; icon: typeof LayoutGrid }[] = [
@@ -159,8 +146,7 @@ function App() {
         {!config ? <div className="panel empty">Loading your workspace…</div> : <>
         {page === "overview" && <><div className="section-title"><div><span className="eyebrow">CURRENT WALLPAPER</span><h2>Your desktop, right now</h2></div><span className="subtle">A moment for yourself</span></div>
           {details && <GalleryPreview key={details.path} path={details.path} combined={details.combined} close={() => setDetails(null)}/>}
-          <div className="preview" style={preview ? { backgroundImage: `linear-gradient(0deg, rgba(12,13,25,.85), transparent 58%), url("${preview}")` } : undefined}>{imagePath && <button type="button" className="preview-open" aria-label="Show image details" title="Show image details" onClick={() => setDetails({ path: imagePath, combined })}/>}<div className="preview-content"><div className="preview-tag"><span className="local-dot"/> {!imagePath ? "YOUR NEXT FAVORITE" : ownMonitors ? "MAIN SLIDESHOW" : "NOW SHOWING"}</div><h3>{fileName || "A blank canvas."}{combined.length > 0 && <span className="combined-badge">+{combined.length} {combined.length === 1 ? "image" : "images"}</span>}</h3>{!imagePath && <p>Add a folder to bring your collection to life.</p>}</div><span className="preview-number" aria-label="Image position in slideshow">{imagePosition !== null && imageTotal !== null ? `${imagePosition} / ${imageTotal}` : "— / —"}</span></div>
-          <MonitorStrip config={config} shows={monitorShows} main={{ path: imagePath, combined }} openDetails={(path, combined) => setDetails({ path, combined })} stopped={status === "stopped"} busy={busy} step={stepMonitor}/>
+          <ScreenCards config={config} main={{ current: imagePath, display: displayPath, position: imagePosition, total: imageTotal, combined }} shows={monitorShows} stopped={status === "stopped"} busy={busy} step={stepMonitor} openDetails={(path, combined) => setDetails({ path, combined })}/>
           <div className="footnote overview-collection">{filtersActive && <>Image filters or exclusions are active. <button className="text-link" onClick={() => navigatePage("settings")}>Review settings <ArrowRight size={14}/></button></>}{status !== "stopped" && <button className="text-link" disabled={busy} onClick={() => act("reload")} title="Rescans enabled folders and keeps the current cycle"><RefreshCw size={14}/> Rescan collection</button>}</div>
           <div className="player"><div><strong>Slideshow</strong><small>{status === "stopped" ? "Ready when you are" : `Changing every ${config.interval_seconds / 60} minutes`}</small></div><div className="player-actions"><button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("previous")} aria-label="Previous wallpaper"><ArrowLeft size={17}/></button>{status === "stopped" ? <button className="primary" disabled={busy || !config.folders.some(f => f.enabled)} onClick={() => act("start")}><Play size={16}/> Start slideshow</button> : <button className="primary" disabled={busy} onClick={() => act(running ? "pause" : "resume")}>{running ? <Pause size={16}/> : <Play size={16}/>} {running ? "Pause" : "Resume"}</button>}<button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("next")} aria-label="Next wallpaper"><ArrowRight size={17}/></button></div></div>
           <section className="quick-settings" aria-labelledby="quick-settings-title"><div className="section-title"><div><span className="eyebrow">SLIDESHOW</span><h2 id="quick-settings-title">Quick settings</h2></div></div><div className="panel settings-panel"><div className="setting-row"><div><strong>Change picture every</strong><small>Set the time between wallpapers.</small></div><IntervalSelect value={config.interval_seconds} disabled={busy} onChange={interval_seconds => save({ ...config, interval_seconds })}/></div><div className="setting-row"><div><strong>Fit mode</strong><small>Choose how wallpapers fit your screen.</small></div><FitModeSelect value={config.fit_mode} disabled={busy} onChange={fit_mode => save({ ...config, fit_mode })}/></div></div></section>

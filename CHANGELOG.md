@@ -32,8 +32,10 @@ All notable changes to MindsWall are recorded here. The format follows
 - Light, dark, and system themes, a custom title bar, a fixed sidebar, hidden
   scroll bars, custom dropdowns, and text selection limited to file names and
   paths.
-- Overview draws the display arrangement with each display's wallpaper, and a
-  display with its own folders can go to its next or previous image alone.
+- Overview shows a card for the main slideshow and for each display with its
+  own folders (the whole image over a blurred copy, in up to three columns),
+  and a display with its own folders can go to its next or previous image
+  alone.
 - Selecting the Overview preview or a display opens the image details; the
   preview no longer shows the folder path.
 - Optional combined wallpapers: portrait images are shown side by side on a

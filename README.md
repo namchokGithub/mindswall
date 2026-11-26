@@ -179,13 +179,16 @@ settings** until you choose **Forget**, or **Move** them to a connected display
 that has no folders of its own, for example when a monitor was moved to another
 port and got a new device path. The configuration keys them by the Windows
 monitor device path. Profiles do not include per-monitor folders or names.
-While a display has its own folders, Overview labels the large preview as the
-main slideshow and draws the display arrangement below it with each display's
-current wallpaper and its position in its own cycle. Pointing at a display with
-its own folders shows Previous and Next buttons that change only that display,
-and selecting a display opens the details of its image;
-the shared interval timer is not restarted. Displays that share the main
-slideshow, and every display in the Span fit mode, change only together.
+Overview shows one card for the main slideshow while any connected display
+shares it, and one card for each connected display with its own folders. Each
+card shows the whole image over a blurred copy of it, the file name, and the
+position in its cycle. One card fills the row, two cards share it, and more
+cards use three columns. For example, with one display that has its own
+folders, only that display's card is shown. Pointing at a display's card
+shows Previous and Next buttons that change only that display; the shared
+interval timer is not restarted. Displays that share the main slideshow, and
+every display in the Span fit mode, change only together. Selecting a card
+opens the details of its image.
 Windows may retain unavailable display records, such as displays connected
 earlier or turned off; Monitors skips records whose dimensions cannot be read
 (`0x80004005`) while showing the displays that are available. These skips are

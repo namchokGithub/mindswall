@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowLeft, ArrowRight, ArrowRightLeft, FolderOpen, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowRightLeft, FolderOpen, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
 import { Select } from "./Select";
@@ -10,7 +10,7 @@ import type { MonitorFolders, UtilityConfig } from "./Utilities";
 export type Monitor = { id: string; name: string | null; x: number; y: number; width: number; height: number; primary: boolean; current: string | null };
 export type MonitorName = { monitor: string; name: string };
 /** The slideshow of a connected monitor with its own folders. */
-export type MonitorPlayback = { monitor: string; current: string | null; position: number | null; total: number; combined?: string[] };
+export type MonitorPlayback = { monitor: string; current: string | null; position: number | null; total: number; combined?: string[]; display?: string | null };
 type FolderList = MonitorFolders["folders"];
 
 const loadMonitorThumbnail = createThumbnailQueue(2);
@@ -33,9 +33,6 @@ export function monitorLabel(id: string, monitors: Monitor[], names: MonitorName
   const index = monitors.findIndex(monitor => same(monitor.id, id));
   return index >= 0 ? `Monitor ${index + 1}` : `Monitor ${shortMonitorId(id)}`;
 }
-
-const hasOwnFolders = (config: UtilityConfig, id: string) =>
-  config.monitor_folders.some(entry => same(entry.monitor, id) && entry.folders.some(folder => folder.enabled));
 
 /** Load the connected monitors and reload them after each slideshow change. */
 export function useMonitors(enabled = true) {
@@ -75,48 +72,17 @@ export function MonitorThumb({ monitor }: { monitor: Monitor }) {
   return src ? <img src={src} alt=""/> : <div className="thumbnail-placeholder">{failed ? "No preview" : "Loading…"}</div>;
 }
 
-/** Monitor arrangement drawn to scale, like Windows display settings. With
- * `select`, each monitor is a button; otherwise `actions` adds controls that
- * appear when the pointer or focus is on a monitor. */
-function MonitorLayout({ monitors, names, selected = null, select, detail, actions, open }: { monitors: Monitor[]; names: MonitorName[]; selected?: string | null; select?: (id: string) => void; detail?: (monitor: Monitor) => ReactNode; actions?: (monitor: Monitor) => ReactNode; open?: (monitor: Monitor) => (() => void) | null }) {
+/** Monitor arrangement drawn to scale, like Windows display settings. */
+function MonitorLayout({ monitors, names, selected, select }: { monitors: Monitor[]; names: MonitorName[]; selected: string | null; select: (id: string) => void }) {
   const left = Math.min(...monitors.map(m => m.x)), top = Math.min(...monitors.map(m => m.y));
   const width = Math.max(...monitors.map(m => m.x + m.width)) - left;
   const height = Math.max(...monitors.map(m => m.y + m.height)) - top;
   return <div className="monitor-layout" style={{ aspectRatio: `${width} / ${height}`, width: `min(100%, 560px, ${Math.round(260 * width / height)}px)` }} role="group" aria-label="Monitor arrangement">
-    {monitors.map((monitor, index) => {
-      const style = { left: `${(monitor.x - left) / width * 100}%`, top: `${(monitor.y - top) / height * 100}%`, width: `${monitor.width / width * 100}%`, height: `${monitor.height / height * 100}%` };
-      const label = <span className="monitor-tile-label"><strong>{index + 1}</strong>{monitorLabel(monitor.id, monitors, names)}{detail ? detail(monitor) : monitor.primary && <small>Primary</small>}</span>;
-      return select
-        ? <button key={monitor.id} type="button" className={`monitor-tile${selected === monitor.id ? " selected" : ""}`} aria-pressed={selected === monitor.id} title={monitor.name ?? undefined} onClick={() => select(monitor.id)} style={style}><MonitorThumb monitor={monitor}/>{label}</button>
-        : <div key={monitor.id} className="monitor-tile" title={monitor.name ?? undefined} style={style}><MonitorThumb monitor={monitor}/>{(() => { const show = open?.(monitor); return show && <button type="button" className="monitor-tile-open" aria-label={`Show details of the wallpaper on ${monitorLabel(monitor.id, monitors, names)}`} onClick={show}/>; })()}{actions && <div className="monitor-tile-actions">{actions(monitor)}</div>}{label}</div>;
-    })}
-  </div>;
-}
-
-/** Overview: the wallpaper on each monitor when some monitors run their own
- * slideshow, with Previous and Next for each of those monitors. */
-export function MonitorStrip({ config, shows, main, stopped, busy, step, openDetails }: { config: UtilityConfig; shows: MonitorPlayback[]; main: { path: string; combined: string[] }; stopped: boolean; busy: boolean; step: (monitor: string, action: "next" | "previous") => void; openDetails: (path: string, combined: string[]) => void }) {
-  const active = config.monitor_folders.some(entry => entry.folders.some(folder => folder.enabled));
-  const { monitors } = useMonitors(active);
-  if (!active || monitors.length === 0) return null;
-  // Span stretches one image over every monitor, so single monitors cannot change.
-  const span = config.fit_mode === "span";
-  const showOf = (id: string) => shows.find(show => same(show.monitor, id));
-  return <div className="overview-monitors">
-    <MonitorLayout monitors={monitors} names={config.monitor_names}
-      open={monitor => {
-        // A monitor without its own slideshow shows the main slideshow's image.
-        const show = showOf(monitor.id);
-        const path = show ? show.current : main.path;
-        return path ? () => openDetails(path, show ? show.combined ?? [] : main.combined) : null;
-      }}
-      detail={monitor => { const show = showOf(monitor.id); return <small>{show ? `${show.position ?? "—"} / ${show.total}` : "Main"}</small>; }}
-      actions={monitor => {
-        const label = monitorLabel(monitor.id, monitors, config.monitor_names);
-        if (span || stopped || !showOf(monitor.id)) return null;
-        return <><button className="icon-button" disabled={busy} aria-label={`Previous wallpaper on ${label}`} title="Previous on this monitor" onClick={() => step(monitor.id, "previous")}><ArrowLeft size={15}/></button><button className="icon-button" disabled={busy} aria-label={`Next wallpaper on ${label}`} title="Next on this monitor" onClick={() => step(monitor.id, "next")}><ArrowRight size={15}/></button></>;
-      }}/>
-    <p className="footnote">{span ? "The Span fit mode shows one image across every monitor, so monitors cannot change on their own." : "Select a monitor to see its image details. Point at a monitor with its own folders to change only that monitor; the buttons below change every monitor."}</p>
+    {monitors.map((monitor, index) => <button key={monitor.id} className={`monitor-tile${selected === monitor.id ? " selected" : ""}`} aria-pressed={selected === monitor.id} title={monitor.name ?? undefined} onClick={() => select(monitor.id)}
+      style={{ left: `${(monitor.x - left) / width * 100}%`, top: `${(monitor.y - top) / height * 100}%`, width: `${monitor.width / width * 100}%`, height: `${monitor.height / height * 100}%` }}>
+      <MonitorThumb monitor={monitor}/>
+      <span className="monitor-tile-label"><strong>{index + 1}</strong>{monitorLabel(monitor.id, monitors, names)}{monitor.primary && <small>Primary</small>}</span>
+    </button>)}
   </div>;
 }
 

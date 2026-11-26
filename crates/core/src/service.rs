@@ -84,17 +84,19 @@ fn snapshot(playback: &Playback, collages: &Collages, monitors: &MonitorShows) -
             .filter_map(|monitor| {
                 let show = monitors.show(&monitor)?;
                 let current = show.current().map(Path::to_path_buf);
-                let combined = current
+                let shown = current
                     .as_deref()
-                    .and_then(|current| collages.remembered(&monitor, current))
-                    .map(|shown| shown.combined)
-                    .unwrap_or_default();
+                    .and_then(|current| collages.remembered(&monitor, current));
                 Some(MonitorPlayback {
                     monitor,
                     current,
                     position: show.position(),
                     total: show.total(),
-                    combined,
+                    combined: shown
+                        .as_ref()
+                        .map(|shown| shown.combined.clone())
+                        .unwrap_or_default(),
+                    display: shown.map(|shown| shown.file),
                 })
             })
             .collect(),

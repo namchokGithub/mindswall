@@ -1027,7 +1027,14 @@ async fn current_preview(path: PathBuf) -> Result<tauri::ipc::Response, String> 
 
 fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
     let status = overview_status_inner()?;
-    if status.current.as_ref() != Some(&path) && status.display.as_ref() != Some(&path) {
+    // Overview previews the main slideshow and each monitor with its own folders.
+    let shown = [&status.current, &status.display].into_iter().chain(
+        status
+            .monitors
+            .iter()
+            .flat_map(|show| [&show.current, &show.display]),
+    );
+    if !shown.flatten().any(|image| image == &path) {
         return Err("Wallpaper has changed".into());
     }
     let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;

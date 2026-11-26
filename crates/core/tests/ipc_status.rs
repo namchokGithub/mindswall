@@ -52,6 +52,7 @@ fn per_monitor_commands_and_status_round_trip() {
             position: Some(1),
             total: 2,
             combined: Vec::new(),
+            display: None,
         }],
         ..old
     };
