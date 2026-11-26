@@ -89,6 +89,7 @@ Windows verification.
 Overview shows the current position and total in the active slideshow cycle.
 The total includes enabled subfolders and reflects active filters and exclusions.
 Use **Rescan collection** to pick up file changes; this starts a new cycle.
+Use **Quick settings** on Overview to change the slideshow interval and fit mode.
 
 Feedback appears in a temporary snackbar on the page where the action was made.
 Notifications are cleared when navigating to another page.
