@@ -26,7 +26,7 @@ function Thumbnail({ path, source = "gallery_thumbnail" }: { path: string; sourc
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true; let url = "";
-    loadThumbnail(() => invoke<number[]>(source, { path }), () => active).then(bytes => {
+    loadThumbnail(() => invoke<ArrayBuffer>(source, { path }), () => active).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "image/png" })); setSrc(url);
     }).catch(() => { if (active) setFailed(true); });

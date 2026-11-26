@@ -26,15 +26,30 @@ impl History {
                 io::Error::new(io::ErrorKind::NotFound, "user data directory unavailable")
             })
     }
+    /// Load the history, or an empty one when the file does not exist. An
+    /// invalid file is moved aside to `<name>.invalid-<unix seconds>` so new
+    /// entries can be recorded again.
     pub fn load(path: &Path) -> io::Result<Self> {
-        match fs::read(path) {
-            Ok(bytes) => {
-                let mut history: Self = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+        let bytes = match fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Self::default()),
+            Err(e) => return Err(e),
+        };
+        match serde_json::from_slice::<Self>(&bytes) {
+            Ok(mut history) => {
                 history.entries.truncate(HISTORY_LIMIT);
                 Ok(history)
             }
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(e) => Err(e),
+            Err(error) => {
+                let backup = crate::config::quarantine(path)?;
+                tracing::warn!(
+                    path = ?path,
+                    backup = ?backup,
+                    %error,
+                    "invalid wallpaper history moved aside; starting a new history"
+                );
+                Ok(Self::default())
+            }
         }
     }
     pub fn push(&mut self, entry: HistoryEntry) {

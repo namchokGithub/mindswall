@@ -281,6 +281,35 @@ fn edited_cache() -> Result<PathBuf, String> {
         .ok_or_else(|| "Cache directory unavailable".into())
 }
 
+fn thumbnail_cache() -> Result<PathBuf, String> {
+    directories::ProjectDirs::from("", "", "MindsWall")
+        .map(|d| d.cache_dir().join("thumbnails"))
+        .ok_or_else(|| "Cache directory unavailable".into())
+}
+
+const MAX_EDITS: usize = 20;
+const MAX_EDIT_BYTES: u64 = 1024 * 1024 * 1024;
+const MAX_THUMBNAILS: usize = 20_000;
+const MAX_THUMBNAIL_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Remove old edited copies, keeping any that appear in the wallpaper history
+/// and the names in `also_keep`.
+fn prune_edits(also_keep: &[&std::ffi::OsStr]) -> Result<(), String> {
+    let history = mindswall_core::history::History::load(
+        &mindswall_core::history::History::default_path().map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    let mut keep: std::collections::HashSet<std::ffi::OsString> = history
+        .entries
+        .iter()
+        .filter_map(|entry| entry.path.file_name().map(ToOwned::to_owned))
+        .collect();
+    keep.extend(also_keep.iter().map(|name| (*name).to_owned()));
+    mindswall_core::utilities::prune_cache(&edited_cache()?, MAX_EDITS, MAX_EDIT_BYTES, &keep)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn edit_image(
     path: PathBuf,
@@ -297,6 +326,9 @@ fn edit_image_inner(
 ) -> Result<EditedImage, String> {
     let output = mindswall_core::editor::render(&path, &edited_cache()?, &options)
         .map_err(|e| e.to_string())?;
+    if let Err(error) = prune_edits(&output.file_name().into_iter().collect::<Vec<_>>()) {
+        eprintln!("Could not clean the edited image cache: {error}");
+    }
     let image = image::open(&output)
         .map_err(|e| e.to_string())?
         .thumbnail(800, 500);
@@ -353,9 +385,9 @@ async fn gallery_images(
 async fn gallery_thumbnail(
     state: tauri::State<'_, GalleryState>,
     path: PathBuf,
-) -> Result<Vec<u8>, String> {
+) -> Result<tauri::ipc::Response, String> {
     let state = state.0.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    blocking(move || {
         if !state.lock().map_err(|e| e.to_string())?.contains(&path)
             && !get_config()?.excluded.contains(&path)
         {
@@ -364,21 +396,18 @@ async fn gallery_thumbnail(
         cached_thumbnail(&path)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map(tauri::ipc::Response::new)
 }
 
 fn cached_thumbnail(path: &std::path::Path) -> Result<Vec<u8>, String> {
-    let cache = directories::ProjectDirs::from("", "", "MindsWall")
-        .ok_or("Cache directory unavailable")?
-        .cache_dir()
-        .join("thumbnails");
-    let thumb = mindswall_core::utilities::thumbnail(path, &cache).map_err(|e| e.to_string())?;
+    let thumb = mindswall_core::utilities::thumbnail(path, &thumbnail_cache()?)
+        .map_err(|e| e.to_string())?;
     std::fs::read(thumb).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn history_thumbnail(path: PathBuf) -> Result<Vec<u8>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+async fn history_thumbnail(path: PathBuf) -> Result<tauri::ipc::Response, String> {
+    blocking(move || {
         let history = mindswall_core::history::History::load(
             &mindswall_core::history::History::default_path().map_err(|e| e.to_string())?,
         )
@@ -389,7 +418,7 @@ async fn history_thumbnail(path: PathBuf) -> Result<Vec<u8>, String> {
         cached_thumbnail(&path)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map(tauri::ipc::Response::new)
 }
 
 #[derive(serde::Serialize)]
@@ -691,8 +720,10 @@ fn service_error(state: tauri::State<'_, ServiceState>) -> Option<String> {
 }
 
 #[tauri::command]
-async fn current_preview(path: PathBuf) -> Result<Vec<u8>, String> {
-    blocking(move || current_preview_inner(path)).await
+async fn current_preview(path: PathBuf) -> Result<tauri::ipc::Response, String> {
+    blocking(move || current_preview_inner(path))
+        .await
+        .map(tauri::ipc::Response::new)
 }
 
 fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
@@ -702,12 +733,8 @@ fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
     }
     let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
     if meta.len() > 15 * 1024 * 1024 {
-        let cache = directories::ProjectDirs::from("", "", "MindsWall")
-            .ok_or("Cache directory unavailable")?
-            .cache_dir()
-            .join("thumbnails");
-        let thumbnail =
-            mindswall_core::utilities::thumbnail(&path, &cache).map_err(|e| e.to_string())?;
+        let thumbnail = mindswall_core::utilities::thumbnail(&path, &thumbnail_cache()?)
+            .map_err(|e| e.to_string())?;
         return std::fs::read(thumbnail).map_err(|e| e.to_string());
     }
     std::fs::read(&path).map_err(|e| e.to_string())
@@ -728,14 +755,20 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
+/// Show and focus the main window, and tell the UI it is visible again.
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        let _ = app.emit("window-visible", true);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            show_main_window(app);
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(
@@ -814,12 +847,7 @@ pub fn run() {
                 .menu(&menu)
                 .tooltip("MindsWall")
                 .on_menu_event(|app, event| match event.id().as_ref() {
-                    "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
+                    "open" => show_main_window(app),
                     "quit" => app.exit(0),
                     action => {
                         if let Some(index) = action
@@ -867,6 +895,23 @@ pub fn run() {
                     *slot = Some(format!("Could not register shortcuts: {error}"));
                 }
             });
+            std::thread::spawn(|| {
+                if let Err(error) = prune_edits(&[]) {
+                    eprintln!("Could not clean the edited image cache: {error}");
+                }
+                let result = thumbnail_cache().and_then(|cache| {
+                    mindswall_core::utilities::prune_cache(
+                        &cache,
+                        MAX_THUMBNAILS,
+                        MAX_THUMBNAIL_BYTES,
+                        &Default::default(),
+                    )
+                    .map_err(|e| e.to_string())
+                });
+                if let Err(error) = result {
+                    eprintln!("Could not clean the thumbnail cache: {error}");
+                }
+            });
             if get_config().is_ok_and(|config| config.folders.iter().any(|folder| folder.enabled)) {
                 let state = app.state::<ServiceState>();
                 let (starting, error) = (state.starting.clone(), state.error.clone());
@@ -880,6 +925,7 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
+                let _ = window.emit("window-visible", false);
             }
         })
         .run(tauri::generate_context!())

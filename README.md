@@ -121,6 +121,15 @@ connected displays and can apply an image to one display. A running slideshow
 can replace a per-monitor selection at its next change.
 Windows may retain unavailable display records; Monitors skips records whose
 dimensions cannot be read while showing the displays that are available.
+If the history file is invalid, it is renamed to
+`history.json.invalid-<timestamp>` and a new history starts. Exclusions match
+paths without regard to letter case or `/` and `\` separators.
+
+Local caches are limited: at startup the app keeps at most 20,000 thumbnails
+(512 MB), and the Editor keeps the 20 most recent edited copies (1 GB) plus any
+copy listed in History. Caches are stored under `%LOCALAPPDATA%\MindsWall\cache`.
+While the window is hidden in the tray, the app stops polling the slideshow
+status.
 
 These utilities remain in development. Folder watching and per-monitor slideshow
 sources are not yet implemented. Multi-monitor behavior and the gallery with a

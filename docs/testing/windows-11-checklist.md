@@ -182,6 +182,26 @@ example from the log.
 - [ ] While a large folder is rescanned or settings are saved, the window
       stays responsive (it can be moved and pages can be switched)
 
+### Control pipe, caches, and history
+
+- [ ] Build the CLI and the app with different Rust toolchains (or use a
+      packaged app with a CLI built later): CLI control commands still reach
+      the app
+- [ ] On a machine with two accounts, start the app as user B first, then as
+      user A: user A's CLI reports
+      `the slideshow control pipe is owned by another user` instead of
+      controlling user B's slideshow
+- [ ] Hide the window to the tray for 10 minutes: Task Manager shows no
+      periodic CPU activity from the WebView process
+- [ ] Reopen the window from the tray: status and preview refresh immediately
+- [ ] Create more than 20 Editor previews: only the 20 newest stay in
+      `%LOCALAPPDATA%\MindsWall\cache\edits`, plus any edited copy in History
+- [ ] Write invalid JSON to `history.json`: History shows an empty list, the
+      file is renamed to `history.json.invalid-<timestamp>`, and the next
+      wallpaper change is recorded
+- [ ] Exclude an image, then edit `config.json` so the exclusion uses a
+      different letter case: the image stays excluded
+
 ## 3. Desktop app (Phase 3)
 
 Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).

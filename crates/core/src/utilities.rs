@@ -48,6 +48,35 @@ pub struct ImageFilter {
     pub aspect_ratio: AspectRatio,
 }
 
+/// A comparison key for a path. Windows paths compare case-insensitively and
+/// treat `/` and `\` alike; other platforms compare paths exactly. Unpaired
+/// UTF-16 surrogates are kept, so paths that are not valid Unicode still match.
+#[cfg(windows)]
+pub fn path_key(path: &Path) -> std::ffi::OsString {
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+    let mut key = Vec::new();
+    for unit in char::decode_utf16(path.as_os_str().encode_wide()) {
+        match unit {
+            Ok('/') => key.push(u16::from(b'\\')),
+            Ok(c) => {
+                for lower in c.to_lowercase() {
+                    let mut buffer = [0; 2];
+                    key.extend_from_slice(lower.encode_utf16(&mut buffer));
+                }
+            }
+            Err(error) => key.push(error.unpaired_surrogate()),
+        }
+    }
+    std::ffi::OsString::from_wide(&key)
+}
+
+/// A comparison key for a path. Windows paths compare case-insensitively and
+/// treat `/` and `\` alike; other platforms compare paths exactly.
+#[cfg(not(windows))]
+pub fn path_key(path: &Path) -> std::ffi::OsString {
+    path.as_os_str().to_owned()
+}
+
 pub fn matches_filter(width: u32, height: u32, filter: &ImageFilter) -> bool {
     width >= filter.min_width
         && height >= filter.min_height
@@ -129,6 +158,54 @@ pub fn image_properties(path: &Path) -> Result<ImageProperties, image::ImageErro
         created: timestamp(metadata.created()),
         modified: timestamp(metadata.modified()),
     })
+}
+
+/// Delete the oldest files in `dir` until at most `max_files` remain and
+/// their total size is at most `max_bytes`. Files whose names are in `keep`
+/// are never deleted. Returns the number of deleted files.
+pub fn prune_cache(
+    dir: &Path,
+    max_files: usize,
+    max_bytes: u64,
+    keep: &std::collections::HashSet<std::ffi::OsString>,
+) -> io::Result<usize> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(0),
+        Err(e) => return Err(e),
+    };
+    let mut files = Vec::new();
+    for entry in entries {
+        let entry = entry?;
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if metadata.is_file() {
+            let modified = metadata.modified().unwrap_or(std::time::UNIX_EPOCH);
+            files.push((modified, metadata.len(), entry.path()));
+        }
+    }
+    files.sort();
+    let mut count = files.len();
+    let mut total: u64 = files.iter().map(|(_, size, _)| size).sum();
+    let mut deleted = 0;
+    for (_, size, path) in files {
+        if count <= max_files && total <= max_bytes {
+            break;
+        }
+        if path.file_name().is_some_and(|name| keep.contains(name)) {
+            continue;
+        }
+        match fs::remove_file(&path) {
+            Ok(()) => {
+                count -= 1;
+                total -= size;
+                deleted += 1;
+            }
+            Err(error) => tracing::warn!(path = ?path, %error, "could not delete cached file"),
+        }
+    }
+    Ok(deleted)
 }
 
 pub fn thumbnail(

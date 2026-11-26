@@ -45,9 +45,21 @@ function App() {
   useEffect(() => {
     invoke<Config>("get_config").then(value => { setConfig(value); return invoke<string | null>("config_warning"); }).then(warning => { if (warning) setError(warning); }).catch(e => setError(String(e)));
     invoke<boolean>("get_autostart").then(setAutostart).catch(() => {});
-    refreshStatus();
-    const timer = window.setInterval(refreshStatus, 3000);
-    return () => window.clearInterval(timer);
+  }, [refreshStatus]);
+
+  // Poll the slideshow only while the window is visible, so a window hidden in
+  // the tray does not keep waking the app.
+  useEffect(() => {
+    let timer: number | undefined; let windowVisible = true; let active = true; let unlisten: (() => void) | undefined;
+    const update = () => {
+      const visible = windowVisible && !document.hidden;
+      if (visible && timer === undefined) { refreshStatus(); timer = window.setInterval(refreshStatus, 3000); }
+      else if (!visible && timer !== undefined) { window.clearInterval(timer); timer = undefined; }
+    };
+    document.addEventListener("visibilitychange", update);
+    listen<boolean>("window-visible", event => { windowVisible = event.payload; update(); }).then(dispose => { if (active) unlisten = dispose; else dispose(); }).catch(() => {});
+    update();
+    return () => { active = false; unlisten?.(); document.removeEventListener("visibilitychange", update); if (timer !== undefined) window.clearInterval(timer); };
   }, [refreshStatus]);
 
   useEffect(() => {
@@ -60,7 +72,7 @@ function App() {
     if (!imagePath) { setPreview(""); return; }
     let active = true; let url = "";
     setPreview("");
-    invoke<number[]>("current_preview", { path: imagePath }).then(bytes => {
+    invoke<ArrayBuffer>("current_preview", { path: imagePath }).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([new Uint8Array(bytes)])); setPreview(url);
     }).catch(() => { if (active) setPreview(""); });

@@ -10,12 +10,12 @@ use std::{
 
 static QUARANTINED: Mutex<Option<PathBuf>> = Mutex::new(None);
 
-/// Move an invalid configuration file aside. Returns `None` when another
-/// process already moved or removed it.
-fn quarantine(path: &Path) -> io::Result<Option<PathBuf>> {
-    let name = path.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "configuration has no name")
-    })?;
+/// Move an invalid data file aside to `<name>.invalid-<unix seconds>`.
+/// Returns `None` when another process already moved or removed it.
+pub(crate) fn quarantine(path: &Path) -> io::Result<Option<PathBuf>> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "configuration has no name"))?;
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -284,6 +284,11 @@ impl Config {
     pub fn images(&self) -> Result<Vec<PathBuf>, Error> {
         let mut seen = std::collections::HashSet::new();
         let mut images = Vec::new();
+        let excluded: std::collections::HashSet<_> = self
+            .excluded
+            .iter()
+            .map(|path| crate::utilities::path_key(path))
+            .collect();
         for folder in self.folders.iter().filter(|f| f.enabled) {
             let report =
                 scanner::scan_lenient(std::slice::from_ref(&folder.path), folder.recursive);
@@ -292,7 +297,7 @@ impl Config {
             }
             for image in report.images {
                 let identity = fs::canonicalize(&image).unwrap_or_else(|_| image.clone());
-                if self.excluded.contains(&image) {
+                if excluded.contains(&crate::utilities::path_key(&image)) {
                     continue;
                 }
                 let filtered = self.filter != Default::default();

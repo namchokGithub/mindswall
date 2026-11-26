@@ -73,7 +73,13 @@ fn invalid_config_is_moved_aside_before_defaults_are_used() {
 fn failing_image_is_skipped_and_removed() {
     let mut show = Slideshow::new(paths(&["a", "b", "c"]), false).unwrap();
     let applied = show
-        .next_available(|path| if path == Path::new("a") { Err("missing") } else { Ok(()) })
+        .next_available(|path| {
+            if path == Path::new("a") {
+                Err("missing")
+            } else {
+                Ok(())
+            }
+        })
         .unwrap();
     assert_eq!(applied, PathBuf::from("b"));
     assert_eq!(show.total(), 2);
@@ -98,7 +104,13 @@ fn previous_skips_earlier_image_that_fails() {
     show.next();
     show.next();
     let applied = show
-        .previous_available(|path| if path == Path::new("b") { Err("missing") } else { Ok(()) })
+        .previous_available(|path| {
+            if path == Path::new("b") {
+                Err("missing")
+            } else {
+                Ok(())
+            }
+        })
         .unwrap()
         .unwrap();
     assert_eq!(applied, PathBuf::from("a"));
@@ -111,7 +123,11 @@ fn previous_reports_failure_without_changing_history() {
     let mut show = Slideshow::new(paths(&["a", "b"]), false).unwrap();
     show.next();
     show.next();
-    assert!(show.previous_available(|_| Err("missing")).unwrap().is_err());
+    assert!(
+        show.previous_available(|_| Err("missing"))
+            .unwrap()
+            .is_err()
+    );
     assert_eq!(show.current().unwrap(), PathBuf::from("b"));
     assert_eq!(show.total(), 2);
 }
