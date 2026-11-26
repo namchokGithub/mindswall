@@ -51,6 +51,9 @@ body{background:var(--c-11121a);user-select:none;-webkit-user-select:none}
 .app-frame>.app-shell{flex:1;min-height:0}
 .app-shell>.sidebar{overflow:hidden}
 .app-shell>main{overflow-y:auto;overscroll-behavior:contain}
+/* main is a fixed-height flex column that scrolls: without this, the top bar
+   and footer shrink on long pages, so their height differed between pages. */
+.app-shell>main>*{flex-shrink:0}
 .titlebar{height:36px;flex:none;display:flex;align-items:center;justify-content:space-between;background:var(--c-171821);border-bottom:1px solid var(--c-292a35)}
 .titlebar-brand{display:flex;align-items:center;gap:9px;padding-left:14px;font-size:12px;font-weight:650;color:var(--c-eaeaf3);height:100%;flex:1}
 .titlebar-brand img{width:18px;height:18px;object-fit:contain;pointer-events:none}
