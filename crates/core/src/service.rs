@@ -192,6 +192,14 @@ fn earliest(waits: [Option<Duration>; 3]) -> Option<Duration> {
 }
 
 /// Run the slideshow from the CLI. It stops when the desktop app takes over.
+const LOG_FILE: &str = "mindswall.log";
+
+/// The slideshow log file in the per-user data directory. The file exists
+/// only after a slideshow has started.
+pub fn log_path() -> Option<PathBuf> {
+    directories::ProjectDirs::from("", "", "MindsWall").map(|dirs| dirs.data_dir().join(LOG_FILE))
+}
+
 pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
     run_slideshow_with(
         ServiceOptions {
@@ -209,10 +217,10 @@ pub fn run_slideshow_with(
     options: ServiceOptions,
     on_change: impl Fn(&PlaybackStatus),
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let dirs = directories::ProjectDirs::from("", "", "MindsWall")
-        .ok_or("user data directory unavailable")?;
-    std::fs::create_dir_all(dirs.data_dir())?;
-    let appender = tracing_appender::rolling::never(dirs.data_dir(), "mindswall.log");
+    let log = log_path().ok_or("user data directory unavailable")?;
+    let log_dir = log.parent().ok_or("user data directory unavailable")?;
+    std::fs::create_dir_all(log_dir)?;
+    let appender = tracing_appender::rolling::never(log_dir, LOG_FILE);
     let (writer, _guard) = tracing_appender::non_blocking(appender);
     tracing_subscriber::fmt()
         .with_ansi(false)

@@ -74,7 +74,8 @@ cargo run -p mindswall-cli -- config show
 Press Ctrl+C in the slideshow terminal to stop it. When the desktop app starts
 its slideshow while `run` is active, the CLI hands over: it prints a message
 and exits, and the app continues with the same image and paused state. Logs are stored under
-`%APPDATA%\MindsWall\data\mindswall.log`. The slideshow and Windows wallpaper
+`%APPDATA%\MindsWall\data\mindswall.log`. The desktop app shows this path under
+**Settings** > **Log file**, with a button to copy it. The slideshow and Windows wallpaper
 integration still need end-to-end testing in an interactive Windows session.
 
 ### Desktop app (development)

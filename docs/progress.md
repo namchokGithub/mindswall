@@ -204,6 +204,7 @@ and Windows startup.
 - [~] **Folder management**: add via native folder picker, remove, enable or
   disable, recursive toggle, image count per folder, rescan
 - [~] **Settings page**: general options, start with Windows, log location
+  (log path with a copy button added 2026-11-26; awaiting Windows check)
 - [~] **Single instance (D2)**: a second launch focuses the existing window;
   the app takes over the named pipe server so CLI control commands work
   while it runs

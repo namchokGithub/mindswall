@@ -20,3 +20,4 @@ All notable changes to MindsWall are recorded here. The format follows
 - Closing the window releases the WebView; "Start with Windows" starts in
   the tray without a window.
 - GitHub Actions CI on Windows and a tag-triggered release workflow.
+- Settings shows the log file location with a button to copy it.

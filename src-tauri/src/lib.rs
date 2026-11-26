@@ -933,6 +933,13 @@ fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
+fn log_location() -> Result<String, String> {
+    mindswall_core::service::log_path()
+        .map(|path| path.display().to_string())
+        .ok_or_else(|| "User data directory unavailable".into())
+}
+
+#[tauri::command]
 fn get_autostart(app: tauri::AppHandle) -> Result<bool, String> {
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
@@ -1055,6 +1062,7 @@ pub fn run() {
             overview_status,
             get_autostart,
             set_autostart,
+            log_location,
             gallery_images,
             gallery_thumbnail,
             history_thumbnail,
