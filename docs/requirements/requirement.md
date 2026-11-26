@@ -62,7 +62,7 @@ _Lightweight Wallpaper Manager for Windows._
 | [thiserror](https://crates.io/crates/thiserror?utm_source=chatgpt.com)    | Error Handling          |
 | [clap](https://crates.io/crates/clap?utm_source=chatgpt.com)              | CLI Commands            |
 | [tauri](https://v2.tauri.app/?utm_source=chatgpt.com)                     | Desktop Application     |
-| [shadcn/ui](https://ui.shadcn.com/?utm_source=chatgpt.com)                | UI Components           |
+| Custom React components + [lucide-react](https://lucide.dev/) | UI Components (D6 in progress.md) |
 
 ## Application Architecture
 

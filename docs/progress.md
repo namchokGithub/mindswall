@@ -19,8 +19,8 @@ Completed items move from the phase checklists to the
   Phase 6 extended features (profiles, editor, hotkeys, import/export).
 - The [Windows 11 manual checklist](testing/windows-11-checklist.md) records
   passing checks for core CLI, slideshow, desktop, utilities, and hotkeys at
-  commit `2bf16d4`. Some checks remain incomplete or need clarification;
-  CI and release workflows exist but have not run yet.
+  commit `2bf16d4`. Some checks remain incomplete; CI and release workflows
+  exist but have not run yet.
 - Commits `ca0a272`, `f8d2046`, and `f4f7d30` fixed slideshow recovery, IPC,
   cache, and file-access issues found in a code review. Their automated tests
   pass, but the matching checklist sections have not been run on Windows yet;
@@ -33,11 +33,10 @@ Completed items move from the phase checklists to the
 - **Windows 11 verification**: checked items in the manual checklist are
   recorded as passed. The checklist sections added for the recent changes
   (Errors, Settings changes during a slideshow, Control pipe, caches, and
-  history, and File access from the desktop app) are still open. The environment summary says administrator and one
-  1920×1080 monitor at 100% scaling, while checked items include standard-user
-  startup and multi-monitor scenarios; clarify which account and monitor setup
-  were used for those checks. Fallback, offline operation, the 5,000-image
-  gallery check, and other unchecked cases remain open.
+  history, and File access from the desktop app) are still open. Fallback,
+  offline operation, the 5,000-image gallery check, and other unchecked cases
+  remain open. Reorganizing overlapping checklist sections, including the
+  environment summary, is deferred until the user asks for it.
 - **Performance notes**: the checklist reports 9–10 MB RAM without a process or
   open/hidden breakdown, so it does not establish the performance target.
 - **Logging**: the slideshow service now logs successful wallpaper changes as
@@ -107,7 +106,7 @@ Completed Log.
 
 ### Next steps (in order)
 
-1. Complete and clarify the outstanding Windows 11 checks in the
+1. Complete the outstanding Windows 11 checks in the
    [manual test checklist](testing/windows-11-checklist.md), starting with the
    sections for the recent changes.
 2. Push the branch so the new Windows CI runs, and fix anything it reports.
@@ -167,9 +166,7 @@ without administrator rights, scanner tests pass, and the README documents the
 CLI.
 
 The checklist records passing CLI and wallpaper-change checks, including the
-corrupt-image case. Its environment summary lists an administrator account;
-clarify the account used when documenting the standard-user requirement. The
-fallback checks are unchecked and may be marked skipped with a reason if the
+corrupt-image case. The fallback checks are unchecked and may be marked skipped with a reason if the
 COM failure cannot be triggered. The fallback keeps the existing Windows fit
 setting, as recorded in D3.
 
@@ -195,8 +192,8 @@ until the log is re-checked on Windows.
 Goal: a Tauri 2 + React + TypeScript app that wraps the core, with tray control
 and Windows startup.
 
-- [~] **Setup**: Tauri 2 project, React + TypeScript (Vite), shadcn/ui; the
-  Tauri backend depends on the core crate rather than duplicating logic
+- [~] **Setup**: Tauri 2 project, React + TypeScript (Vite), custom UI
+  controls (D6); the Tauri backend depends on the core crate rather than duplicating logic
 - [~] **Command layer**: Tauri commands for status, next/previous/pause,
   folder CRUD, and settings; events from core to UI for wallpaper changes
 - [~] **Overview dashboard**: current wallpaper preview, Previous / Next /
@@ -219,9 +216,8 @@ both the UI and the tray, settings persist, and startup registration works for
 a standard user.
 
 The checklist records passing desktop, tray, CLI control, and startup checks,
-including the checked standard-user startup scenario. Clarify the account used
-because the environment summary lists administrator. The UI uses custom controls
-rather than shadcn/ui. Releasing the WebView on close, event-driven updates,
+including the checked standard-user startup scenario. The UI uses custom
+controls (D6). Releasing the WebView on close, event-driven updates,
 and the handoff from a running CLI instance are implemented and await Windows
 verification.
 The checked folder-management and overview actions passed; a dedicated rescan
@@ -263,9 +259,7 @@ folder (for example 5,000+ images).
 The GUI now includes paged thumbnails, manual per-monitor images, filters, fit
 modes, local history, the folder watcher, per-monitor slideshow folders, and
 display-change handling; the last three await Windows verification.
-The fixed aspect ratio tolerance is 5%. Gallery scale remains untested. The
-checklist marks multi-monitor, mixed-scaling, and Span checks as passed; clarify
-the setup used because the environment summary lists one monitor.
+The fixed aspect ratio tolerance is 5%. Gallery scale remains untested.
 Reapplying history outside the active collection changes the desktop directly;
 the running slideshow may replace it at its next change.
 
@@ -363,7 +357,7 @@ mindswall/
 │   │                     # config, history, wallpaper trait + Windows impl
 │   └── cli/              # mindswall-cli: `mindswall` binary (clap)
 ├── src-tauri/            # Tauri 2 app, depends on mindswall-core
-├── ui/                   # React + TypeScript frontend (Vite, shadcn/ui)
+├── ui/                   # React + TypeScript frontend (Vite, custom controls)
 ├── docs/
 └── config.example.json
 ```
@@ -415,6 +409,14 @@ only the image; forcing Fill there would require writing the per-user
 - Other formats such as WebP are out of scope until after the first release.
 - A new format is added only when the scanner, thumbnail generation, and the
   Windows wallpaper API all support it, with tests.
+
+### D6. UI components: custom React controls instead of shadcn/ui
+
+- The UI keeps its custom controls and stylesheet with `lucide-react` icons.
+  shadcn/ui is not used, which avoids adding Tailwind and Radix dependencies
+  and rewriting working screens.
+- Revisit only if the custom controls become hard to keep accessible or
+  consistent.
 
 ## Risks
 
