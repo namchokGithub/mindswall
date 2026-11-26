@@ -14,6 +14,15 @@ fn profile_switch_preserves_saved_settings() {
     assert_eq!(config.profiles.len(), 2);
     assert!(config.save_profile(" ").is_err());
     assert!(config.save_profile("work").is_err());
+    // Names are limited to 50 characters, counted as characters, not bytes.
+    let limit = mindswall_core::config::MAX_PROFILE_NAME;
+    assert!(config.save_profile(&"ก".repeat(limit)).is_ok());
+    assert!(config.save_profile(&"x".repeat(limit + 1)).is_err());
+    // A longer name saved by an older version still loads.
+    let mut older = config.clone();
+    older.profiles[0].name = "y".repeat(80);
+    older.active_profile = None;
+    assert!(older.validate().is_ok());
 }
 
 #[test]

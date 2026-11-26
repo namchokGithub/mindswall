@@ -67,6 +67,9 @@ pub enum Theme {
     Light,
     Dark,
 }
+/// Longest name, in characters, for a new profile.
+pub const MAX_PROFILE_NAME: usize = 50;
+
 /// How combined wallpapers arrange their images.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -238,8 +241,10 @@ impl Config {
         let mut names = std::collections::HashSet::new();
         for profile in &self.profiles {
             let name = profile.name.trim();
+            // Older versions allowed 80 bytes, so saved names up to 80
+            // characters still load; new names are limited by `save_profile`.
             if name.is_empty()
-                || name.len() > 80
+                || name.chars().count() > 80
                 || !names.insert(name.to_lowercase())
                 || !(60..=86400).contains(&profile.settings.interval_seconds)
                 || profile.settings.folders.len() > 1000
@@ -276,10 +281,10 @@ impl Config {
     }
     pub fn save_profile(&mut self, name: &str) -> io::Result<()> {
         let name = name.trim();
-        if name.is_empty() || name.len() > 80 {
+        if name.is_empty() || name.chars().count() > MAX_PROFILE_NAME {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Profile name must contain 1–80 characters",
+                format!("Profile name must contain 1–{MAX_PROFILE_NAME} characters"),
             ));
         }
         if self

@@ -249,7 +249,8 @@ is checked every 30 seconds while the window is open. Multi-monitor behavior and
 large collection still need interactive Windows verification.
 
 **Profiles** saves named collections and can import or export settings and
-profiles as JSON. A profile stores folders, interval, shuffle, filters,
+profiles as JSON. Profile names have 1–50 characters (names up to 80
+characters saved by earlier versions still load). A profile stores folders, interval, shuffle, filters,
 exclusions, and fit mode. The active profile is shown at the top of every page
 and checked in the tray **Profiles** submenu. When those settings change after
 a profile was applied, it is marked **changed**: **Update profile** saves the
