@@ -212,6 +212,44 @@ can be recorded using the keyboard in **Settings**, and saved profiles are avail
 system tray. These features still need interactive Windows verification. A
 running slideshow may replace an edited wallpaper at its next change.
 
+### Installing a release build (Windows SmartScreen)
+
+No release has been published yet. Release builds are planned as a per-user
+NSIS installer (`MindsWall_<version>_x64-setup.exe`) and a portable ZIP
+(`MindsWall_<version>_x64_portable.zip`), with `SHA256SUMS.txt`. They are not
+code-signed, so Windows SmartScreen may show **Windows protected your PC** the
+first time you run them. Installing does not need administrator rights; an
+elevation (UAC) prompt is not expected.
+
+1. Download the files only from this repository's GitHub Releases page.
+2. Check the file against `SHA256SUMS.txt` before running it:
+
+   ```powershell
+   Get-FileHash .\MindsWall_<version>_x64-setup.exe -Algorithm SHA256
+   ```
+
+   The hash must match the line for that file. If it does not, delete the file
+   and do not run it.
+3. Run the installer. If SmartScreen appears, select **More info**, check that
+   the app name is MindsWall, then select **Run anyway**.
+4. For the portable ZIP, unblock it before extracting so the extracted
+   executable does not trigger the warning again: right-click the ZIP, select
+   **Properties**, tick **Unblock**, and select **OK**. Alternatively run:
+
+   ```powershell
+   Unblock-File .\MindsWall_<version>_x64_portable.zip
+   ```
+
+   Then extract it to a folder in your user profile and run `MindsWall.exe`.
+
+**Run anyway** is not offered when Smart App Control is on (Windows Security >
+App & browser control > Smart App Control), because it blocks unsigned apps.
+Turning Smart App Control off cannot be undone without resetting Windows, so
+consider building from source instead (see
+[Desktop app (development)](#desktop-app-development)). Some antivirus products
+may also scan or quarantine new unsigned executables; check the file hash
+before allowing it. Code signing is planned to remove these warnings.
+
 ### Continuous integration and performance
 
 The GitHub Actions workflow in `.github/workflows/ci.yml` runs on Windows for
