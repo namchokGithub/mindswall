@@ -1,27 +1,28 @@
 # MindsWall
 
-โปรแกรมจัดการวอลเปเปอร์สำหรับ Windows ที่ออกแบบให้มีน้ำหนักเบาและทำงานแบบ local-first โดยไม่จำเป็นต้องเชื่อมต่ออินเทอร์เน็ตหรือใช้สิทธิ์ Administrator
+A lightweight, local-first wallpaper manager for Windows that does not require
+an internet connection or administrator privileges.
 
-## สถานะโปรเจกต์
+## Project status
 
 The project is in early development. The Rust CLI can scan folders and set or randomly select a wallpaper on Windows. The desktop interface and slideshow are planned.
 
-## ฟีเจอร์ที่วางแผนไว้
+## Planned features
 
-- จัดการโฟลเดอร์ภาพหลายโฟลเดอร์และค้นหาภาพในโฟลเดอร์ย่อย
-- เปลี่ยนวอลเปเปอร์ตามเวลา พร้อมสุ่มภาพแบบไม่ซ้ำจนครบชุด
-- ควบคุมโปรแกรมผ่าน System Tray และบันทึกการตั้งค่า
-- รองรับหลายจอ แกลเลอรีภาพ ประวัติวอลเปเปอร์ และการตรวจจับไฟล์ที่เปลี่ยนแปลง
-- เพิ่มโปรไฟล์วอลเปเปอร์ เครื่องมือปรับภาพ และปุ่มลัดในอนาคต
+- Manage multiple image folders and search their subfolders.
+- Change wallpapers on a schedule and shuffle images without repeats until the set is exhausted.
+- Control the app from the system tray and save settings.
+- Support multiple monitors, an image gallery, wallpaper history, and file change detection.
+- Add wallpaper profiles, image editing tools, and keyboard shortcuts.
 
-## เทคโนโลยี
+## Technology
 
-- **แพลตฟอร์มเป้าหมาย:** Windows 11
+- **Target platform:** Windows 11
 - **Backend:** Rust
-- **Desktop UI ที่วางแผนไว้:** Tauri 2, React และ TypeScript
-- **รูปแบบการแจกจ่ายที่วางแผนไว้:** Portable EXE และ Installer
+- **Planned desktop UI:** Tauri 2, React, and TypeScript
+- **Planned distribution:** Portable EXE and installer
 
-## เริ่มต้นพัฒนา
+## Getting started
 
 Install Rust and Cargo, then run the CLI from the repository root:
 
@@ -103,7 +104,8 @@ can be configured in **Settings**, and saved profiles are available from the
 system tray. These features still need interactive Windows verification. A
 running slideshow may replace an edited wallpaper at its next change.
 
-ดูขอบเขตฟีเจอร์ สถาปัตยกรรม และแผนการพัฒนาเพิ่มเติมได้ที่ [Requirement](docs/requirements/requirement.md)
+See the [requirements](docs/requirements/requirement.md) for the feature scope,
+architecture, and development roadmap.
 
 ---
 
