@@ -46,5 +46,6 @@ All notable changes to MindsWall are recorded here. The format follows
   one loads, instead of flashing a placeholder.
 - The Editor previews the chosen image with its size, compares it with the
   edited copy, and has a **Clear** button.
+- Settings can open the log folder and show the last 100 log lines.
 - Optional combined wallpapers: portrait images are shown side by side on a
   landscape monitor over a blurred background, with an adjustable gap.

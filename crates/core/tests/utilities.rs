@@ -59,3 +59,28 @@ fn dimensions_refresh_after_image_changes() {
         (150, 80)
     );
 }
+
+#[test]
+fn tail_lines_reads_only_the_last_lines() {
+    use mindswall_core::utilities::tail_lines;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    assert!(tail_lines(&path, 100).unwrap().is_empty());
+
+    // Long enough to need several chunks.
+    let text: String = (1..=5000)
+        .map(|n| format!("line {n} {}\n", "x".repeat(40)))
+        .collect();
+    std::fs::write(&path, &text).unwrap();
+    let lines = tail_lines(&path, 100).unwrap();
+    assert_eq!(lines.len(), 100);
+    assert!(lines[0].starts_with("line 4901 "));
+    assert!(lines[99].starts_with("line 5000 "));
+
+    std::fs::write(&path, "first\nsecond\nlast without newline").unwrap();
+    assert_eq!(
+        tail_lines(&path, 100).unwrap(),
+        ["first", "second", "last without newline"]
+    );
+    assert_eq!(tail_lines(&path, 1).unwrap(), ["last without newline"]);
+}

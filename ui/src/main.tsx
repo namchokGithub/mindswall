@@ -13,6 +13,7 @@ import { ScreenCards } from "./Overview";
 import { Editor, HotkeySettings, Profiles } from "./Extended";
 import { maskUserName } from "./maskPath";
 import { PathCopy } from "./PathCopy";
+import { LogViewer } from "./LogViewer";
 import { SnackbarProvider, useSnackbar } from "./Snackbar";
 import { FitModeSelect, IntervalSelect } from "./SettingControls";
 import "./style.css";
@@ -189,6 +190,10 @@ function UtilitySettings({ config, busy, save }: { config: Config; busy: boolean
   const [logPath, setLogPath] = useState<string | null>(null);
   const { setError, setNotice } = useSnackbar("settings");
   useEffect(() => { invoke<string>("log_location").then(setLogPath).catch(() => setLogPath(null)); }, []);
+  const [showLog, setShowLog] = useState(false);
+  async function openLogFolder() {
+    try { await invoke("open_log_folder"); } catch (e) { setError(String(e)); }
+  }
   async function copyLogPath() {
     if (!logPath) return;
     try { await navigator.clipboard.writeText(logPath); setNotice("Log path copied."); } catch { setError("Could not copy the log path."); }
@@ -198,7 +203,7 @@ function UtilitySettings({ config, busy, save }: { config: Config; busy: boolean
     if (!Number.isInteger(w) || !Number.isInteger(h) || w < 0 || h < 0 || w > 100000 || h > 100000) { setError("Enter whole numbers between 0 and 100000."); return; }
     await save({ ...config, filter: { ...config.filter, min_width: w, min_height: h } });
   }
-  return <><div className="section-title"><div><span className="eyebrow">APPEARANCE</span><h2>Look and feel</h2></div></div><div className="panel settings-panel">
+  return <>{showLog && <LogViewer close={() => setShowLog(false)}/>}<div className="section-title"><div><span className="eyebrow">APPEARANCE</span><h2>Look and feel</h2></div></div><div className="panel settings-panel">
     <div className="setting-row"><div><strong>Theme</strong><small>System follows the Windows app mode.</small></div><Select label="Theme" value={config.theme} disabled={busy} onChange={theme => save({ ...config, theme })} options={[{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}/></div>
   </div>
   <div className="section-title utility-heading"><div><span className="eyebrow">WALLPAPER UTILITIES</span><h2>Image preferences</h2></div></div><div className="panel settings-panel">
@@ -206,7 +211,7 @@ function UtilitySettings({ config, busy, save }: { config: Config; busy: boolean
     <div className="setting-row"><div><strong>Orientation</strong><small>Only show images with this orientation.</small></div><Select label="Image orientation" value={config.filter.orientation} disabled={busy} onChange={orientation => save({ ...config, filter: { ...config.filter, orientation } })} options={[{ value: "any", label: "Any" }, { value: "landscape", label: "Landscape" }, { value: "portrait", label: "Portrait" }, { value: "square", label: "Square" }]}/></div>
     <div className="setting-row"><div><strong>Aspect ratio</strong><small>Allow a 5% difference from the selected ratio.</small></div><Select label="Image aspect ratio" value={config.filter.aspect_ratio} disabled={busy} onChange={aspect_ratio => save({ ...config, filter: { ...config.filter, aspect_ratio } })} options={[{ value: "any", label: "Any" }, { value: "wide", label: "16:9" }, { value: "wide_ten", label: "16:10" }, { value: "standard", label: "4:3" }, { value: "square", label: "1:1" }]}/></div>
     <div className="setting-row"><div><strong>Minimum resolution</strong><small>Use 0 to accept any width or height.</small></div><div className="resolution"><input aria-label="Minimum width" type="number" min="0" max="100000" value={width} onChange={e => setWidth(e.target.value)}/><span>×</span><input aria-label="Minimum height" type="number" min="0" max="100000" value={height} onChange={e => setHeight(e.target.value)}/><button className="secondary" disabled={busy} onClick={applyFilter}>Apply</button></div></div>
-    <div className="setting-row"><div><strong>Log file</strong><small className="log-path">{logPath ? maskUserName(logPath) : "Log location unavailable."}</small>{logPath && <small>The user name is hidden; <b>Copy path</b> copies the full path.</small>}</div><button className="secondary" disabled={!logPath} onClick={copyLogPath}>Copy path</button></div>
+    <div className="setting-row"><div><strong>Log file</strong><small className="log-path">{logPath ? maskUserName(logPath) : "Log location unavailable."}</small>{logPath && <small>The user name is hidden; <b>Copy path</b> copies the full path.</small>}</div><div className="profile-create log-actions"><button className="secondary" disabled={!logPath} onClick={() => setShowLog(true)}>View log</button><button className="secondary" disabled={!logPath} onClick={openLogFolder}>Open folder</button><button className="secondary" disabled={!logPath} onClick={copyLogPath}>Copy path</button></div></div>
     <div className="setting-row"><div><strong>Combine portrait images</strong><small>On a landscape monitor, show portrait images side by side over a blurred background. Works with every fit mode.</small></div><label className="switch" title="Combine portrait images"><input type="checkbox" aria-label="Combine portrait images" checked={config.collage.enabled} disabled={busy} onChange={e => save({ ...config, collage: { ...config.collage, enabled: e.target.checked } })}/><span/></label></div>
     <div className="setting-row"><div><strong>Space between images</strong><small>Used when portrait images are combined.</small></div><Select label="Space between combined images" value={config.collage.gap} disabled={busy || !config.collage.enabled} onChange={gap => save({ ...config, collage: { ...config.collage, gap } })} options={[0, 2, 4, 8, 12, 16, 24, 32].map(gap => ({ value: gap, label: gap === 0 ? "None" : `${gap} px` }))}/></div>
     <div className="setting-row"><div><strong>Excluded images</strong><small>{config.excluded.length} images excluded from your collection.</small></div><button className="secondary" disabled={busy || config.excluded.length === 0} onClick={() => save({ ...config, excluded: [] })}>Restore all</button></div>

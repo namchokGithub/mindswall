@@ -229,3 +229,44 @@ pub fn thumbnail(
         .map_err(|e| io::Error::other(e.error))?;
     Ok(target)
 }
+
+/// The last `count` lines of a text file, oldest first. Only the end of the
+/// file is read (at most 4 MB), so a large log stays cheap. Invalid UTF-8 is
+/// replaced. A missing file has no lines.
+pub fn tail_lines(path: &Path, count: usize) -> io::Result<Vec<String>> {
+    use std::io::{Read, Seek, SeekFrom};
+    const CHUNK: u64 = 16 * 1024;
+    const LIMIT: u64 = 4 * 1024 * 1024;
+    let mut file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let length = file.metadata()?.len();
+    let mut start = length;
+    let mut buffer = Vec::new();
+    // One extra line break is needed to know that the oldest kept line is whole.
+    while start > 0
+        && length - start < LIMIT
+        && buffer.iter().filter(|&&byte| byte == b'\n').count() <= count
+    {
+        let size = CHUNK.min(start);
+        start -= size;
+        file.seek(SeekFrom::Start(start))?;
+        let mut chunk = vec![0; size as usize];
+        file.read_exact(&mut chunk)?;
+        chunk.extend_from_slice(&buffer);
+        buffer = chunk;
+    }
+    let text = String::from_utf8_lossy(&buffer);
+    let mut lines: Vec<&str> = text.lines().collect();
+    if start > 0 && !lines.is_empty() {
+        // The first line starts before the part that was read.
+        lines.remove(0);
+    }
+    let skip = lines.len().saturating_sub(count);
+    Ok(lines[skip..]
+        .iter()
+        .map(|line| (*line).to_owned())
+        .collect())
+}

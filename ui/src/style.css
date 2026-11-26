@@ -104,3 +104,5 @@ body{background:var(--c-11121a);user-select:none;-webkit-user-select:none}
 .editor-image img{max-width:100%;max-height:100%;object-fit:contain}.editor-image .thumbnail-placeholder{height:auto}
 .editor-previews figcaption{margin-top:6px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--c-9090a5);text-align:center}
 @media(max-width:600px){.editor-previews.compare{grid-template-columns:minmax(0,1fr)}}
+.log-dialog{width:min(1000px,calc(100vw - 32px))}.log-lines{margin:0;padding:16px 24px;max-height:min(60vh,560px);overflow:auto;font:11px/1.6 Consolas,"Cascadia Mono",monospace;color:var(--c-c3c3d3);background:var(--c-11121a);white-space:pre-wrap;overflow-wrap:anywhere;scrollbar-width:thin}
+.log-actions{justify-content:flex-end;flex:none}

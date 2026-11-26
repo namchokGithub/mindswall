@@ -79,7 +79,9 @@ its slideshow while `run` is active, the CLI hands over: it prints a message
 and exits, and the app continues with the same image and paused state. Logs are stored under
 `%APPDATA%\MindsWall\data\mindswall.log`. The desktop app shows this path under
 **Settings** > **Log file**, with the Windows user name hidden as `******`;
-the **Copy path** button copies the full path. The slideshow and Windows wallpaper
+the **Copy path** button copies the full path, **Open folder** opens the log
+folder in File Explorer, and **View log** shows the last 100 lines (user names
+in paths hidden), with a button to read them again. The slideshow and Windows wallpaper
 integration still need end-to-end testing in an interactive Windows session.
 
 ### Desktop app (development)

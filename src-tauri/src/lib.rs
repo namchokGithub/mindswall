@@ -1099,6 +1099,31 @@ fn log_location() -> Result<String, String> {
         .ok_or_else(|| "User data directory unavailable".into())
 }
 
+/// Open the folder that holds the slideshow log in File Explorer.
+#[tauri::command]
+async fn open_log_folder() -> Result<(), String> {
+    blocking(|| {
+        let folder = mindswall_core::service::log_path()
+            .and_then(|path| path.parent().map(PathBuf::from))
+            .ok_or("User data directory unavailable")?;
+        if !folder.is_dir() {
+            return Err("There is no log yet. Start the slideshow first.".into());
+        }
+        mindswall_core::explorer::open_folder(&folder)
+    })
+    .await
+}
+
+/// The last 100 lines of the slideshow log, oldest first.
+#[tauri::command]
+async fn recent_log() -> Result<Vec<String>, String> {
+    blocking(|| {
+        let path = mindswall_core::service::log_path().ok_or("User data directory unavailable")?;
+        mindswall_core::utilities::tail_lines(&path, 100).map_err(|e| e.to_string())
+    })
+    .await
+}
+
 #[tauri::command]
 fn get_autostart(app: tauri::AppHandle) -> Result<bool, String> {
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
@@ -1225,6 +1250,8 @@ pub fn run() {
             get_autostart,
             set_autostart,
             log_location,
+            open_log_folder,
+            recent_log,
             gallery_images,
             gallery_thumbnail,
             history_thumbnail,

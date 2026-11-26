@@ -299,6 +299,11 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [ ] **Settings** > **Log file** shows `%APPDATA%\MindsWall\data\mindswall.log`
       (expanded) with the user name shown as `******` and no tooltip with the name;
       **Copy path** copies the full, unmasked path to the clipboard
+- [ ] **Open folder** opens the log folder in File Explorer; before the
+      slideshow has ever run, it says there is no log yet
+- [ ] **View log** shows the last 100 lines, scrolled to the newest, with user
+      names in paths shown as `******`; **Reload** shows new lines; Escape
+      closes it; with a large log (several MB) it still opens quickly
 - [ ] The **Rescan collection** tooltip says the current cycle is kept
 - [ ] The Overview preview shows the file name but not its folder; clicking
       it (or Tab then Enter) opens image details with the folder, size, and
