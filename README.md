@@ -113,6 +113,8 @@ also contains fit, resolution, orientation, and aspect-ratio filters. **History*
 keeps the most recent 100 applied images locally, and **Monitors** lists
 connected displays and can apply an image to one display. A running slideshow
 can replace a per-monitor selection at its next change.
+Windows may retain unavailable display records; Monitors skips records whose
+dimensions cannot be read while showing the displays that are available.
 
 These utilities remain in development. Folder watching and per-monitor slideshow
 sources are not yet implemented. Multi-monitor behavior and the gallery with a

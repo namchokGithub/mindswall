@@ -44,14 +44,14 @@ fn with_desktop<T>(f: impl FnOnce(&IDesktopWallpaper) -> Result<T, String>) -> R
     unsafe {
         CoInitializeEx(None, COINIT_APARTMENTTHREADED)
             .ok()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Could not initialize the Windows desktop API: {e}"))?;
         let result = match CoCreateInstance(&DesktopWallpaper, None, CLSCTX_ALL) {
             Ok(desktop) => {
                 let result = f(&desktop);
                 drop(desktop);
                 result
             }
-            Err(error) => Err(error.to_string()),
+            Err(error) => Err(format!("Could not open the Windows desktop API: {error}")),
         };
         CoUninitialize();
         result
@@ -62,24 +62,45 @@ pub fn list_monitors() -> Result<Vec<crate::wallpaper::MonitorInfo>, String> {
     with_desktop(|desktop| unsafe {
         let count = desktop
             .GetMonitorDevicePathCount()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Could not count monitors: {e}"))?;
         let mut monitors = Vec::new();
+        let mut unavailable = None;
         for index in 0..count {
             let id = desktop
                 .GetMonitorDevicePathAt(index)
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| format!("Could not get monitor {index}: {e}"))?;
             let name = id.to_string().map_err(|e| e.to_string());
-            let rect = desktop
-                .GetMonitorRECT(PCWSTR(id.0))
-                .map_err(|e| e.to_string());
+            let rect = desktop.GetMonitorRECT(PCWSTR(id.0));
             windows::Win32::System::Com::CoTaskMemFree(Some(id.0.cast()));
             let name = name?;
-            let rect = rect?;
+            let rect = match rect {
+                Ok(rect) => rect,
+                Err(error) if error.code() == windows::Win32::Foundation::E_FAIL => {
+                    tracing::warn!(monitor_index = index, %error, "skipping a monitor without readable dimensions");
+                    unavailable = Some(format!(
+                        "Could not read monitor {index} dimensions: {error}"
+                    ));
+                    continue;
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "Could not read monitor {index} dimensions: {error}"
+                    ));
+                }
+            };
+            if rect.right <= rect.left || rect.bottom <= rect.top {
+                continue;
+            }
             monitors.push(crate::wallpaper::MonitorInfo {
                 id: name,
                 width: rect.right - rect.left,
                 height: rect.bottom - rect.top,
             });
+        }
+        if monitors.is_empty()
+            && let Some(error) = unavailable
+        {
+            return Err(error);
         }
         Ok(monitors)
     })
@@ -95,10 +116,10 @@ pub fn set_monitor_wallpaper(monitor: &str, path: &Path) -> Result<(), String> {
     with_desktop(|desktop| unsafe {
         desktop
             .SetPosition(fit_position(configured_fit()))
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Could not set the wallpaper fit mode: {e}"))?;
         desktop
             .SetWallpaper(PCWSTR(monitor.as_ptr()), PCWSTR(wide.as_ptr()))
-            .map_err(|e| e.to_string())
+            .map_err(|e| format!("Could not set wallpaper for this monitor: {e}"))
     })
 }
 

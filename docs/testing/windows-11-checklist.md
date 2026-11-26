@@ -274,6 +274,8 @@ matches the Windows **Personalize > Background** setting of the same name.
 
 ### Monitors (needs two or more displays)
 
+- [ ] Open **Monitors** after disconnecting a previously used display: available
+      displays still load if Windows retains an inaccessible display record
 - [x] **Monitors** lists every connected display
 - [x] Applying an image to one monitor changes only that monitor
 - [x] A running slideshow later replaces the per-monitor image (known behavior)

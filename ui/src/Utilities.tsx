@@ -76,15 +76,15 @@ export function HistoryPage() {
 
 type Monitor = { id: string; width: number; height: number };
 export function MonitorsPage() {
-  const [monitors, setMonitors] = useState<Monitor[]>([]); const { setError, setNotice } = useSnackbar("monitors"); const [loading, setLoading] = useState(true);
-  const refresh = useCallback(async () => { setLoading(true); try { setMonitors(await invoke<Monitor[]>("monitors")); setError(""); } catch (e) { setError(String(e)); } finally { setLoading(false); } }, [setError]);
+  const [monitors, setMonitors] = useState<Monitor[]>([]); const { setError, setNotice } = useSnackbar("monitors"); const [loading, setLoading] = useState(true); const [loadFailed, setLoadFailed] = useState(false);
+  const refresh = useCallback(async () => { setLoading(true); setLoadFailed(false); try { setMonitors(await invoke<Monitor[]>("monitors")); setError(""); } catch (e) { setLoadFailed(true); setError(String(e)); } finally { setLoading(false); } }, [setError]);
   useEffect(() => { refresh(); }, [refresh]);
   async function choose(monitor: Monitor) {
     try { const path = await open({ multiple: false, filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "bmp"] }] }); if (path) { await invoke("set_monitor_image", { monitor: monitor.id, path }); setNotice("Wallpaper changed for this monitor."); } }
     catch (e) { setError(String(e)); }
   }
   return <><div className="section-title"><div><span className="eyebrow">YOUR SCREENS</span><h2>Connected monitors</h2></div><button className="icon-button" aria-label="Refresh monitors" disabled={loading} onClick={refresh}><RefreshCw size={16}/></button></div>
-    {loading ? <p role="status">Finding monitors…</p> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <div className="panel">{monitors.map((monitor, index) => <div className="history-row" key={monitor.id}><div><strong>Monitor {index + 1}</strong><small>{monitor.width} × {monitor.height}</small><small title={monitor.id}>{monitor.id}</small></div><button className="secondary" onClick={() => choose(monitor)}>Choose image</button></div>)}</div>}
+    {loading ? <p role="status">Finding monitors…</p> : loadFailed ? <div className="panel empty"><h3>Could not load monitors.</h3><p>Try refreshing the list.</p><button className="secondary" onClick={refresh}>Try again</button></div> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <div className="panel">{monitors.map((monitor, index) => <div className="history-row" key={monitor.id}><div><strong>Monitor {index + 1}</strong><small>{monitor.width} × {monitor.height}</small><small title={monitor.id}>{monitor.id}</small></div><button className="secondary" onClick={() => choose(monitor)}>Choose image</button></div>)}</div>}
     <p className="footnote">A running slideshow can replace per-monitor images on its next change.</p>
   </>;
 }
