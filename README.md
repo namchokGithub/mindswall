@@ -101,7 +101,8 @@ Use **Quick settings** on Overview to change the slideshow interval and fit mode
 Feedback appears in a temporary snackbar on the page where the action was made.
 Notifications are cleared when navigating to another page.
 
-The desktop **Gallery** loads images in pages and keeps local thumbnails. You
+The desktop **Gallery** shows a loading state while it finds images, loads them
+in pages, and keeps local thumbnails. You
 can set or exclude an image, and restore exclusions in **Settings**. Settings
 also contains fit, resolution, orientation, and aspect-ratio filters. **History**
 keeps the most recent 100 applied images locally, and **Monitors** lists

@@ -164,7 +164,7 @@ fn refresh_tray(app: &tauri::AppHandle) {
 }
 
 #[derive(Default)]
-struct GalleryState(Mutex<Vec<PathBuf>>);
+struct GalleryState(std::sync::Arc<Mutex<Vec<PathBuf>>>);
 
 #[derive(serde::Serialize)]
 struct GalleryPage {
@@ -300,34 +300,46 @@ fn apply_edited(path: PathBuf) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn gallery_images(
+async fn gallery_images(
     state: tauri::State<'_, GalleryState>,
     offset: usize,
 ) -> Result<GalleryPage, String> {
-    let mut images = state.0.lock().map_err(|e| e.to_string())?;
-    if offset == 0 {
-        *images = get_config()?.images().map_err(|e| e.to_string())?;
-    }
-    Ok(GalleryPage {
-        total: images.len(),
-        paths: images.iter().skip(offset).take(48).cloned().collect(),
+    let state = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if offset == 0 {
+            let scanned = get_config()?.images().map_err(|e| e.to_string())?;
+            *state.lock().map_err(|e| e.to_string())? = scanned;
+        }
+        let images = state.lock().map_err(|e| e.to_string())?;
+        Ok(GalleryPage {
+            total: images.len(),
+            paths: images.iter().skip(offset).take(48).cloned().collect(),
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn gallery_thumbnail(
+async fn gallery_thumbnail(
     state: tauri::State<'_, GalleryState>,
     path: PathBuf,
 ) -> Result<Vec<u8>, String> {
-    if !state.0.lock().map_err(|e| e.to_string())?.contains(&path) {
-        return Err("Image is not in the current collection".into());
-    }
-    let cache = directories::ProjectDirs::from("", "", "MindsWall")
-        .ok_or("Cache directory unavailable")?
-        .cache_dir()
-        .join("thumbnails");
-    let thumb = mindswall_core::utilities::thumbnail(&path, &cache).map_err(|e| e.to_string())?;
-    std::fs::read(thumb).map_err(|e| e.to_string())
+    let state = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !state.lock().map_err(|e| e.to_string())?.contains(&path) {
+            return Err("Image is not in the current collection".into());
+        }
+        let cache = directories::ProjectDirs::from("", "", "MindsWall")
+            .ok_or("Cache directory unavailable")?
+            .cache_dir()
+            .join("thumbnails");
+        let thumb =
+            mindswall_core::utilities::thumbnail(&path, &cache).map_err(|e| e.to_string())?;
+        std::fs::read(thumb).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

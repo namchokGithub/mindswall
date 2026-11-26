@@ -3,18 +3,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, RefreshCw } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
+import { createThumbnailQueue } from "./thumbnailQueue";
 
 export type Filter = { min_width: number; min_height: number; orientation: "any" | "landscape" | "portrait" | "square"; aspect_ratio: "any" | "wide" | "wide_ten" | "standard" | "square" };
 export type UtilityConfig = { excluded: string[]; filter: Filter; fit_mode: string };
 type Page = { paths: string[]; total: number };
 type Entry = { path: string; timestamp: number; monitor: string | null };
 
+const loadThumbnail = createThumbnailQueue(4);
+
 function Thumbnail({ path }: { path: string }) {
   const [src, setSrc] = useState("");
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true; let url = "";
-    invoke<number[]>("gallery_thumbnail", { path }).then(bytes => {
+    loadThumbnail(() => invoke<number[]>("gallery_thumbnail", { path }), () => active).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "image/png" })); setSrc(url);
     }).catch(() => { if (active) setFailed(true); });
@@ -25,17 +28,17 @@ function Thumbnail({ path }: { path: string }) {
 
 export function Gallery({ exclude }: { exclude: (path: string) => Promise<void> }) {
   const [paths, setPaths] = useState<string[]>([]); const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true); const { setError, setNotice } = useSnackbar("gallery");
+  const [loading, setLoading] = useState(true); const [loadFailed, setLoadFailed] = useState(false); const { setError, setNotice } = useSnackbar("gallery");
   const load = useCallback(async (offset: number) => {
-    setLoading(true); setError("");
+    setLoading(true); setLoadFailed(false); setError("");
     try { const page = await invoke<Page>("gallery_images", { offset }); setPaths(previous => offset === 0 ? page.paths : [...previous, ...page.paths]); setTotal(page.total); }
-    catch (e) { setError(String(e)); } finally { setLoading(false); }
+    catch (e) { setLoadFailed(true); setError(String(e)); } finally { setLoading(false); }
   }, [setError]);
   useEffect(() => { load(0); }, [load]);
   async function apply(path: string) { setError(""); try { await invoke("apply_image", { path }); setNotice("Wallpaper changed."); } catch (e) { setError(String(e)); } }
   return <><div className="section-title"><div><span className="eyebrow">YOUR COLLECTION</span><h2>All wallpapers <span className="count-pill">{total}</span></h2></div><button className="icon-button" aria-label="Refresh gallery" disabled={loading} onClick={() => load(0)}><RefreshCw size={16}/></button></div>
-    {!loading && paths.length === 0 ? <div className="panel empty"><div className="empty-icon"><Image size={25}/></div><h3>No images found.</h3><p>Add a folder or adjust your image filters.</p></div> : <div className="gallery-grid">{paths.map(path => <article className="gallery-card" key={path}><div className="gallery-thumb"><Thumbnail path={path}/></div><div className="gallery-body"><strong title={path}>{path.split(/[\\/]/).pop()}</strong><div className="gallery-actions"><button onClick={() => apply(path)}>Set wallpaper</button><button onClick={async () => { try { await exclude(path); await load(0); } catch (e) { setError(String(e)); } }}>Exclude</button></div></div></article>)}</div>}
-    {loading && <p className="loading" role="status">Loading images…</p>}{paths.length < total && <button className="secondary load-more" disabled={loading} onClick={() => load(paths.length)}>Load more</button>}
+    {loading && paths.length === 0 ? <div className="panel empty gallery-loading" role="status" aria-live="polite"><div className="gallery-spinner" aria-hidden="true"/><h3>Loading your collection…</h3><p>Finding wallpapers in your folders.</p></div> : loadFailed && paths.length === 0 ? <div className="panel empty"><h3>Could not load your collection.</h3><p>Check your folders and try again.</p><button className="secondary" onClick={() => load(0)}>Try again</button></div> : !loading && paths.length === 0 ? <div className="panel empty"><div className="empty-icon"><Image size={25}/></div><h3>No images found.</h3><p>Add a folder or adjust your image filters.</p></div> : <div className="gallery-grid" aria-busy={loading}>{paths.map(path => <article className="gallery-card" key={path}><div className="gallery-thumb"><Thumbnail path={path}/></div><div className="gallery-body"><strong title={path}>{path.split(/[\\/]/).pop()}</strong><div className="gallery-actions"><button onClick={() => apply(path)}>Set wallpaper</button><button onClick={async () => { try { await exclude(path); await load(0); } catch (e) { setError(String(e)); } }}>Exclude</button></div></div></article>)}</div>}
+    {loading && paths.length > 0 && <p className="loading" role="status">Loading images…</p>}{paths.length < total && <button className="secondary load-more" disabled={loading} onClick={() => load(paths.length)}>Load more</button>}
   </>;
 }
 
