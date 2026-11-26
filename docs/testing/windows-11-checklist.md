@@ -377,6 +377,8 @@ matches the Windows **Personalize > Background** setting of the same name.
 
 - [ ] Open **Monitors** after disconnecting a previously used display: available
       displays still load if Windows retains an inaccessible display record
+      (the first pass logged `skipping a monitor without readable dimensions`
+      as a warning; it is now a debug message and should not appear)
 - [x] **Monitors** lists every connected display
 - [x] Applying an image to one monitor changes only that monitor
 - [x] A running slideshow later replaces the per-monitor image (known behavior)

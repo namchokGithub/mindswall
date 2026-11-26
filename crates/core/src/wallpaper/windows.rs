@@ -84,8 +84,11 @@ pub fn list_monitors() -> Result<Vec<crate::wallpaper::MonitorInfo>, String> {
             let name = name?;
             let rect = match rect {
                 Ok(rect) => rect,
+                // Windows keeps records of monitors that were connected
+                // before or are turned off; they fail with E_FAIL. This is
+                // normal and happens on every listing, so it is not a warning.
                 Err(error) if error.code() == windows::Win32::Foundation::E_FAIL => {
-                    tracing::warn!(monitor_index = index, %error, "skipping a monitor without readable dimensions");
+                    tracing::debug!(monitor_index = index, %error, "skipping a monitor without readable dimensions");
                     unavailable = Some(format!(
                         "Could not read monitor {index} dimensions: {error}"
                     ));

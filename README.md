@@ -156,8 +156,10 @@ port and got a new device path. The configuration keys them by the Windows
 monitor device path. Profiles do not include per-monitor folders or names.
 While a display has its own folders, Overview labels the large preview as the
 main slideshow and shows a thumbnail for each display below it.
-Windows may retain unavailable display records; Monitors skips records whose
-dimensions cannot be read while showing the displays that are available.
+Windows may retain unavailable display records, such as displays connected
+earlier or turned off; Monitors skips records whose dimensions cannot be read
+(`0x80004005`) while showing the displays that are available. These skips are
+not written to the log, because they are normal and repeat on every listing.
 If the history file is invalid, it is renamed to
 `history.json.invalid-<timestamp>` and a new history starts. Exclusions match
 paths without regard to letter case or `/` and `\` separators.
