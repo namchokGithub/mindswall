@@ -318,6 +318,9 @@ matches the Windows **Personalize > Background** setting of the same name.
 
 ### Global hotkeys
 
+- [ ] Record a shortcut by pressing its keys, save it, and verify it works
+- [ ] Escape cancels recording, Clear disables a shortcut, and duplicate or
+      unavailable shortcuts report an error
 Hotkeys are empty by default; configure them in **Settings**.
 
 - [x] Next, Previous, and Pause hotkeys work while another app has focus

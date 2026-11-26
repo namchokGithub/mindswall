@@ -113,6 +113,16 @@ mod tests {
         hotkeys.previous = "Ctrl+Alt+Left".into();
         assert_eq!(parse_hotkeys(&hotkeys).unwrap().len(), 2);
     }
+
+    #[test]
+    fn accepts_recorded_keyboard_codes() {
+        let hotkeys = mindswall_core::config::Hotkeys {
+            next: "Ctrl+Alt+ArrowRight".into(),
+            previous: "Ctrl+Shift+KeyA".into(),
+            pause: "F12".into(),
+        };
+        assert_eq!(parse_hotkeys(&hotkeys).unwrap().len(), 3);
+    }
 }
 
 #[tauri::command]

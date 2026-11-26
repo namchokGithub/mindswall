@@ -124,7 +124,7 @@ large collection still need interactive Windows verification.
 profiles as JSON. The **Editor** creates a cached copy with optional crop,
 resize, blur, and dim; the original image remains untouched. The Editor shows
 a loading indicator while creating a preview. Global shortcuts
-can be configured in **Settings**, and saved profiles are available from the
+can be recorded using the keyboard in **Settings**, and saved profiles are available from the
 system tray. These features still need interactive Windows verification. A
 running slideshow may replace an edited wallpaper at its next change.
 

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, Download, Upload } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
+import { displayShortcut, shortcutFromKey } from "./shortcutCapture";
 
 type Profile = { name: string };
 type ExtendedConfig = { profiles: Profile[]; active_profile: string | null };
@@ -61,10 +62,20 @@ export function Editor() {
 
 export function HotkeySettings({ hotkeys, refresh }: { hotkeys: Hotkeys; refresh: () => Promise<void> }) {
   const [draft, setDraft] = useState(hotkeys); const [busy, setBusy] = useState(false); const { setError, setNotice } = useSnackbar("settings");
+  const [recording, setRecording] = useState<keyof Hotkeys | null>(null);
+  const [captureHint, setCaptureHint] = useState("");
   useEffect(() => setDraft(hotkeys), [hotkeys]);
   useEffect(() => { invoke<string | null>("hotkey_error").then(value => { if (value) setError(value); }).catch(() => {}); }, [setError]);
   async function apply() { setBusy(true); setError(""); setNotice(""); try { await invoke("set_hotkeys", { hotkeys: draft }); await refresh(); setNotice("Shortcuts saved."); } catch (e) { setError(String(e)); } finally { setBusy(false); } }
   return <><div className="section-title utility-heading"><div><span className="eyebrow">SHORTCUTS</span><h2>Control from anywhere</h2></div></div>
-    <div className="panel editor-panel"><small>Enter combinations such as Ctrl+Alt+Right. Leave a field empty to disable it.</small><div className="editor-fields">{([ ["Next wallpaper", "next"], ["Previous wallpaper", "previous"], ["Pause or resume", "pause"] ] as const).map(([label, key]) => <label key={key}>{label}<input type="text" maxLength={80} value={draft[key]} placeholder="Not assigned" onChange={e => setDraft({ ...draft, [key]: e.target.value })}/></label>)}</div><button className="secondary" disabled={busy} onClick={apply}>Save shortcuts</button></div>
+    <div className="panel editor-panel"><small>Select Record, then press a key combination. Press Escape to cancel. Clear disables a shortcut.</small><div className="shortcut-fields">{([ ["Next wallpaper", "next"], ["Previous wallpaper", "previous"], ["Pause or resume", "pause"] ] as const).map(([label, key]) => <div className="shortcut-field" key={key}><span id={`shortcut-${key}`}>{label}</span><div className="shortcut-actions"><button type="button" className="shortcut-record" disabled={busy} aria-labelledby={`shortcut-${key} shortcut-value-${key}`} aria-pressed={recording === key} onClick={() => { setRecording(key); setCaptureHint(""); }} onBlur={() => { setRecording(null); setCaptureHint(""); }} onKeyDown={e => {
+      if (recording !== key) return;
+      if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.metaKey) return;
+      e.preventDefault(); e.stopPropagation();
+      if (e.key === "Escape") { setRecording(null); setCaptureHint("Recording cancelled."); return; }
+      const shortcut = shortcutFromKey(e.nativeEvent);
+      if (shortcut) { setDraft(current => ({ ...current, [key]: shortcut })); setRecording(null); setCaptureHint(`${label}: ${displayShortcut(shortcut)} recorded. Save to apply.`); }
+      else if (!/^(Control|Shift|Alt|Meta)/.test(e.key)) setCaptureHint("This key cannot be used. Try another key.");
+    }}><span id={`shortcut-value-${key}`}>{recording === key ? "Press shortcut…" : `Record: ${displayShortcut(draft[key]) || "Not assigned"}`}</span></button><button type="button" className="secondary" disabled={busy || !draft[key]} aria-label={`Clear ${label} shortcut`} onClick={() => { setDraft(current => ({ ...current, [key]: "" })); setRecording(null); }}>Clear</button></div></div>)}</div><p className="shortcut-hint" role="status">{captureHint || "Some system shortcuts may not be available."}</p><button className="secondary" disabled={busy || recording !== null} onClick={apply}>Save shortcuts</button></div>
   </>;
 }
