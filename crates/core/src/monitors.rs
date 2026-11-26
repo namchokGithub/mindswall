@@ -144,6 +144,12 @@ impl MonitorShows {
         }
     }
 
+    /// Every image of the per-monitor slideshows; an image in several of
+    /// them is listed once per slideshow.
+    pub fn images(&self) -> impl Iterator<Item = &PathBuf> {
+        self.shows.values().flat_map(Slideshow::images)
+    }
+
     /// The slideshow of a monitor with its own folders.
     pub fn show(&self, monitor: &str) -> Option<&Slideshow> {
         self.shows.get(monitor)

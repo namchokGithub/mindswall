@@ -93,7 +93,9 @@ npm.cmd --prefix ui run tauri dev
 ```
 
 Use **Folders** to select image directories, then start the slideshow from
-**Overview**. Closing the window releases its WebView to save memory while the
+**Overview**. Folder paths on **Folders** and **Monitors** show only the last
+folder (for example `******\wallpapers`) so the rest stays out of screenshots;
+select a path to copy the full path. Closing the window releases its WebView to save memory while the
 app keeps running in the system tray; use the tray menu to open the window
 again or quit the app. **Settings** includes the per-user Windows startup
 option; when started with Windows, the app starts in the tray without opening a
@@ -126,7 +128,9 @@ change, without a full rescan, and new images join the current cycle. Files
 whose image header cannot be read yet, such as files still being copied, are
 picked up by a later change. When the desktop app runs the slideshow, the
 Overview total, the **Folders** image counts, and an open **Gallery** refresh
-after such a change. Use **Rescan collection** to force a full rescan. Saving settings keeps the current cycle: the wallpaper changes only when
+after such a change, and an open window shows how many images were added or
+removed (a renamed image counts as one of each). No notice is shown while the
+window is closed. Use **Rescan collection** to force a full rescan. Saving settings keeps the current cycle: the wallpaper changes only when
 the current image leaves the collection or the fit mode changes.
 Use **Quick settings** on Overview to change the slideshow interval and fit mode.
 

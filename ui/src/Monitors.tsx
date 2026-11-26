@@ -5,6 +5,7 @@ import { ArrowRightLeft, FolderOpen, Pencil, Plus, RefreshCw, Trash2 } from "luc
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
 import { Select } from "./Select";
+import { PathCopy } from "./PathCopy";
 import type { MonitorFolders, UtilityConfig } from "./Utilities";
 
 export type Monitor = { id: string; name: string | null; x: number; y: number; width: number; height: number; primary: boolean; current: string | null };
@@ -155,7 +156,7 @@ export function MonitorsPage({ config, busy, saveMonitors }: { config: UtilityCo
     const total = imageCount(folders);
     return `Own folders · ${folders.length} ${folders.length === 1 ? "folder" : "folders"}${total === null ? "" : ` · ${total} images`}`;
   };
-  const folderList = (id: string) => foldersOf(id).map(folder => <div className="monitor-folder" key={folder.path}><FolderOpen size={15}/><small title={folder.path}>{folder.path}</small><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => removeFolder(id, folder.path)}><Trash2 size={14}/></button></div>);
+  const folderList = (id: string) => foldersOf(id).map(folder => <div className="monitor-folder" key={folder.path}><FolderOpen size={15}/><PathCopy path={folder.path} copied={ok => ok ? setNotice("Folder path copied.") : setError("Could not copy the folder path.")}/><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => removeFolder(id, folder.path)}><Trash2 size={14}/></button></div>);
 
   const savedIds = useMemo(() => {
     const ids = [...config.monitor_folders.map(entry => entry.monitor), ...config.monitor_names.map(entry => entry.monitor)];

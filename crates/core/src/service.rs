@@ -43,7 +43,9 @@ pub enum Change {
     Playback,
     /// The folder watcher added, removed, or renamed images in the main or a
     /// per-monitor collection. The playback state may have changed as well.
-    Collection,
+    /// A renamed image counts as one removed and one added image; both counts
+    /// are zero when only the order or a folder changed.
+    Collection { added: usize, removed: usize },
 }
 
 enum Event {
@@ -318,6 +320,17 @@ fn check_monitors(monitors: &mut MonitorShows) -> (bool, Vec<String>) {
             (false, Vec::new())
         }
     }
+}
+
+/// Every image in the main and the per-monitor collections.
+fn collection(playback: &Playback, monitors: &MonitorShows) -> HashSet<PathBuf> {
+    playback
+        .show
+        .iter()
+        .flat_map(|show| show.images())
+        .chain(monitors.images())
+        .cloned()
+        .collect()
 }
 
 fn earliest(waits: [Option<Duration>; 3]) -> Option<Duration> {
@@ -624,7 +637,7 @@ pub fn run_slideshow_with(
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let now = Instant::now();
                 let mut changed = false;
-                let mut collection_changed = false;
+                let mut collection_changed = None;
                 if monitors_due.is_some_and(|due| now >= due) {
                     monitors_due = Some(now + MONITOR_CHECK);
                     let (layout_changed, added) = check_monitors(&mut monitors);
@@ -641,6 +654,8 @@ pub fn run_slideshow_with(
                 if files_due.is_some_and(|due| now >= due) {
                     files_due = None;
                     let paths = std::mem::take(&mut changed_files);
+                    let before = collection(&playback, &monitors);
+                    let mut updated = false;
                     let target = monitors.shared_target();
                     match playback.apply_file_changes(&config, &paths, now, &|path| {
                         show_shared(&collages, &target, path, &[]).map(|_| ())
@@ -650,14 +665,21 @@ pub fn run_slideshow_with(
                                 paths = paths.len(),
                                 "collection updated from folder changes"
                             );
-                            collection_changed = true;
+                            updated = true;
                         }
                         Ok(false) => {}
                         Err(error) => tracing::warn!(%error, "could not apply folder changes"),
                     }
                     if monitors.apply_file_changes(&config, &paths, &monitor_again) {
                         tracing::info!("monitor collections updated from folder changes");
-                        collection_changed = true;
+                        updated = true;
+                    }
+                    if updated {
+                        let after = collection(&playback, &monitors);
+                        collection_changed = Some(Change::Collection {
+                            added: after.difference(&before).count(),
+                            removed: before.difference(&after).count(),
+                        });
                     }
                 }
                 if playback.timer.is_due(now)
@@ -673,11 +695,8 @@ pub fn run_slideshow_with(
                     playback.timer.reset(Instant::now());
                     changed = true;
                 }
-                if collection_changed {
-                    on_change(
-                        &snapshot(&playback, &collages, &monitors),
-                        Change::Collection,
-                    );
+                if let Some(change) = collection_changed {
+                    on_change(&snapshot(&playback, &collages, &monitors), change);
                 } else if changed {
                     on_change(&snapshot(&playback, &collages, &monitors), Change::Playback);
                 }

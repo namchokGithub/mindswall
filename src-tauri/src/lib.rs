@@ -989,9 +989,12 @@ fn start_service_inner(
         // slideshow that this app runs.
         let notify = |status: &ipc::PlaybackStatus, change: Change| {
             let _ = app.emit("slideshow-changed", status);
-            if change == Change::Collection {
+            if let Change::Collection { added, removed } = change {
                 // Folder counts and the gallery are not part of the status.
-                let _ = app.emit("collection-changed", ());
+                let _ = app.emit(
+                    "collection-changed",
+                    serde_json::json!({ "added": added, "removed": removed }),
+                );
             }
         };
         let options = mindswall_core::service::ServiceOptions {

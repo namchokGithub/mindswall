@@ -212,7 +212,10 @@ example from the log.
       a few seconds the Overview total, the **Folders** image count, and the
       open **Gallery** update without changing pages, and the log shows
       `collection updated from folder changes` (the first pass saw the log
-      line, but Folders and Gallery updated only after a page change)
+      line, but Folders and Gallery updated only after a page change); a
+      notice says **N images added to your collection**
+- [ ] Delete images: the notice says **N images removed**; rename one: it
+      says **1 image added to your collection, 1 image removed**
 - [ ] Copy a large image slowly (or over the network): it is added after the
       copy finishes and never applied while incomplete
 - [ ] Delete or rename an image in a watched folder: the total updates; if it
@@ -278,6 +281,12 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
       the Windows default image
 - [x] Removing a folder updates the config file
 - [x] Non-ASCII folder paths display and work
+- [ ] Folder paths on **Folders** and **Monitors** show only the last folder
+      (`D:\coding\mindswall\example.wallpaper` shows
+      `******\example.wallpaper`; `D:\wallpapers` is shown unchanged), and
+      hovering shows no full path
+- [ ] Clicking a folder path (or Tab then Enter) copies the full, unmasked
+      path and shows **Folder path copied.**
 
 ### Overview and settings
 

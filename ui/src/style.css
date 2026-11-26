@@ -91,3 +91,4 @@ body{background:var(--c-11121a);user-select:none;-webkit-user-select:none}
 .screen-card-actions .icon-button{width:32px;height:32px;min-height:32px;background:rgba(12,13,25,.75);border-color:var(--c-4a4b58);color:var(--c-eaeaf3)}
 .screen-cards-note{justify-content:center;text-align:center;margin-top:10px}
 @media(max-width:760px){.screen-cards.columns-3{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:500px){.screen-cards.columns-2,.screen-cards.columns-3{grid-template-columns:minmax(0,1fr)}}
+.path-copy{display:flex;align-items:center;gap:6px;max-width:100%;min-width:0;margin-top:4px;padding:2px 0;border:0;background:none;color:var(--c-858698);font-size:11px;text-align:left}.path-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.path-copy svg{flex:none;opacity:0;transition:opacity .15s}.path-copy:hover{color:var(--c-bcb9f5)}.path-copy:hover svg,.path-copy:focus-visible svg{opacity:1}.monitor-folder .path-copy{flex:1;margin-top:0}

@@ -12,6 +12,7 @@ import { MonitorsPage, type MonitorPlayback } from "./Monitors";
 import { ScreenCards } from "./Overview";
 import { Editor, HotkeySettings, Profiles } from "./Extended";
 import { maskUserName } from "./maskPath";
+import { PathCopy } from "./PathCopy";
 import { SnackbarProvider, useSnackbar } from "./Snackbar";
 import { FitModeSelect, IntervalSelect } from "./SettingControls";
 import "./style.css";
@@ -21,6 +22,16 @@ type ProfileStatus = { active: string | null; changed: boolean };
 type Config = { theme: ThemeSetting; collage: { enabled: boolean; gap: number } } & { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
 type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings";
 type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null; combined: string[]; display: string | null; monitors?: MonitorPlayback[] };
+
+/** The notice shown when the folder watcher adds or removes images. */
+function collectionNotice(change: { added: number; removed: number } | null) {
+  const count = (n: number) => `${n} ${n === 1 ? "image" : "images"}`;
+  const parts = [
+    change && change.added > 0 && `${count(change.added)} added to your collection`,
+    change && change.removed > 0 && `${count(change.removed)} removed`,
+  ].filter(Boolean);
+  return parts.length > 0 ? `${parts.join(", ")}.` : "";
+}
 
 function App() {
   const [page, setPage] = useState<Page>("overview");
@@ -79,10 +90,14 @@ function App() {
     const keep = (dispose: () => void) => { if (active) disposers.push(dispose); else dispose(); };
     document.addEventListener("visibilitychange", update);
     listen("slideshow-changed", () => { if (visible()) refreshStatus(); }).then(keep).catch(() => {});
-    listen("collection-changed", () => setCollectionVersion(version => version + 1)).then(keep).catch(() => {});
+    listen<{ added: number; removed: number } | null>("collection-changed", event => {
+      setCollectionVersion(version => version + 1);
+      const text = collectionNotice(event.payload);
+      if (text) setMessage(text);
+    }).then(keep).catch(() => {});
     update();
     return () => { active = false; disposers.forEach(dispose => dispose()); document.removeEventListener("visibilitychange", update); if (timer !== undefined) window.clearInterval(timer); };
-  }, [refreshStatus]);
+  }, [refreshStatus, setMessage]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined; let active = true;
@@ -152,7 +167,7 @@ function App() {
           <section className="quick-settings" aria-labelledby="quick-settings-title"><div className="section-title"><div><span className="eyebrow">SLIDESHOW</span><h2 id="quick-settings-title">Quick settings</h2></div></div><div className="panel settings-panel"><div className="setting-row"><div><strong>Change picture every</strong><small>Set the time between wallpapers.</small></div><IntervalSelect value={config.interval_seconds} disabled={busy} onChange={interval_seconds => save({ ...config, interval_seconds })}/></div><div className="setting-row"><div><strong>Fit mode</strong><small>Choose how wallpapers fit your screen.</small></div><FitModeSelect value={config.fit_mode} disabled={busy} onChange={fit_mode => save({ ...config, fit_mode })}/></div></div></section>
           <div className="overview-grid"><div className="summary-card"><div className="summary-icon"><FolderOpen size={18}/></div><span>YOUR COLLECTION</span><strong>{config.folders.filter(f => f.enabled).length} <small>active folders</small></strong><button className="text-link" onClick={() => navigatePage("folders")}>Manage folders <ArrowRight size={14}/></button></div><div className="summary-card"><div className="summary-icon"><RefreshCw size={18}/></div><span>THE FLOW</span><strong>{config.shuffle ? "Shuffle" : "In order"} <small>every {config.interval_seconds / 60} min</small></strong><button className="text-link" onClick={() => navigatePage("settings")}>Adjust settings <ArrowRight size={14}/></button></div></div></>}
         {page === "folders" && <><div className="section-title"><div><span className="eyebrow">COLLECTION SOURCES</span><h2>Folders <span className="count-pill">{config.folders.length}</span></h2></div><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add folder</button></div>
-          {config.folders.length === 0 ? <div className="panel empty"><div className="empty-icon"><FolderOpen size={25}/></div><h3>It starts with a folder.</h3><p>Add a folder of images and make this space your own.</p><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add your first folder</button></div> : <div className="panel folder-list">{config.folders.map((folder, index) => <div className="folder-row" key={folder.path}><div className="folder-icon"><FolderOpen size={19}/></div><div className="folder-info"><strong className="selectable" title={folder.path}>{folder.path.split(/[\\/]/).pop() || folder.path}</strong><small className="selectable" title={folder.path}>{folder.path}</small><span>{counts[folder.path] === undefined ? "Scanning…" : typeof counts[folder.path] === "number" ? `${counts[folder.path]} images` : counts[folder.path]}</span></div><label className="inline-check"><input type="checkbox" checked={folder.recursive} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, recursive: e.target.checked } : f) })}/> Include subfolders</label><label className="switch" title="Enable folder"><input type="checkbox" aria-label={`Enable ${folder.path}`} checked={folder.enabled} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, enabled: e.target.checked } : f) })}/><span/></label><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => save({ ...config, folders: config.folders.filter((_, i) => i !== index) })}><Trash2 size={16}/></button></div>)}</div>}
+          {config.folders.length === 0 ? <div className="panel empty"><div className="empty-icon"><FolderOpen size={25}/></div><h3>It starts with a folder.</h3><p>Add a folder of images and make this space your own.</p><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add your first folder</button></div> : <div className="panel folder-list">{config.folders.map((folder, index) => <div className="folder-row" key={folder.path}><div className="folder-icon"><FolderOpen size={19}/></div><div className="folder-info"><strong className="selectable">{folder.path.split(/[\\/]/).pop() || folder.path}</strong><PathCopy path={folder.path} copied={ok => ok ? setMessage("Folder path copied.") : setError("Could not copy the folder path.")}/><span>{counts[folder.path] === undefined ? "Scanning…" : typeof counts[folder.path] === "number" ? `${counts[folder.path]} images` : counts[folder.path]}</span></div><label className="inline-check"><input type="checkbox" checked={folder.recursive} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, recursive: e.target.checked } : f) })}/> Include subfolders</label><label className="switch" title="Enable folder"><input type="checkbox" aria-label={`Enable ${folder.path}`} checked={folder.enabled} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, enabled: e.target.checked } : f) })}/><span/></label><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => save({ ...config, folders: config.folders.filter((_, i) => i !== index) })}><Trash2 size={16}/></button></div>)}</div>}
           <div className="footnote"><Image size={16}/> JPG, JPEG, PNG and BMP images are supported.</div></>}
         {page === "gallery" && <Gallery config={config} busy={busy} collectionVersion={collectionVersion} openSettings={() => navigatePage("settings")} exclude={async path => { await save({ ...config, excluded: [...config.excluded, path] }, true); }} restore={async path => { await save({ ...config, excluded: config.excluded.filter(item => item !== path) }, true); }}/>}
         {page === "history" && <HistoryPage names={config.monitor_names}/>}
