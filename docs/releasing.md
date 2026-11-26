@@ -39,7 +39,11 @@ The UI footer in `ui/src/main.tsx` also shows the version; update it too.
 4. Packages `MindsWall_<version>_x64_portable.zip` with `MindsWall.exe`,
    `mindswall.exe`, `LICENSE`, and `README.md`, and writes `SHA256SUMS.txt`.
 5. Uploads the files as a workflow artifact and attaches them to a draft
-   release whose notes are the changelog section.
+   release. Its notes are the changelog section followed by a fixed
+   **Downloads** section that lists the files (GitHub adds the source code
+   archives) and warns that the builds are not code-signed and may be blocked
+   by SmartScreen, Smart App Control, or antivirus software, linking to the
+   README steps.
 
 The portable build needs the Microsoft Edge WebView2 Runtime, which Windows 11
 includes. It stores settings in the same per-user folders as the installed

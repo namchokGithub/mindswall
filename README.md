@@ -20,7 +20,10 @@ The project is in early development. The Rust CLI can scan folders and set or ra
 - **Target platform:** Windows 11
 - **Backend:** Rust
 - **Planned desktop UI:** Tauri 2, React, and TypeScript
-- **Planned distribution:** Portable EXE and installer
+- **Planned distribution:** source code, a portable ZIP (with `MindsWall.exe`),
+  and a per-user installer through GitHub Releases. Builds are not
+  code-signed, so Windows may block them; see
+  [Installing a release build](#installing-a-release-build-windows-smartscreen).
 
 ## Getting started
 

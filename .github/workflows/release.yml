@@ -95,7 +95,26 @@ jobs:
           $notes = (Get-Content CHANGELOG.md -Raw) -split "(?m)^## " |
             Where-Object { $_ -match "^\[$version\]" } |
             Select-Object -First 1
-          ($notes -replace "^\[$version\][^\r\n]*\r?\n", '').Trim() | Set-Content dist/notes.md
+          $changes = ($notes -replace "^\[$version\][^\r\n]*\r?\n", '').Trim()
+          $repo = "${{ github.server_url }}/${{ github.repository }}"
+          # Every release states that the builds are unsigned.
+          $download = @"
+          ## Downloads
+
+          - ``MindsWall_<version>_x64-setup.exe``: per-user installer (no administrator rights needed)
+          - ``MindsWall_<version>_x64_portable.zip``: portable build; extract it and run ``MindsWall.exe``
+          - ``SHA256SUMS.txt``: checksums for both files
+          - **Source code** (zip / tar.gz): added by GitHub
+
+          > [!WARNING]
+          > These builds are **not code-signed**. Windows SmartScreen may show
+          > "Windows protected your PC", Smart App Control may block them, and
+          > antivirus software may scan or quarantine them. Check the SHA-256
+          > checksum first, then select **More info** > **Run anyway**. See
+          > [Installing a release build]($repo#installing-a-release-build-windows-smartscreen)
+          > for the steps, or build from source.
+          "@ -replace '<version>', '${{ github.ref_name }}'.TrimStart('v') -replace '(?m)^          ', ''
+          "$changes`n`n$download" | Set-Content dist/notes.md
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
