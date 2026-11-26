@@ -307,6 +307,8 @@ matches the Windows **Personalize > Background** setting of the same name.
 
 ### Editor
 
+- [ ] Creating a preview shows a loading state and prevents changing edit
+      settings until the preview succeeds or fails
 - [ ] Crop, resize, blur (0–20), and dim (0–90) each produce the expected result
 - [ ] The edited copy is written to the cache; the original file is unchanged
       (compare size and modified time)

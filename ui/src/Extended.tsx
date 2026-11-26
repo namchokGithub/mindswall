@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, Download, Upload } from "lucide-react";
@@ -30,6 +30,8 @@ export function Editor() {
   const [width, setWidth] = useState(""); const [height, setHeight] = useState(""); const [crop, setCrop] = useState(false);
   const [x, setX] = useState("0"); const [y, setY] = useState("0"); const [cropWidth, setCropWidth] = useState(""); const [cropHeight, setCropHeight] = useState("");
   const [blur, setBlur] = useState(0); const [dim, setDim] = useState(0); const { setError, setNotice } = useSnackbar("editor"); const [busy, setBusy] = useState(false);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   async function choose() { try { const path = await open({ multiple: false, filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "bmp"] }] }); if (path) { setSource(path); setEdited(""); setPreview(""); setError(""); } } catch (e) { setError(String(e)); } }
   async function generate() {
@@ -38,17 +40,21 @@ export function Editor() {
     const w = width ? number(width) : null, h = height ? number(height) : null;
     const cropValues = [x, y, cropWidth, cropHeight].map(number);
     if ((!!width !== !!height) || (width && (w === null || h === null)) || (crop && cropValues.some(v => v === null))) { setError("Enter valid whole numbers for both resize dimensions and all crop fields."); return; }
-    setBusy(true);
+    setEdited(""); setBusy(true);
     try {
       const result = await invoke<EditResult>("edit_image", { path: source, options: { width: w, height: h, crop: crop ? { x: cropValues[0], y: cropValues[1], width: cropValues[2], height: cropValues[3] } : null, blur, dim } });
+      if (!mounted.current) return;
       setEdited(result.path); setPreview(URL.createObjectURL(new Blob([new Uint8Array(result.preview)], { type: "image/png" }))); setNotice("Preview created. Your original image is unchanged.");
-    } catch (e) { setError(String(e)); } finally { setBusy(false); }
+    } catch (e) { if (mounted.current) setError(String(e)); } finally { if (mounted.current) setBusy(false); }
   }
   return <><div className="section-title"><div><span className="eyebrow">MAKE IT YOURS</span><h2>Image editor</h2></div><button className="primary" disabled={busy} onClick={choose}><FolderOpen size={16}/> Choose image</button></div>
-    {!source ? <div className="panel empty"><h3>Start with an image.</h3><p>Crop, resize, blur or dim a copy for your desktop.</p><button className="primary" onClick={choose}>Choose image</button></div> : <><div className="panel editor-panel" onChange={() => setEdited("")}><strong title={source}>{source.split(/[\\/]/).pop()}</strong><small>{source}</small>{preview && <img className="edited-preview" src={preview} alt="Preview of the edited image"/>}
+    {!source ? <div className="panel empty"><h3>Start with an image.</h3><p>Crop, resize, blur or dim a copy for your desktop.</p><button className="primary" disabled={busy} onClick={choose}>Choose image</button></div> : <><div className="panel editor-panel" onChange={() => setEdited("")}><strong title={source}>{source.split(/[\\/]/).pop()}</strong><small>{source}</small>{preview && <img className="edited-preview" src={preview} alt="Preview of the edited image"/>}
+      {busy && <div className="editor-loading" role="status"><span className="editor-spinner" aria-hidden="true"/><div><strong>Creating preview…</strong><p>This may take a moment for large images.</p></div></div>}
+      <fieldset className="editor-controls" disabled={busy} aria-busy={busy}>
       <div className="editor-fields"><label>Width (px)<input type="number" min="1" max="8192" value={width} onChange={e => setWidth(e.target.value)} placeholder="Original"/></label><label>Height (px)<input type="number" min="1" max="8192" value={height} onChange={e => setHeight(e.target.value)} placeholder="Original"/></label><label>Blur ({blur})<input type="range" min="0" max="20" step="1" value={blur} onChange={e => setBlur(Number(e.target.value))}/></label><label>Dim ({dim}%)<input type="range" min="0" max="90" step="5" value={dim} onChange={e => setDim(Number(e.target.value))}/></label></div>
       <label className="inline-check"><input type="checkbox" checked={crop} onChange={e => setCrop(e.target.checked)}/> Crop image before resizing</label>{crop && <div className="editor-fields">{[["Left (px)", x, setX], ["Top (px)", y, setY], ["Crop width", cropWidth, setCropWidth], ["Crop height", cropHeight, setCropHeight]].map(([label, value, setter]) => <label key={label as string}>{label as string}<input type="number" min="0" value={value as string} onChange={e => (setter as (s: string) => void)(e.target.value)}/></label>)}</div>}
-      <div className="profile-create"><button className="primary" disabled={busy} onClick={generate}>Create preview</button><button className="secondary" disabled={busy || !edited} onClick={async () => { try { await invoke("apply_edited", { path: edited }); setNotice("Edited image applied to your desktop."); } catch (e) { setError(String(e)); } }}>Set as wallpaper</button></div>
+      </fieldset>
+      <div className="profile-create"><button className="primary" disabled={busy} onClick={generate}>{busy ? "Creating preview…" : "Create preview"}</button><button className="secondary" disabled={busy || !edited} onClick={async () => { try { await invoke("apply_edited", { path: edited }); setNotice("Edited image applied to your desktop."); } catch (e) { setError(String(e)); } }}>Set as wallpaper</button></div>
       <small>Edits are written to a local cache; the original is never changed.</small></div></>}
   </>;
 }
