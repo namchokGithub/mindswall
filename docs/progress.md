@@ -98,6 +98,14 @@ Completed Log.
   any monitor has its own. While configured, monitors are listed every 10
   seconds; a reconnected monitor gets its image again and keeps its cycle. The
   Monitors page adds and removes folders per monitor.
+- **Monitors page and names** (2026-11-26, not committed yet): monitors show
+  the name from `DisplayConfigGetDeviceInfo` (EDID), position, primary flag,
+  and the current wallpaper from `IDesktopWallpaper::GetWallpaper`; the page
+  draws the arrangement to scale, monitors can be renamed (`monitor_names`),
+  and saved settings of a disconnected monitor can be moved to another one.
+  Overview shows a thumbnail per monitor while any monitor has its own
+  folders, and History names and filters monitors (the 10-entry limit stays
+  shared by all monitors). Interval and shuffle stay shared (D7).
 - **Release workflow** (2026-11-26, not committed yet): pushing a `v*.*.*` tag
   runs the CI checks, verifies the manifest versions and `CHANGELOG.md`, builds
   the NSIS installer and a portable ZIP with checksums, and creates a draft
@@ -233,8 +241,9 @@ Goal: complete the P2 feature set.
   on all monitors or a separate image (and optionally separate folders) per
   monitor; handle monitors being connected or disconnected; Monitors page.
   Per-monitor folders and connect/disconnect handling (10-second polling
-  while configured) were implemented on 2026-11-26; need verification on a
-  real multi-monitor setup
+  while configured) were implemented on 2026-11-26, followed by monitor names,
+  previews, and the arrangement view; need verification on a real
+  multi-monitor setup
 - [~] **Image gallery**: grid of discovered images with cached, downscaled
   thumbnails (`image` crate, stored in the local cache directory); lazy
   loading or virtualized list for large libraries; set-as-wallpaper and
@@ -419,6 +428,15 @@ only the image; forcing Fill there would require writing the per-user
   and rewriting working screens.
 - Revisit only if the custom controls become hard to keep accessible or
   consistent.
+
+### D7. Per-monitor slideshows share playback settings
+
+- Monitors with their own folders use the main interval, shuffle, filters, and
+  exclusions; per-monitor intervals are not planned for v1.
+- Windows applies one fit mode to the whole desktop
+  (`IDesktopWallpaper::SetPosition`), so fit mode cannot differ per monitor.
+- History keeps the latest 10 changes across all monitors and filters them by
+  monitor in the UI.
 
 ## Risks
 

@@ -129,9 +129,17 @@ You can set or exclude an image, then use
 **Excluded** in Gallery to restore individual images or **Settings** to restore
 all exclusions. Restored images still need to match enabled folders and filters. Settings
 also contains fit, resolution, orientation, and aspect-ratio filters. **History**
-shows thumbnails for the most recent 10 applied images locally, and **Monitors** lists
-connected displays and can apply an image to one display. A running slideshow
-can replace a per-monitor selection at its next change.
+shows thumbnails for the most recent 10 applied images locally. With more than
+one display, each entry names its display or the main slideshow, and a filter
+shows one display; the limit of 10 covers all displays together.
+
+**Monitors** draws the display arrangement to scale, like Windows display
+settings, with each display's current wallpaper. Displays are numbered left to
+right and show the name the monitor reports (for example its model), its
+resolution, and whether it is the primary display. Use the pencil button to
+give a display your own name (up to 40 characters, stored in `monitor_names`);
+the name is used in Monitors, Overview, and History. **Choose image** applies an
+image to one display; a running slideshow can replace it at its next change.
 
 In **Monitors**, a display can also get its own folders. It then runs its own
 slideshow at the same interval, with the same shuffle, filter, exclusion, and
@@ -140,9 +148,13 @@ and Pause apply to every display. The slideshow still needs at least one
 enabled folder in **Folders**. While any display has its own folders, the
 slideshow lists monitors every 10 seconds: a reconnected display gets its image
 again and continues its own cycle, and a disconnected display is skipped.
-Folders of disconnected displays stay saved until you choose **Forget**. The
-configuration stores them in `monitor_folders`, keyed by the Windows monitor
-device path. Profiles do not include per-monitor folders.
+Folders and names of disconnected displays stay saved under **Saved monitor
+settings** until you choose **Forget**, or **Move** them to a connected display
+that has no folders of its own, for example when a monitor was moved to another
+port and got a new device path. The configuration keys them by the Windows
+monitor device path. Profiles do not include per-monitor folders or names.
+While a display has its own folders, Overview labels the large preview as the
+main slideshow and shows a thumbnail for each display below it.
 Windows may retain unavailable display records; Monitors skips records whose
 dimensions cannot be read while showing the displays that are available.
 If the history file is invalid, it is renamed to

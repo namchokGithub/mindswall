@@ -1,10 +1,20 @@
 use crate::Error;
-use std::path::Path;
-#[derive(serde::Serialize)]
+use std::path::{Path, PathBuf};
+/// A connected monitor. Coordinates are in desktop pixels; the primary
+/// monitor's top-left corner is at (0, 0).
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct MonitorInfo {
+    /// Windows device path, used as the monitor key in the configuration.
     pub id: String,
+    /// The name the monitor reports, such as "DELL P2419H", when available.
+    pub name: Option<String>,
+    pub x: i32,
+    pub y: i32,
     pub width: i32,
     pub height: i32,
+    pub primary: bool,
+    /// The image Windows shows on this monitor, when it reports one.
+    pub current: Option<PathBuf>,
 }
 pub trait WallpaperSetter {
     fn set_wallpaper(&self, path: &Path) -> Result<(), Error>;

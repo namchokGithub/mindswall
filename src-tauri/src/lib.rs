@@ -681,6 +681,22 @@ async fn monitors() -> Result<Vec<mindswall_core::wallpaper::MonitorInfo>, Strin
     blocking(mindswall_core::wallpaper::list_monitors).await
 }
 
+/// A thumbnail of the image Windows shows on a monitor. The path comes from
+/// Windows rather than the UI, so only current wallpapers can be read.
+#[tauri::command]
+async fn monitor_thumbnail(monitor: String) -> Result<tauri::ipc::Response, String> {
+    blocking(move || {
+        let path = mindswall_core::wallpaper::list_monitors()?
+            .into_iter()
+            .find(|info| info.id == monitor)
+            .and_then(|info| info.current)
+            .ok_or("This monitor has no wallpaper image")?;
+        cached_thumbnail(&path)
+    })
+    .await
+    .map(tauri::ipc::Response::new)
+}
+
 #[tauri::command]
 async fn set_monitor_image(
     state: tauri::State<'_, GalleryState>,
@@ -1077,6 +1093,7 @@ pub fn run() {
             get_history,
             reapply_history,
             monitors,
+            monitor_thumbnail,
             set_monitor_image,
             save_profile,
             apply_profile,

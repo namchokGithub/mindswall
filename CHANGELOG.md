@@ -21,3 +21,8 @@ All notable changes to MindsWall are recorded here. The format follows
   the tray without a window.
 - GitHub Actions CI on Windows and a tag-triggered release workflow.
 - Settings shows the log file location with a button to copy it.
+- Monitors shows each display's name, position, and current wallpaper in a
+  to-scale arrangement; displays can be renamed, and saved settings of a
+  disconnected display can be moved to another one.
+- Overview shows a thumbnail per display while a display has its own folders,
+  and History names and filters displays.

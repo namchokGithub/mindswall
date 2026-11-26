@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FolderOpen, Grid2X2, Grid3X3, Image, List, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Grid2X2, Grid3X3, Image, List, RefreshCw } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
 import { GalleryPreview } from "./GalleryPreview";
+import { monitorLabel, useMonitors, type MonitorName } from "./Monitors";
 
 export type Filter = { min_width: number; min_height: number; orientation: "any" | "landscape" | "portrait" | "square"; aspect_ratio: "any" | "wide" | "wide_ten" | "standard" | "square" };
 export type MonitorFolders = { monitor: string; folders: { path: string; enabled: boolean; recursive: boolean }[] };
-export type UtilityConfig = { excluded: string[]; filter: Filter; fit_mode: string; monitor_folders: MonitorFolders[] };
+export type UtilityConfig = { excluded: string[]; filter: Filter; fit_mode: string; monitor_folders: MonitorFolders[]; monitor_names: MonitorName[] };
 type Page = { paths: string[]; total: number };
 type Entry = { path: string; timestamp: number; monitor: string | null };
 type GalleryLayout = "large" | "compact" | "list";
@@ -72,40 +73,20 @@ export function Gallery({ config, busy, collectionVersion, openSettings, exclude
   </>;
 }
 
-export function HistoryPage() {
+export function HistoryPage({ names }: { names: MonitorName[] }) {
   const [entries, setEntries] = useState<Entry[]>([]); const { setError, setNotice } = useSnackbar("history"); const [loading, setLoading] = useState(true);
+  // "" shows every entry, "main" the main slideshow, any other value one monitor.
+  const [filter, setFilter] = useState("");
+  const { monitors } = useMonitors();
   const refresh = useCallback(async () => { try { setEntries(await invoke<Entry[]>("get_history")); setError(""); } catch (e) { setError(String(e)); } finally { setLoading(false); } }, [setError]);
   useEffect(() => { refresh(); }, [refresh]);
-  return <><div className="section-title"><div><span className="eyebrow">RECENT MOMENTS</span><h2>Wallpaper history</h2></div><button className="icon-button" aria-label="Refresh history" onClick={refresh}><RefreshCw size={16}/></button></div>
-    {loading ? <p role="status">Loading history…</p> : entries.length === 0 ? <div className="panel empty"><h3>Nothing here yet.</h3><p>Wallpapers you apply will appear here.</p></div> : <div className="panel">{entries.map((entry, index) => <div className="history-row history-entry" key={`${entry.timestamp}-${index}`}><div className="history-thumbnail"><Thumbnail path={entry.path} source="history_thumbnail"/></div><div className="history-details"><strong title={entry.path}>{entry.path.split(/[\\/]/).pop()}</strong><small title={entry.path}>{entry.path}</small><small>{new Date(entry.timestamp * 1000).toLocaleString()}{entry.monitor ? ` · ${entry.monitor}` : ""}</small></div><button className="secondary" onClick={async () => { try { await invoke("reapply_history", { path: entry.path, monitor: entry.monitor }); await refresh(); setNotice("Wallpaper changed."); } catch (e) { setError(String(e)); } }}>Apply again</button></div>)}</div>}
+  const label = (monitor: string | null) => monitor ? monitorLabel(monitor, monitors, names) : "Main slideshow";
+  const targets = [...new Set(entries.map(entry => entry.monitor).filter((monitor): monitor is string => monitor !== null))];
+  const shown = entries.filter(entry => filter === "" || (filter === "main" ? entry.monitor === null : entry.monitor === filter));
+  const hasMonitors = targets.length > 0;
+  return <><div className="section-title"><div><span className="eyebrow">RECENT MOMENTS</span><h2>Wallpaper history</h2></div><div className="history-tools">{hasMonitors && <select aria-label="Show history for" value={filter} onChange={event => setFilter(event.target.value)}><option value="">All monitors</option><option value="main">Main slideshow</option>{targets.map(monitor => <option key={monitor} value={monitor}>{label(monitor)}</option>)}</select>}<button className="icon-button" aria-label="Refresh history" onClick={refresh}><RefreshCw size={16}/></button></div></div>
+    {loading ? <p role="status">Loading history…</p> : shown.length === 0 ? <div className="panel empty"><h3>Nothing here yet.</h3><p>{entries.length === 0 ? "Wallpapers you apply will appear here." : "No wallpapers for this monitor in the latest 10 changes."}</p></div> : <div className="panel">{shown.map((entry, index) => <div className="history-row history-entry" key={`${entry.timestamp}-${index}`}><div className="history-thumbnail"><Thumbnail path={entry.path} source="history_thumbnail"/></div><div className="history-details"><strong title={entry.path}>{entry.path.split(/[\\/]/).pop()}</strong><small title={entry.path}>{entry.path}</small><small title={entry.monitor ?? undefined}>{new Date(entry.timestamp * 1000).toLocaleString()}{hasMonitors ? ` · ${label(entry.monitor)}` : ""}</small></div><button className="secondary" onClick={async () => { try { await invoke("reapply_history", { path: entry.path, monitor: entry.monitor }); await refresh(); setNotice("Wallpaper changed."); } catch (e) { setError(String(e)); } }}>Apply again</button></div>)}</div>}
+    {hasMonitors && <p className="footnote">History keeps the latest 10 changes across all monitors.</p>}
   </>;
 }
 
-type Monitor = { id: string; width: number; height: number };
-export function MonitorsPage({ config, busy, saveMonitorFolders }: { config: UtilityConfig; busy: boolean; saveMonitorFolders: (value: MonitorFolders[]) => Promise<void> }) {
-  const [monitors, setMonitors] = useState<Monitor[]>([]); const { setError, setNotice } = useSnackbar("monitors"); const [loading, setLoading] = useState(true); const [loadFailed, setLoadFailed] = useState(false);
-  const refresh = useCallback(async () => { setLoading(true); setLoadFailed(false); try { setMonitors(await invoke<Monitor[]>("monitors")); setError(""); } catch (e) { setLoadFailed(true); setError(String(e)); } finally { setLoading(false); } }, [setError]);
-  useEffect(() => { refresh(); }, [refresh]);
-  async function choose(monitor: Monitor) {
-    try { const path = await invoke<string | null>("pick_image"); if (path) { await invoke("set_monitor_image", { monitor: monitor.id, path }); setNotice("Wallpaper changed for this monitor."); } }
-    catch (e) { setError(String(e)); }
-  }
-  const foldersOf = (id: string) => config.monitor_folders.find(entry => entry.monitor === id)?.folders ?? [];
-  // Entries without folders are dropped so a monitor returns to the main slideshow.
-  const withFolders = (id: string, folders: MonitorFolders["folders"]) => [...config.monitor_folders.filter(entry => entry.monitor !== id), ...(folders.length > 0 ? [{ monitor: id, folders }] : [])];
-  async function addFolder(id: string) {
-    try {
-      const path = await invoke<string | null>("pick_folder");
-      if (!path || foldersOf(id).some(folder => folder.path.toLowerCase() === path.toLowerCase())) return;
-      await saveMonitorFolders(withFolders(id, [...foldersOf(id), { path, enabled: true, recursive: true }]));
-    } catch (e) { setError(String(e)); }
-  }
-  const removeFolder = (id: string, path: string) => saveMonitorFolders(withFolders(id, foldersOf(id).filter(folder => folder.path !== path)));
-  const folderList = (id: string) => foldersOf(id).length === 0 ? <small>Shows the main slideshow.</small> : foldersOf(id).map(folder => <div className="monitor-folder" key={folder.path}><FolderOpen size={15}/><small title={folder.path}>{folder.path}</small><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => removeFolder(id, folder.path)}><Trash2 size={14}/></button></div>);
-  const disconnected = config.monitor_folders.filter(entry => !monitors.some(monitor => monitor.id === entry.monitor));
-  return <><div className="section-title"><div><span className="eyebrow">YOUR SCREENS</span><h2>Connected monitors</h2></div><button className="icon-button" aria-label="Refresh monitors" disabled={loading} onClick={refresh}><RefreshCw size={16}/></button></div>
-    {loading ? <p role="status">Finding monitors…</p> : loadFailed ? <div className="panel empty"><h3>Could not load monitors.</h3><p>Try refreshing the list.</p><button className="secondary" onClick={refresh}>Try again</button></div> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <div className="panel">{monitors.map((monitor, index) => <div className="history-row" key={monitor.id}><div><strong>Monitor {index + 1}</strong><small>{monitor.width} × {monitor.height}</small><small title={monitor.id}>{monitor.id}</small>{folderList(monitor.id)}</div><div className="monitor-actions"><button className="secondary" disabled={busy} onClick={() => addFolder(monitor.id)}><Plus size={15}/> Add folder</button><button className="secondary" onClick={() => choose(monitor)}>Choose image</button></div></div>)}</div>}
-    {!loading && !loadFailed && disconnected.length > 0 && <><div className="section-title"><div><span className="eyebrow">NOT CONNECTED</span><h2>Saved monitor folders</h2></div></div><div className="panel">{disconnected.map(entry => <div className="history-row" key={entry.monitor}><div><small title={entry.monitor}>{entry.monitor}</small>{folderList(entry.monitor)}</div><button className="secondary" disabled={busy} onClick={() => saveMonitorFolders(withFolders(entry.monitor, []))}>Forget</button></div>)}</div></>}
-    <p className="footnote">A monitor with its own folders runs its own slideshow at the same interval; other monitors share the main slideshow. Connected and disconnected monitors are noticed within about 10 seconds. A single image chosen here lasts until the next change.</p>
-  </>;
-}

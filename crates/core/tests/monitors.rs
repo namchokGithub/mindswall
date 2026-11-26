@@ -1,5 +1,5 @@
 use mindswall_core::{
-    config::{Config, Folder, MonitorFolders},
+    config::{Config, Folder, MonitorFolders, MonitorName},
     monitors::{MonitorShows, SharedTarget},
 };
 use std::{
@@ -164,4 +164,39 @@ fn monitor_folders_are_validated() {
     assert!(config.validate().is_err());
     config.monitor_folders[1].monitor = " ".into();
     assert!(config.validate().is_err());
+}
+
+#[test]
+fn monitor_names_are_validated() {
+    let name = |monitor: &str, name: &str| MonitorName {
+        monitor: monitor.into(),
+        name: name.into(),
+    };
+    let mut config = Config {
+        monitor_names: vec![name("left", "Desk"), name("right", "Wall")],
+        ..Config::default()
+    };
+    assert!(config.validate().is_ok());
+
+    for invalid in [
+        name("LEFT", "Duplicate monitor"),
+        name("other", " "),
+        name("other", " Padded"),
+        name("other", &"x".repeat(41)),
+        name(" ", "No monitor"),
+    ] {
+        config.monitor_names.push(invalid);
+        assert!(config.validate().is_err());
+        config.monitor_names.pop();
+    }
+    config.monitor_names.push(name("other", &"จ".repeat(40)));
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn monitor_names_default_to_empty_in_older_configs() {
+    let config: Config =
+        serde_json::from_str(r#"{"version":1,"folders":[],"interval_seconds":600,"shuffle":true}"#)
+            .unwrap();
+    assert!(config.monitor_names.is_empty());
 }

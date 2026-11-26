@@ -392,8 +392,25 @@ matches the Windows **Personalize > Background** setting of the same name.
       continues its cycle
 - [ ] Disconnect a monitor that shows the main slideshow, then reconnect it:
       it shows the main slideshow's current image
-- [ ] A disconnected monitor appears under **Saved monitor folders**;
-      **Forget** removes it from `monitor_folders`
+- [ ] A disconnected monitor appears under **Saved monitor settings**;
+      **Forget** removes it from `monitor_folders` and `monitor_names`
+- [ ] Each monitor shows its model name (or "Unknown model"), resolution, and
+      **Primary** on the primary display; the device path appears only in the
+      tooltip
+- [ ] The arrangement matches **Settings > System > Display** (positions and
+      relative sizes); clicking a monitor highlights its card
+- [ ] Each monitor card and arrangement tile shows that monitor's current
+      wallpaper, including an image chosen with **Choose image**, and updates
+      after the slideshow changes
+- [ ] Rename a monitor: the name appears in Monitors, Overview, and History and
+      persists after restart; saving an empty name restores **Monitor N**
+- [ ] With a saved monitor disconnected, **Move** its settings to a connected
+      monitor without folders: the folders and name move, and that monitor
+      starts its own slideshow
+- [ ] With a monitor that has its own folders, Overview labels the large
+      preview **Main slideshow** and shows one thumbnail per monitor
+- [ ] History names the monitor of each entry, and the filter shows only the
+      main slideshow or one monitor
 - [ ] Remove the last folder of a monitor: it returns to the main slideshow
 - [ ] Add, delete, and rename images in a monitor's folder: that monitor's
       collection follows the change, as for the main folders

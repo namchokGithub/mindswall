@@ -58,6 +58,12 @@ pub struct MonitorFolders {
     pub monitor: String,
     pub folders: Vec<Folder>,
 }
+/// A name the user gave a monitor, shown instead of its device path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MonitorName {
+    pub monitor: String,
+    pub name: String,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProfileSettings {
     pub folders: Vec<Folder>,
@@ -101,6 +107,10 @@ pub struct Config {
     /// slideshow.
     #[serde(default)]
     pub monitor_folders: Vec<MonitorFolders>,
+    /// Names the user gave monitors. A monitor without a name is shown with
+    /// the name Windows reports for it.
+    #[serde(default)]
+    pub monitor_names: Vec<MonitorName>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -116,6 +126,7 @@ impl Default for Config {
             active_profile: None,
             hotkeys: Hotkeys::default(),
             monitor_folders: Vec::new(),
+            monitor_names: Vec::new(),
         }
     }
 }
@@ -142,6 +153,7 @@ impl Config {
             || self.folders.len() > 1000
             || self.excluded.len() > 100000
             || self.monitor_folders.len() > 64
+            || self.monitor_names.len() > 64
         {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -158,6 +170,22 @@ impl Config {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Invalid or duplicate monitor folders",
+                ));
+            }
+        }
+        let mut named = std::collections::HashSet::new();
+        for entry in &self.monitor_names {
+            let name = entry.name.trim();
+            if entry.monitor.trim().is_empty()
+                || entry.monitor.len() > 512
+                || name.is_empty()
+                || name.chars().count() > 40
+                || name.len() != entry.name.len()
+                || !named.insert(entry.monitor.to_lowercase())
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid or duplicate monitor name",
                 ));
             }
         }
