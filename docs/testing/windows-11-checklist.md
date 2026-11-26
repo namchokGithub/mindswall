@@ -259,7 +259,7 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [ ] In Light, every page is readable (text, buttons, badges, snackbars, the
       Overview preview text over the image, and Monitors tiles); the file name
       on an Overview card is light text, not dark; the sidebar caption, top
-      bar, and footer are clearly readable
+      bar, and footer are clearly readable in both Light and Dark
 - [ ] Every loading state is the same spinning circle, with no "Loading…" text:
       app start, Gallery (first load and **Load more**), thumbnails, History,
       Folders image counts, Monitors (finding monitors and thumbnails),
