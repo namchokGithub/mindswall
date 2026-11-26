@@ -315,4 +315,50 @@ impl Config {
         images.sort();
         Ok(images)
     }
+    /// Update a collection for paths reported by a folder watcher without
+    /// rescanning every folder. Changed paths and anything below them are
+    /// removed, then files and folders that still exist are checked again.
+    /// New images must have a readable header, so files still being written
+    /// are skipped until a later change event.
+    pub fn apply_changes(
+        &self,
+        current: &[PathBuf],
+        changed: &std::collections::HashSet<PathBuf>,
+    ) -> Vec<PathBuf> {
+        let excluded: std::collections::HashSet<_> = self
+            .excluded
+            .iter()
+            .map(|path| crate::utilities::path_key(path))
+            .collect();
+        let filtered = self.filter != Default::default();
+        let accept = |image: &Path| {
+            scanner::is_image(image)
+                && image.is_file()
+                && self.folders.iter().any(|folder| {
+                    folder.enabled
+                        && image.starts_with(&folder.path)
+                        && (folder.recursive || image.parent() == Some(folder.path.as_path()))
+                })
+                && !excluded.contains(&crate::utilities::path_key(image))
+                && crate::utilities::dimensions(image).is_ok_and(|(w, h)| {
+                    !filtered || crate::utilities::matches_filter(w, h, &self.filter)
+                })
+        };
+        let mut images: Vec<PathBuf> = current
+            .iter()
+            .filter(|image| !changed.iter().any(|path| image.starts_with(path)))
+            .cloned()
+            .collect();
+        for path in changed {
+            if path.is_dir() {
+                let report = scanner::scan_lenient(std::slice::from_ref(path), true);
+                images.extend(report.images.into_iter().filter(|image| accept(image)));
+            } else if accept(path) {
+                images.push(path.clone());
+            }
+        }
+        images.sort();
+        images.dedup();
+        images
+    }
 }

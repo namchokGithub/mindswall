@@ -48,6 +48,36 @@ impl Playback {
             return Ok(());
         }
         let images = config.images().map_err(|e| e.to_string())?;
+        self.replace_images(images, config, now, apply)
+    }
+
+    /// Apply file changes reported by a folder watcher. Returns whether the
+    /// collection changed. Does nothing when no slideshow is running.
+    pub fn apply_file_changes(
+        &mut self,
+        config: &Config,
+        changed: &std::collections::HashSet<PathBuf>,
+        now: Instant,
+        apply: &impl Fn(&Path) -> Result<(), String>,
+    ) -> Result<bool, String> {
+        let Some(show) = self.show.as_ref() else {
+            return Ok(false);
+        };
+        let images = config.apply_changes(show.images(), changed);
+        if images.as_slice() == show.images() {
+            return Ok(false);
+        }
+        self.replace_images(images, config, now, apply)?;
+        Ok(true)
+    }
+
+    fn replace_images(
+        &mut self,
+        images: Vec<PathBuf>,
+        config: &Config,
+        now: Instant,
+        apply: &impl Fn(&Path) -> Result<(), String>,
+    ) -> Result<(), String> {
         let interval = Duration::from_secs(config.interval_seconds);
         match self.show.as_mut() {
             None => {

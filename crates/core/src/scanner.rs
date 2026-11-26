@@ -10,7 +10,8 @@ pub struct ScanReport {
     pub skipped: Vec<Error>,
 }
 
-fn is_image(path: &Path) -> bool {
+/// Whether the path has a supported image extension (JPG, JPEG, PNG, BMP).
+pub fn is_image(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
         .is_some_and(|ext| {

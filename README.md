@@ -101,8 +101,11 @@ image cannot be applied.
 
 Overview shows the current position and total in the active slideshow cycle.
 The total includes enabled subfolders and reflects active filters and exclusions.
-Use **Rescan collection** to pick up file changes; new images join the current
-cycle. Saving settings keeps the current cycle: the wallpaper changes only when
+While the slideshow runs, enabled folders are watched: images that are added,
+removed, or renamed update the collection about two seconds after the last
+change, without a full rescan, and new images join the current cycle. Files
+whose image header cannot be read yet, such as files still being copied, are
+picked up by a later change. Use **Rescan collection** to force a full rescan. Saving settings keeps the current cycle: the wallpaper changes only when
 the current image leaves the collection or the fit mode changes.
 Use **Quick settings** on Overview to change the slideshow interval and fit mode.
 
@@ -138,8 +141,9 @@ the app. The desktop app only reads or writes paths chosen this way during the
 current session, or paths that are already part of the collection, history,
 or configuration.
 
-These utilities remain in development. Folder watching and per-monitor slideshow
-sources are not yet implemented. Multi-monitor behavior and the gallery with a
+These utilities remain in development. Per-monitor slideshow sources are not
+yet implemented. Overview updates when the app's slideshow changes; a slideshow
+run from the CLI is checked every 30 seconds while the window is open. Multi-monitor behavior and the gallery with a
 large collection still need interactive Windows verification.
 
 **Profiles** saves named collections and can import or export settings and
@@ -150,6 +154,15 @@ pages during the same app session. Global shortcuts
 can be recorded using the keyboard in **Settings**, and saved profiles are available from the
 system tray. These features still need interactive Windows verification. A
 running slideshow may replace an edited wallpaper at its next change.
+
+### Continuous integration and performance
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs on Windows for
+pushes and pull requests. It builds the frontend, then runs `cargo fmt --check`,
+Clippy with warnings denied, and the Rust tests, and builds the NSIS installer
+as a downloadable workflow artifact. It does not publish releases. See
+[docs/performance.md](docs/performance.md) for how to measure CPU and memory
+use with `scripts/measure-performance.ps1`; no results have been recorded yet.
 
 See the [requirements](docs/requirements/requirement.md) for the feature scope,
 architecture, and development roadmap.

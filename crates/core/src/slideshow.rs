@@ -80,6 +80,9 @@ impl Slideshow {
     pub fn total(&self) -> usize {
         self.images.len()
     }
+    pub fn images(&self) -> &[PathBuf] {
+        &self.images
+    }
     pub fn contains(&self, path: &Path) -> bool {
         self.images.iter().any(|image| image == path)
     }

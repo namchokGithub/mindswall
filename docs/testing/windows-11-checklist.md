@@ -205,6 +205,23 @@ example from the log.
 - [ ] Exclude an image, then edit `config.json` so the exclusion uses a
       different letter case: the image stays excluded
 
+### Folder watcher and slideshow events
+
+- [ ] Copy new images into a watched folder while the slideshow runs: within
+      a few seconds the Overview total increases, and the log shows
+      `collection updated from folder changes`
+- [ ] Copy a large image slowly (or over the network): it is added after the
+      copy finishes and never applied while incomplete
+- [ ] Delete or rename an image in a watched folder: the total updates; if it
+      was the current wallpaper, another image is applied
+- [ ] Add or remove a subfolder with images in a recursive folder; repeat
+      with a non-recursive folder, whose subfolders must be ignored
+- [ ] Images in a folder added through **Folders** are watched after saving
+- [ ] With the app running the slideshow, Overview updates immediately after
+      each automatic change, without waiting for a poll
+- [ ] With the slideshow run from the CLI, Overview still updates within 30
+      seconds while the window is open
+
 ### File access from the desktop app
 
 - [ ] **Add folder**, Editor **Choose image**, Monitors image selection,

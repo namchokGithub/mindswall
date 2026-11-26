@@ -46,10 +46,8 @@ Completed items move from the phase checklists to the
 - **Not implemented**:
   - WebView is not released or suspended when the window is hidden (RAM).
     Status polling now stops while the window is hidden.
-  - No event-driven wallpaper updates from the core to the UI; profile changes
-    do emit a configuration event.
-  - No named pipe handoff from a running CLI instance to the app.
-  - No folder watcher.
+  - No named pipe handoff from a running CLI instance to the app. When the CLI
+    owns the slideshow, Overview falls back to polling every 30 seconds.
   - No per-monitor slideshow folders.
   - No automatic handling of monitors being connected or disconnected.
 - **Phase 5 partly started**: error recovery is implemented in code but not
@@ -81,6 +79,11 @@ Completed Log.
 - **History and exclusions** (`f8d2046`): an invalid `history.json` is renamed
   aside and a new history starts; exclusions use a hash set and, on Windows,
   ignore letter case and `/` versus `\`.
+- **Folder watcher and slideshow events** (2026-11-26, not committed yet):
+  enabled folders are watched while the slideshow runs and changes update the
+  collection without a full rescan; the app's slideshow sends a
+  `slideshow-changed` event to the UI, and fallback polling is every 30
+  seconds.
 - **File access** (`f4f7d30`): file and folder dialogs open from Rust, and
   commands accept only paths chosen in this session or already managed by the
   app.
@@ -90,10 +93,10 @@ Completed Log.
 1. Complete and clarify the outstanding Windows 11 checks in the
    [manual test checklist](testing/windows-11-checklist.md), starting with the
    sections for the recent changes.
-2. Set up CI on Windows.
+2. Push the branch so the new Windows CI runs, and fix anything it reports.
 3. Finish the remaining Phase 3 work.
-4. Implement the folder watcher.
-5. Measure performance, then optimize.
+4. Verify the folder watcher and slideshow events on Windows.
+5. Measure performance with `scripts/measure-performance.ps1`, then optimize.
 6. Packaging and release when the user decides to proceed with release work;
    the bundle already targets the per-user NSIS installer from D4.
 
@@ -218,9 +221,11 @@ Goal: complete the P2 feature set.
   the earlier 100-entry limit; the 10-entry limit and thumbnails still need
   Windows verification.
 
-- [ ] **Folder watcher**: `notify` with debouncing; update the image set and
+- [~] **Folder watcher**: `notify` with debouncing; update the image set and
       shuffle queue on add/remove/rename without a full rescan; skip images
-      still being written
+      still being written. Implemented on 2026-11-26 with a 2-second quiet
+      period and core tests for event-to-collection mapping; needs Windows
+      verification
 
 - [~] **Tests**: filter rules, history limits, watcher event-to-queue mapping
 
@@ -241,8 +246,10 @@ the running slideshow may replace it at its next change.
 
 Goal: measured performance, robust error recovery, and repeatable releases.
 
-- [ ] **Benchmarks**: measure idle CPU and background RAM with the window
-      hidden and with it open; record method and results in `docs/`
+- [~] **Benchmarks**: measure idle CPU and background RAM with the window
+      hidden and with it open; record method and results in `docs/`. The
+      method and `scripts/measure-performance.ps1` are in
+      [performance.md](performance.md); no results are recorded yet
 - [ ] **Optimization**: fix whatever the measurements show exceeds the targets
 - [~] **Test coverage**: fill gaps in core unit tests; add integration tests
       for CLI commands. Recovery, cache, and history tests were added on
@@ -256,8 +263,11 @@ Goal: measured performance, robust error recovery, and repeatable releases.
       targets only NSIS with `installMode: currentUser` since 2026-11-26 (it
       previously used `all`, which included the per-machine MSI); the
       installer build and the portable ZIP are not yet produced or verified
-- [ ] **CI**: GitHub Actions on Windows for `fmt`, `clippy`, `test`, frontend
-      lint and type-check, and build
+- [~] **CI**: GitHub Actions on Windows for `fmt`, `clippy`, `test`, frontend
+      lint and type-check, and build. `.github/workflows/ci.yml` was added on
+      2026-11-26 and also builds the NSIS installer; it has not run yet, and
+      the frontend tests in `ui/tests` are not run because `ui/package.json`
+      has no test script
 - [ ] **Release workflow**: tag-triggered build that produces release
       artifacts; changelog; version bump process
 - [ ] **Docs**: README with installation, usage, and screenshots

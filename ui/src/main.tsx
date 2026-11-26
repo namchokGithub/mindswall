@@ -46,19 +46,22 @@ function App() {
     invoke<boolean>("get_autostart").then(setAutostart).catch(() => {});
   }, [refreshStatus]);
 
-  // Poll the slideshow only while the window is visible, so a window hidden in
-  // the tray does not keep waking the app.
+  // The app's own slideshow sends "slideshow-changed" events, so polling is
+  // only a slow fallback for a slideshow run from the CLI. Nothing is polled
+  // or refreshed while the window is hidden.
   useEffect(() => {
-    let timer: number | undefined; let windowVisible = true; let active = true; let unlisten: (() => void) | undefined;
+    let timer: number | undefined; let windowVisible = true; let active = true; const disposers: Array<() => void> = [];
+    const visible = () => windowVisible && !document.hidden;
     const update = () => {
-      const visible = windowVisible && !document.hidden;
-      if (visible && timer === undefined) { refreshStatus(); timer = window.setInterval(refreshStatus, 3000); }
-      else if (!visible && timer !== undefined) { window.clearInterval(timer); timer = undefined; }
+      if (visible() && timer === undefined) { refreshStatus(); timer = window.setInterval(refreshStatus, 30000); }
+      else if (!visible() && timer !== undefined) { window.clearInterval(timer); timer = undefined; }
     };
+    const keep = (dispose: () => void) => { if (active) disposers.push(dispose); else dispose(); };
     document.addEventListener("visibilitychange", update);
-    listen<boolean>("window-visible", event => { windowVisible = event.payload; update(); }).then(dispose => { if (active) unlisten = dispose; else dispose(); }).catch(() => {});
+    listen<boolean>("window-visible", event => { windowVisible = event.payload; update(); }).then(keep).catch(() => {});
+    listen("slideshow-changed", () => { if (visible()) refreshStatus(); }).then(keep).catch(() => {});
     update();
-    return () => { active = false; unlisten?.(); document.removeEventListener("visibilitychange", update); if (timer !== undefined) window.clearInterval(timer); };
+    return () => { active = false; disposers.forEach(dispose => dispose()); document.removeEventListener("visibilitychange", update); if (timer !== undefined) window.clearInterval(timer); };
   }, [refreshStatus]);
 
   useEffect(() => {

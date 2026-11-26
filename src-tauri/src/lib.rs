@@ -831,13 +831,17 @@ fn overview_status_inner() -> Result<OverviewStatus, String> {
 }
 
 #[tauri::command]
-async fn start_service(state: tauri::State<'_, ServiceState>) -> Result<(), String> {
+async fn start_service(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ServiceState>,
+) -> Result<(), String> {
     let starting = state.starting.clone();
     let error = state.error.clone();
-    blocking(move || start_service_inner(starting, error)).await
+    blocking(move || start_service_inner(app, starting, error)).await
 }
 
 fn start_service_inner(
+    app: tauri::AppHandle,
     starting: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
 ) -> Result<(), String> {
@@ -861,7 +865,12 @@ fn start_service_inner(
     }
     *error.lock().map_err(|e| e.to_string())? = None;
     std::thread::spawn(move || {
-        if let Err(e) = mindswall_core::service::run_slideshow()
+        // Tell the UI about every change so it does not need to poll a
+        // slideshow that this app runs.
+        let notify = |status: &ipc::PlaybackStatus| {
+            let _ = app.emit("slideshow-changed", status);
+        };
+        if let Err(e) = mindswall_core::service::run_slideshow_with(notify)
             && let Ok(mut slot) = error.lock()
         {
             *slot = Some(e.to_string());
@@ -1076,8 +1085,9 @@ pub fn run() {
             if get_config().is_ok_and(|config| config.folders.iter().any(|folder| folder.enabled)) {
                 let state = app.state::<ServiceState>();
                 let (starting, error) = (state.starting.clone(), state.error.clone());
+                let handle = app.handle().clone();
                 std::thread::spawn(move || {
-                    let _ = start_service_inner(starting, error);
+                    let _ = start_service_inner(handle, starting, error);
                 });
             }
             Ok(())

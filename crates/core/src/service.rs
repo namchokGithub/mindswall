@@ -4,7 +4,72 @@ use crate::{
     playback::Playback,
     wallpaper::{SystemWallpaper, WallpaperSetter, default_wallpaper_path},
 };
-use std::{path::Path, sync::mpsc, time::Instant};
+use notify::{RecursiveMode, Watcher};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    sync::mpsc,
+    time::{Duration, Instant},
+};
+
+/// Quiet period after the last file event before changes are applied, so
+/// files that are still being copied can settle.
+const FILE_SETTLE: Duration = Duration::from_secs(2);
+
+enum Event {
+    Control(ipc::Request),
+    Files(Vec<PathBuf>),
+}
+
+fn snapshot(playback: &Playback) -> PlaybackStatus {
+    PlaybackStatus {
+        state: if playback.show.is_none() {
+            "stopped"
+        } else if playback.timer.is_paused() {
+            "paused"
+        } else {
+            "running"
+        }
+        .to_owned(),
+        current: playback
+            .show
+            .as_ref()
+            .and_then(|show| show.current().map(Path::to_path_buf))
+            .or_else(|| playback.default_image.clone()),
+        position: playback.show.as_ref().and_then(|show| show.position()),
+        total: playback.show.as_ref().map_or(0, |show| show.total()),
+    }
+}
+
+/// Watch the enabled folders and forward file events to the slideshow loop.
+/// Folders that cannot be watched are logged and skipped.
+fn watch(config: &Config, events: mpsc::Sender<Event>) -> Option<notify::RecommendedWatcher> {
+    let handler = move |result: notify::Result<notify::Event>| match result {
+        Ok(event) if !event.kind.is_access() && !event.paths.is_empty() => {
+            let _ = events.send(Event::Files(event.paths));
+        }
+        Ok(_) => {}
+        Err(error) => tracing::warn!(%error, "folder watcher error"),
+    };
+    let mut watcher = match notify::recommended_watcher(handler) {
+        Ok(watcher) => watcher,
+        Err(error) => {
+            tracing::warn!(%error, "could not start the folder watcher");
+            return None;
+        }
+    };
+    for folder in config.folders.iter().filter(|folder| folder.enabled) {
+        let mode = if folder.recursive {
+            RecursiveMode::Recursive
+        } else {
+            RecursiveMode::NonRecursive
+        };
+        if let Err(error) = watcher.watch(&folder.path, mode) {
+            tracing::warn!(path = ?folder.path, %error, "could not watch folder");
+        }
+    }
+    Some(watcher)
+}
 
 fn apply(path: &Path) -> Result<(), crate::Error> {
     if let Err(error) = SystemWallpaper.set_wallpaper(path) {
@@ -19,6 +84,14 @@ fn apply(path: &Path) -> Result<(), crate::Error> {
 }
 
 pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
+    run_slideshow_with(|_| {})
+}
+
+/// Run the slideshow and call `on_change` after every state change, such as a
+/// new wallpaper, pause, resume, or a reloaded collection.
+pub fn run_slideshow_with(
+    on_change: impl Fn(&PlaybackStatus),
+) -> Result<(), Box<dyn std::error::Error>> {
     let dirs = directories::ProjectDirs::from("", "", "MindsWall")
         .ok_or("user data directory unavailable")?;
     std::fs::create_dir_all(dirs.data_dir())?;
@@ -30,44 +103,57 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
         .try_init()
         .ok();
     let path = Config::default_path()?;
-    let config = Config::load(&path)?;
+    let mut config = Config::load(&path)?;
     let mut playback = Playback::new(&config, Instant::now())?;
-    let (tx, rx) = mpsc::channel();
-    ipc::listen(tx).map_err(|e| {
+    let (control_tx, control_rx) = mpsc::channel();
+    ipc::listen(control_tx).map_err(|e| {
         format!("cannot start slideshow control listener (another instance may be running): {e}")
     })?;
+    let (event_tx, event_rx) = mpsc::channel();
+    let forward = event_tx.clone();
+    std::thread::spawn(move || {
+        for request in control_rx {
+            if forward.send(Event::Control(request)).is_err() {
+                break;
+            }
+        }
+    });
+    let mut watcher = watch(&config, event_tx.clone());
     playback
         .show
         .as_mut()
         .expect("initial slideshow exists")
         .next_available(apply)?;
+    on_change(&snapshot(&playback));
     println!("Slideshow running. Press Ctrl+C to stop.");
+    let mut changed_files = HashSet::new();
+    let mut files_due: Option<Instant> = None;
     loop {
-        let event = match playback.timer.wait(Instant::now()) {
-            Some(wait) => rx.recv_timeout(wait),
-            None => rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected),
+        let now = Instant::now();
+        let wait = match (
+            playback.timer.wait(now),
+            files_due.map(|due| due.saturating_duration_since(now)),
+        ) {
+            (Some(timer), Some(files)) => Some(timer.min(files)),
+            (timer, files) => timer.or(files),
+        };
+        let event = match wait {
+            Some(wait) => event_rx.recv_timeout(wait),
+            None => event_rx
+                .recv()
+                .map_err(|_| mpsc::RecvTimeoutError::Disconnected),
         };
         match event {
-            Ok((command, reply)) => {
+            Ok(Event::Files(paths)) => {
+                changed_files.extend(paths);
+                files_due = Some(Instant::now() + FILE_SETTLE);
+            }
+            Ok(Event::Control((command, reply))) => {
                 let now = Instant::now();
+                let notify_change = !matches!(command, Control::Status);
+                let mut reloaded = None;
                 let status = if matches!(command, Control::Status) {
-                    Some(PlaybackStatus {
-                        state: if playback.show.is_none() {
-                            "stopped"
-                        } else if playback.timer.is_paused() {
-                            "paused"
-                        } else {
-                            "running"
-                        }
-                        .to_owned(),
-                        current: playback
-                            .show
-                            .as_ref()
-                            .and_then(|show| show.current().map(Path::to_path_buf))
-                            .or_else(|| playback.default_image.clone()),
-                        position: playback.show.as_ref().and_then(|show| show.position()),
-                        total: playback.show.as_ref().map_or(0, |show| show.total()),
-                    })
+                    Some(snapshot(&playback))
                 } else {
                     None
                 };
@@ -109,6 +195,7 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                             &|path| apply(path).map_err(|e| e.to_string()),
                             &default_wallpaper_path,
                         )?;
+                        reloaded = Some(config);
                         Ok(if playback.show.is_none() {
                             "No enabled folders; using Windows default wallpaper"
                         } else {
@@ -170,13 +257,45 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 };
                 let _ = reply.send(response);
+                if let Some(new_config) = reloaded {
+                    config = new_config;
+                    changed_files.clear();
+                    files_due = None;
+                    // Drop the old watcher first so folders are not watched twice.
+                    drop(watcher.take());
+                    watcher = watch(&config, event_tx.clone());
+                }
+                if notify_change {
+                    on_change(&snapshot(&playback));
+                }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                if let Some(show) = playback.show.as_mut() {
+                let now = Instant::now();
+                if files_due.is_some_and(|due| now >= due) {
+                    files_due = None;
+                    let changed = std::mem::take(&mut changed_files);
+                    match playback.apply_file_changes(&config, &changed, now, &|path| {
+                        apply(path).map_err(|e| e.to_string())
+                    }) {
+                        Ok(true) => {
+                            tracing::info!(
+                                paths = changed.len(),
+                                "collection updated from folder changes"
+                            );
+                            on_change(&snapshot(&playback));
+                        }
+                        Ok(false) => {}
+                        Err(error) => tracing::warn!(%error, "could not apply folder changes"),
+                    }
+                }
+                if playback.timer.is_due(now)
+                    && let Some(show) = playback.show.as_mut()
+                {
                     if let Err(error) = show.next_available(apply) {
                         tracing::warn!(%error, "wallpaper update failed");
                     }
                     playback.timer.reset(Instant::now());
+                    on_change(&snapshot(&playback));
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
