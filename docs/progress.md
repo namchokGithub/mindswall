@@ -317,6 +317,8 @@ Development started before release at the user's request.
 
 - [~] **Wallpaper profiles**: named sets of folders and settings with quick
   switching from the UI and tray
+  (2026-11-26: the active profile is shown on every page and checked in the
+  tray; a changed profile can be updated or reverted; awaiting Windows check)
 - [~] **Image editor**: crop, resize, blur, and dim applied to a generated copy
   in the cache; never modify original files
 - [~] **Import / export**: back up and restore configuration and profiles as

@@ -427,6 +427,14 @@ matches the Windows **Personalize > Background** setting of the same name.
 - [ ] The tray **Profiles** submenu lists profiles and switches them
 - [ ] The tray submenu updates after adding or deleting a profile
 - [ ] Profiles persist after restart
+- [ ] After applying a profile, every page shows **Profile: <name>** at the
+      top, and clicking it opens **Profiles**
+- [ ] Change the interval or a folder: the top shows **· changed**, and the
+      profile row offers **Update profile** and **Revert**; each clears the
+      changed state (Update saves the new settings, Revert restores the saved
+      ones)
+- [ ] The tray **Profiles** submenu checks the active profile, including after
+      applying a profile from the app or the tray
 
 ### Import and export
 

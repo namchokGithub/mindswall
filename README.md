@@ -177,7 +177,11 @@ is checked every 30 seconds while the window is open. Multi-monitor behavior and
 large collection still need interactive Windows verification.
 
 **Profiles** saves named collections and can import or export settings and
-profiles as JSON. The **Editor** creates a cached copy with optional crop,
+profiles as JSON. A profile stores folders, interval, shuffle, filters,
+exclusions, and fit mode. The active profile is shown at the top of every page
+and checked in the tray **Profiles** submenu. When those settings change after
+a profile was applied, it is marked **changed**: **Update profile** saves the
+current settings into it, and **Revert** applies its saved settings again. The **Editor** creates a cached copy with optional crop,
 resize, blur, and dim; the original image remains untouched. The Editor shows
 a loading indicator while creating a preview and keeps its work when switching
 pages during the same app session. Global shortcuts

@@ -26,3 +26,6 @@ All notable changes to MindsWall are recorded here. The format follows
   disconnected display can be moved to another one.
 - Overview shows a thumbnail per display while a display has its own folders,
   and History names and filters displays.
+- Every page shows the active profile and whether its settings changed;
+  profiles can be updated with the current settings or reverted, and the tray
+  checks the active profile.

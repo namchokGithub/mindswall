@@ -248,16 +248,42 @@ impl Config {
         }
         let profile = Profile {
             name: name.to_owned(),
-            settings: ProfileSettings {
-                folders: self.folders.clone(),
-                interval_seconds: self.interval_seconds,
-                shuffle: self.shuffle,
-                filter: self.filter.clone(),
-                excluded: self.excluded.clone(),
-                fit_mode: self.fit_mode,
-            },
+            settings: self.profile_settings(),
         };
         self.profiles.push(profile);
+        self.active_profile = Some(name.to_owned());
+        self.validate()
+    }
+    /// The current settings that a profile stores.
+    pub fn profile_settings(&self) -> ProfileSettings {
+        ProfileSettings {
+            folders: self.folders.clone(),
+            interval_seconds: self.interval_seconds,
+            shuffle: self.shuffle,
+            filter: self.filter.clone(),
+            excluded: self.excluded.clone(),
+            fit_mode: self.fit_mode,
+        }
+    }
+    /// Whether the current settings differ from the active profile's saved
+    /// settings. `false` when no profile is active.
+    pub fn active_profile_changed(&self) -> bool {
+        self.active_profile.as_ref().is_some_and(|name| {
+            self.profiles
+                .iter()
+                .find(|profile| &profile.name == name)
+                .is_some_and(|profile| profile.settings != self.profile_settings())
+        })
+    }
+    /// Save the current settings into an existing profile and make it active.
+    pub fn update_profile(&mut self, name: &str) -> io::Result<()> {
+        let settings = self.profile_settings();
+        let profile = self
+            .profiles
+            .iter_mut()
+            .find(|p| p.name == name)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Profile not found"))?;
+        profile.settings = settings;
         self.active_profile = Some(name.to_owned());
         self.validate()
     }

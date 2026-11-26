@@ -14,7 +14,7 @@ use std::{
 };
 use tauri::{
     Emitter, Manager,
-    menu::{Menu, MenuBuilder, SubmenuBuilder},
+    menu::{CheckMenuItem, Menu, MenuBuilder, SubmenuBuilder},
     tray::TrayIconBuilder,
 };
 use tauri_plugin_autostart::ManagerExt;
@@ -204,7 +204,16 @@ fn tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     {
         let mut submenu = SubmenuBuilder::new(app, "Profiles");
         for (index, profile) in config.profiles.iter().enumerate() {
-            submenu = submenu.text(format!("profile_{index}"), &profile.name);
+            let active = config.active_profile.as_deref() == Some(profile.name.as_str());
+            let item = CheckMenuItem::with_id(
+                app,
+                format!("profile_{index}"),
+                &profile.name,
+                true,
+                active,
+                None::<&str>,
+            )?;
+            submenu = submenu.item(&item);
         }
         builder = builder.item(&submenu.build()?);
     }
@@ -308,8 +317,38 @@ fn save_profile(app: tauri::AppHandle, name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn apply_profile(name: String) -> Result<String, String> {
-    blocking(move || apply_profile_inner(name)).await
+async fn apply_profile(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    let result = blocking(move || apply_profile_inner(name)).await;
+    refresh_tray(&app);
+    result
+}
+
+/// Save the current settings into the named profile.
+#[tauri::command]
+fn update_profile(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    let mut config = get_config()?;
+    config.update_profile(&name).map_err(|e| e.to_string())?;
+    config
+        .save(&Config::default_path().map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    refresh_tray(&app);
+    Ok("Profile updated.".into())
+}
+
+#[derive(serde::Serialize)]
+struct ProfileStatus {
+    active: Option<String>,
+    changed: bool,
+}
+
+/// The active profile and whether the current settings differ from it.
+#[tauri::command]
+fn profile_status() -> Result<ProfileStatus, String> {
+    let config = get_config()?;
+    Ok(ProfileStatus {
+        changed: config.active_profile_changed(),
+        active: config.active_profile,
+    })
 }
 
 fn apply_profile_inner(name: String) -> Result<String, String> {
@@ -1097,6 +1136,8 @@ pub fn run() {
             set_monitor_image,
             save_profile,
             apply_profile,
+            update_profile,
+            profile_status,
             delete_profile,
             export_backup,
             import_backup,

@@ -17,6 +17,32 @@ fn profile_switch_preserves_saved_settings() {
 }
 
 #[test]
+fn active_profile_tracks_changes_and_can_be_updated() {
+    let mut config = Config {
+        interval_seconds: 60,
+        ..Config::default()
+    };
+    assert!(!config.active_profile_changed());
+    config.save_profile("Work").unwrap();
+    assert!(!config.active_profile_changed());
+
+    config.interval_seconds = 300;
+    assert!(config.active_profile_changed());
+    config.update_profile("Work").unwrap();
+    assert!(!config.active_profile_changed());
+    assert_eq!(config.profiles[0].settings.interval_seconds, 300);
+
+    // Settings a profile does not store do not count as changes.
+    config.hotkeys.next = "Ctrl+Alt+N".into();
+    assert!(!config.active_profile_changed());
+
+    config.shuffle = !config.shuffle;
+    config.apply_profile("Work").unwrap();
+    assert!(!config.active_profile_changed());
+    assert!(config.update_profile("Missing").is_err());
+}
+
+#[test]
 fn backup_validation_rejects_invalid_data_without_writing() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("config.json");
