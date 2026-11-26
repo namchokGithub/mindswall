@@ -1,6 +1,6 @@
 use crate::{
     config::Config,
-    ipc::{self, Command as Control, Response},
+    ipc::{self, Command as Control, PlaybackStatus, Response},
     scheduler::Scheduler,
     slideshow::Slideshow,
     wallpaper::{SystemWallpaper, WallpaperSetter},
@@ -48,6 +48,21 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
         match event {
             Ok((command, reply)) => {
                 let now = Instant::now();
+                let status = if matches!(command, Control::Status) {
+                    Some(PlaybackStatus {
+                        state: if timer.is_paused() {
+                            "paused"
+                        } else {
+                            "running"
+                        }
+                        .to_owned(),
+                        current: show.current().map(Path::to_path_buf),
+                        position: show.position(),
+                        total: show.total(),
+                    })
+                } else {
+                    None
+                };
                 let result: Result<String, String> = match command {
                     Control::Pause => {
                         timer.pause(now);
@@ -127,10 +142,18 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 };
                 let response = match result {
-                    Ok(message) => Response { ok: true, message },
+                    Ok(message) => Response {
+                        ok: true,
+                        message,
+                        status,
+                    },
                     Err(message) => {
                         tracing::warn!("{message}");
-                        Response { ok: false, message }
+                        Response {
+                            ok: false,
+                            message,
+                            status: None,
+                        }
                     }
                 };
                 let _ = reply.send(response);

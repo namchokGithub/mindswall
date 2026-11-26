@@ -15,6 +15,16 @@ pub enum Command {
 pub struct Response {
     pub ok: bool,
     pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<PlaybackStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaybackStatus {
+    pub state: String,
+    pub current: Option<std::path::PathBuf>,
+    pub position: Option<usize>,
+    pub total: usize,
 }
 
 #[cfg(windows)]
@@ -114,6 +124,7 @@ mod transport {
                 .send(Response {
                     ok: true,
                     message: "running".into(),
+                    status: None,
                 })
                 .unwrap();
             assert_eq!(client.join().unwrap().message, "running");

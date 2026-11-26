@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -13,6 +13,7 @@ import "./style.css";
 type Folder = { path: string; enabled: boolean; recursive: boolean };
 type Config = { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
 type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings";
+type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null };
 
 function App() {
   const [page, setPage] = useState<Page>("overview");
@@ -24,14 +25,20 @@ function App() {
   const [counts, setCounts] = useState<Record<string, number | string>>({});
   const [preview, setPreview] = useState("");
   const [imagePath, setImagePath] = useState("");
+  const [imagePosition, setImagePosition] = useState<number | null>(null);
+  const [imageTotal, setImageTotal] = useState<number | null>(null);
+  const statusRequest = useRef(0);
 
   const refreshStatus = useCallback(async () => {
+    const request = ++statusRequest.current;
     try {
-      const value = await invoke<string>("control", { action: "status" });
-      const split = value.indexOf(": ");
-      setStatus(value.slice(0, split));
-      setImagePath(value.slice(split + 2));
-    } catch { setStatus("stopped"); setImagePath(""); }
+      const value = await invoke<OverviewStatus>("overview_status");
+      if (request !== statusRequest.current) return;
+      setStatus(value.state);
+      setImagePath(value.current ?? "");
+      setImagePosition(value.position);
+      setImageTotal(value.total);
+    } catch { if (request === statusRequest.current) { setStatus("stopped"); setImagePath(""); setImagePosition(null); setImageTotal(null); } }
   }, []);
 
   useEffect(() => {
@@ -51,7 +58,8 @@ function App() {
   useEffect(() => {
     if (!imagePath) { setPreview(""); return; }
     let active = true; let url = "";
-    invoke<number[]>("current_preview").then(bytes => {
+    setPreview("");
+    invoke<number[]>("current_preview", { path: imagePath }).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([new Uint8Array(bytes)])); setPreview(url);
     }).catch(() => { if (active) setPreview(""); });
@@ -79,6 +87,7 @@ function App() {
       if (action === "start") { await invoke("start_service"); await new Promise(resolve => setTimeout(resolve, 700)); const failure = await invoke<string | null>("service_error"); if (failure) throw failure; }
       else await invoke("control", { action });
       await refreshStatus();
+      if (action === "reload") setMessage("Collection rescanned. A new cycle has started.");
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); }
   }
@@ -90,6 +99,7 @@ function App() {
   function navigatePage(next: Page) { navigate(next); setPage(next); }
   const fileName = imagePath.split(/[\\/]/).pop();
   const running = status === "running";
+  const filtersActive = config && (config.excluded.length > 0 || config.filter.min_width > 0 || config.filter.min_height > 0 || config.filter.orientation !== "any" || config.filter.aspect_ratio !== "any");
   const nav: { id: Page; label: string; icon: typeof LayoutGrid }[] = [
     { id: "overview", label: "Overview", icon: LayoutGrid }, { id: "folders", label: "Folders", icon: FolderOpen }, { id: "gallery", label: "Gallery", icon: Image }, { id: "monitors", label: "Monitors", icon: Monitor }, { id: "history", label: "History", icon: History }, { id: "profiles", label: "Profiles", icon: Layers }, { id: "editor", label: "Editor", icon: Paintbrush }, { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -102,7 +112,8 @@ function App() {
       <div className="content"><div className="heading"><div><div className="eyebrow">{page === "overview" ? "YOUR SPACE" : page === "settings" ? "PREFERENCES" : "YOUR COLLECTION"}</div><h1>{page === "overview" ? "A little change of scenery." : page === "folders" ? "Your folders." : page === "gallery" ? "A collection of moments." : page === "history" ? "Take another look." : page === "monitors" ? "Your screens." : "Make it yours."}</h1><p>{page === "overview" ? "A fresh perspective, right on your desktop." : page === "folders" ? "Choose the places where your wallpapers live." : page === "gallery" ? "Find a favorite for your desktop." : page === "history" ? "Revisit wallpapers you have enjoyed." : page === "monitors" ? "Give each display its own view." : "Set the rhythm that feels right for you."}</p></div><span className={`status ${status}`}><span/> {status === "running" ? "Playing" : status === "paused" ? "Paused" : "Stopped"}</span></div>
         {!config ? <div className="panel empty">Loading your workspace…</div> : <>
         {page === "overview" && <><div className="section-title"><div><span className="eyebrow">CURRENT WALLPAPER</span><h2>Your desktop, right now</h2></div><span className="subtle">A moment for yourself</span></div>
-          <div className="preview" style={preview ? { backgroundImage: `linear-gradient(0deg, rgba(12,13,25,.85), transparent 58%), url("${preview}")` } : undefined}><div className="preview-content"><div className="preview-tag"><span className="local-dot"/> {imagePath ? "NOW SHOWING" : "YOUR NEXT FAVORITE"}</div><h3>{fileName || "A blank canvas."}</h3><p>{imagePath ? imagePath : "Add a folder to bring your collection to life."}</p></div><span className="preview-number">01 / 01</span></div>
+          <div className="preview" style={preview ? { backgroundImage: `linear-gradient(0deg, rgba(12,13,25,.85), transparent 58%), url("${preview}")` } : undefined}><div className="preview-content"><div className="preview-tag"><span className="local-dot"/> {imagePath ? "NOW SHOWING" : "YOUR NEXT FAVORITE"}</div><h3>{fileName || "A blank canvas."}</h3><p>{imagePath ? imagePath : "Add a folder to bring your collection to life."}</p></div><span className="preview-number" aria-label="Image position in slideshow">{imagePosition !== null && imageTotal !== null ? `${imagePosition} / ${imageTotal}` : "— / —"}</span></div>
+          <div className="footnote overview-collection">{filtersActive && <>Image filters or exclusions are active. <button className="text-link" onClick={() => navigatePage("settings")}>Review settings <ArrowRight size={14}/></button></>}{status !== "stopped" && <button className="text-link" disabled={busy} onClick={() => act("reload")} title="Rescans enabled folders and starts a new cycle"><RefreshCw size={14}/> Rescan collection</button>}</div>
           <div className="player"><div><strong>Slideshow</strong><small>{status === "stopped" ? "Ready when you are" : `Changing every ${config.interval_seconds / 60} minutes`}</small></div><div className="player-actions"><button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("previous")} aria-label="Previous wallpaper"><ArrowLeft size={17}/></button>{status === "stopped" ? <button className="primary" disabled={busy || !config.folders.some(f => f.enabled)} onClick={() => act("start")}><Play size={16}/> Start slideshow</button> : <button className="primary" disabled={busy} onClick={() => act(running ? "pause" : "resume")}>{running ? <Pause size={16}/> : <Play size={16}/>} {running ? "Pause" : "Resume"}</button>}<button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("next")} aria-label="Next wallpaper"><ArrowRight size={17}/></button></div></div>
           <div className="overview-grid"><div className="summary-card"><div className="summary-icon"><FolderOpen size={18}/></div><span>YOUR COLLECTION</span><strong>{config.folders.filter(f => f.enabled).length} <small>active folders</small></strong><button className="text-link" onClick={() => navigatePage("folders")}>Manage folders <ArrowRight size={14}/></button></div><div className="summary-card"><div className="summary-icon"><RefreshCw size={18}/></div><span>THE FLOW</span><strong>{config.shuffle ? "Shuffle" : "In order"} <small>every {config.interval_seconds / 60} min</small></strong><button className="text-link" onClick={() => navigatePage("settings")}>Adjust settings <ArrowRight size={14}/></button></div></div></>}
         {page === "folders" && <><div className="section-title"><div><span className="eyebrow">COLLECTION SOURCES</span><h2>Folders <span className="count-pill">{config.folders.length}</span></h2></div><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add folder</button></div>

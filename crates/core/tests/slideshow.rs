@@ -27,14 +27,36 @@ fn history_replays_before_advancing_queue() {
 }
 
 #[test]
+fn reports_position_in_current_cycle_and_history() {
+    let mut show = Slideshow::new(vec!["a".into(), "b".into(), "c".into()], false).unwrap();
+    assert_eq!(show.position(), None);
+    assert_eq!(show.total(), 3);
+    show.next();
+    assert_eq!(show.position(), Some(1));
+    show.next();
+    assert_eq!(show.position(), Some(2));
+    show.previous();
+    assert_eq!(show.position(), Some(1));
+    show.next();
+    show.next();
+    assert_eq!(show.position(), Some(3));
+    show.next();
+    assert_eq!(show.position(), Some(1));
+    show.previous();
+    assert_eq!(show.position(), Some(3));
+}
+
+#[test]
 fn choosing_image_updates_history_and_skips_it_in_current_queue() {
     let mut show = Slideshow::new(vec!["a".into(), "b".into(), "c".into()], false).unwrap();
     assert_eq!(show.next(), PathBuf::from("a"));
     show.select(PathBuf::from("c")).unwrap();
+    assert_eq!(show.position(), Some(2));
     assert_eq!(show.current().unwrap(), PathBuf::from("c"));
     assert_eq!(show.previous().unwrap(), PathBuf::from("a"));
     assert_eq!(show.next(), PathBuf::from("c"));
     assert_eq!(show.next(), PathBuf::from("b"));
+    assert_eq!(show.position(), Some(3));
 }
 
 #[test]

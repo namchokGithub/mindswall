@@ -86,6 +86,10 @@ startup option. The app and the CLI use the same local configuration and control
 pipe. Desktop interactions and startup behavior still require interactive
 Windows verification.
 
+Overview shows the current position and total in the active slideshow cycle.
+The total includes enabled subfolders and reflects active filters and exclusions.
+Use **Rescan collection** to pick up file changes; this starts a new cycle.
+
 Feedback appears in a temporary snackbar on the page where the action was made.
 Notifications are cleared when navigating to another page.
 

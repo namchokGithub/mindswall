@@ -1,6 +1,9 @@
 use crate::Error;
 use rand::seq::SliceRandom;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone)]
 pub struct Slideshow {
@@ -8,7 +11,8 @@ pub struct Slideshow {
     queue: Vec<PathBuf>,
     index: usize,
     shuffle: bool,
-    history: Vec<PathBuf>,
+    history: Vec<(PathBuf, usize)>,
+    cycle_positions: HashMap<PathBuf, usize>,
     cursor: Option<usize>,
 }
 
@@ -23,6 +27,7 @@ impl Slideshow {
             index: 0,
             shuffle,
             history: Vec::new(),
+            cycle_positions: HashMap::new(),
             cursor: None,
         })
     }
@@ -32,25 +37,31 @@ impl Slideshow {
             && cursor + 1 < self.history.len()
         {
             self.cursor = Some(cursor + 1);
-            return &self.history[cursor + 1];
+            return &self.history[cursor + 1].0;
         }
         if self.index >= self.queue.len() {
             self.queue = self.images.clone();
             if self.shuffle {
                 self.queue.shuffle(&mut rand::rng());
-                if self.queue.len() > 1 && self.history.last() == self.queue.first() {
+                if self.queue.len() > 1
+                    && self.history.last().map(|entry| &entry.0) == self.queue.first()
+                {
                     self.queue.swap(0, 1);
                 }
             }
             self.index = 0;
+            self.cycle_positions.clear();
         }
-        self.history.push(self.queue[self.index].clone());
+        let path = self.queue[self.index].clone();
+        let position = self.cycle_positions.len() + 1;
+        self.cycle_positions.insert(path.clone(), position);
+        self.history.push((path, position));
         self.index += 1;
         if self.history.len() > 100 {
             self.history.remove(0);
         }
         self.cursor = Some(self.history.len() - 1);
-        self.history.last().unwrap()
+        &self.history.last().unwrap().0
     }
     pub fn previous(&mut self) -> Option<&Path> {
         let cursor = self.cursor?;
@@ -58,10 +69,16 @@ impl Slideshow {
             return None;
         }
         self.cursor = Some(cursor - 1);
-        Some(&self.history[cursor - 1])
+        Some(&self.history[cursor - 1].0)
     }
     pub fn current(&self) -> Option<&Path> {
-        self.cursor.map(|i| self.history[i].as_path())
+        self.cursor.map(|i| self.history[i].0.as_path())
+    }
+    pub fn position(&self) -> Option<usize> {
+        self.cursor.map(|i| self.history[i].1)
+    }
+    pub fn total(&self) -> usize {
+        self.images.len()
     }
     pub fn select(&mut self, path: PathBuf) -> Result<(), Error> {
         if !self.images.contains(&path) {
@@ -85,7 +102,12 @@ impl Slideshow {
         if let Some(cursor) = self.cursor {
             self.history.truncate(cursor + 1);
         }
-        self.history.push(path);
+        let next_position = self.cycle_positions.len() + 1;
+        let position = *self
+            .cycle_positions
+            .entry(path.clone())
+            .or_insert(next_position);
+        self.history.push((path, position));
         if self.history.len() > 100 {
             self.history.remove(0);
         }

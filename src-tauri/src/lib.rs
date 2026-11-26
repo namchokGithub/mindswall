@@ -448,6 +448,7 @@ fn control(action: &str) -> Result<String, String> {
         "pause" => Command::Pause,
         "resume" => Command::Resume,
         "status" => Command::Status,
+        "reload" => Command::Reload,
         _ => return Err("Unknown action".into()),
     };
     let response = ipc::send(command).map_err(|e| e.to_string())?;
@@ -455,6 +456,41 @@ fn control(action: &str) -> Result<String, String> {
         Ok(response.message)
     } else {
         Err(response.message)
+    }
+}
+
+#[derive(serde::Serialize)]
+struct OverviewStatus {
+    state: String,
+    current: Option<PathBuf>,
+    position: Option<usize>,
+    total: Option<usize>,
+}
+
+#[tauri::command]
+fn overview_status() -> Result<OverviewStatus, String> {
+    let response = ipc::send(Command::Status).map_err(|e| e.to_string())?;
+    if !response.ok {
+        return Err(response.message);
+    }
+    if let Some(status) = response.status {
+        Ok(OverviewStatus {
+            state: status.state,
+            current: status.current,
+            position: status.position,
+            total: Some(status.total),
+        })
+    } else {
+        let (state, path) = response
+            .message
+            .split_once(": ")
+            .ok_or("Invalid slideshow status")?;
+        Ok(OverviewStatus {
+            state: state.to_owned(),
+            current: (!path.is_empty()).then(|| PathBuf::from(path)),
+            position: None,
+            total: None,
+        })
     }
 }
 
@@ -486,18 +522,22 @@ fn service_error(state: tauri::State<'_, ServiceState>) -> Option<String> {
 }
 
 #[tauri::command]
-fn current_preview() -> Result<Vec<u8>, String> {
-    let status = ipc::send(Command::Status).map_err(|e| e.to_string())?;
-    let (_, path) = status
-        .message
-        .split_once(": ")
-        .ok_or("No current wallpaper")?;
-    let path = std::path::Path::new(path);
-    let meta = std::fs::metadata(path).map_err(|e| e.to_string())?;
-    if meta.len() > 15 * 1024 * 1024 {
-        return Err("Image is too large for preview".into());
+fn current_preview(path: PathBuf) -> Result<Vec<u8>, String> {
+    let status = overview_status()?;
+    if status.current.as_ref() != Some(&path) {
+        return Err("Wallpaper has changed".into());
     }
-    std::fs::read(path).map_err(|e| e.to_string())
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > 15 * 1024 * 1024 {
+        let cache = directories::ProjectDirs::from("", "", "MindsWall")
+            .ok_or("Cache directory unavailable")?
+            .cache_dir()
+            .join("thumbnails");
+        let thumbnail =
+            mindswall_core::utilities::thumbnail(&path, &cache).map_err(|e| e.to_string())?;
+        return std::fs::read(thumbnail).map_err(|e| e.to_string());
+    }
+    std::fs::read(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -572,6 +612,7 @@ pub fn run() {
             start_service,
             service_error,
             current_preview,
+            overview_status,
             get_autostart,
             set_autostart,
             gallery_images,

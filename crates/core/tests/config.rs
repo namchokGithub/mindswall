@@ -61,3 +61,29 @@ fn enabled_folders_are_deduplicated_and_respect_recursion() {
     };
     assert_eq!(config.images().unwrap().len(), 2);
 }
+
+#[test]
+fn recursive_collection_includes_nested_images_matching_filter() {
+    use mindswall_core::utilities::Orientation;
+    let dir = tempfile::tempdir().unwrap();
+    let nested = dir.path().join("nested");
+    std::fs::create_dir(&nested).unwrap();
+    image::RgbImage::new(20, 10)
+        .save(dir.path().join("landscape.png"))
+        .unwrap();
+    image::RgbImage::new(10, 20)
+        .save(nested.join("portrait.png"))
+        .unwrap();
+    let mut config = Config {
+        folders: vec![Folder {
+            path: dir.path().to_owned(),
+            enabled: true,
+            recursive: true,
+        }],
+        ..Config::default()
+    };
+    config.filter.orientation = Orientation::Portrait;
+    assert_eq!(config.images().unwrap(), vec![nested.join("portrait.png")]);
+    config.folders[0].recursive = false;
+    assert!(config.images().unwrap().is_empty());
+}
