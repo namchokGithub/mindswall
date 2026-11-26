@@ -1,4 +1,4 @@
-use crate::{config::Config, scheduler::Scheduler, slideshow::Slideshow};
+use crate::{config::Config, scheduler::Scheduler, slideshow::Slideshow, utilities::FitMode};
 use std::{
     path::{Path, PathBuf},
     time::{Duration, Instant},
@@ -9,6 +9,7 @@ pub struct Playback {
     pub timer: Scheduler,
     pub default_image: Option<PathBuf>,
     paused_before_empty: bool,
+    fit_mode: FitMode,
 }
 
 impl Playback {
@@ -20,9 +21,13 @@ impl Playback {
             timer: Scheduler::new(Duration::from_secs(config.interval_seconds), now),
             default_image: None,
             paused_before_empty: false,
+            fit_mode: config.fit_mode,
         })
     }
 
+    /// Apply a changed configuration. A running slideshow keeps its current
+    /// cycle and wallpaper unless the current image left the collection or
+    /// the fit mode changed.
     pub fn reload(
         &mut self,
         config: &Config,
@@ -42,21 +47,53 @@ impl Playback {
             self.default_image = Some(path);
             return Ok(());
         }
-        let mut candidate =
-            Slideshow::new(config.images().map_err(|e| e.to_string())?, config.shuffle)
-                .map_err(|e| e.to_string())?;
-        apply(candidate.next())?;
-        let paused = if self.show.is_some() {
-            self.timer.is_paused()
-        } else {
-            self.paused_before_empty
-        };
-        self.show = Some(candidate);
-        self.default_image = None;
-        self.timer = Scheduler::new(Duration::from_secs(config.interval_seconds), now);
-        if paused {
-            self.timer.pause(now);
+        let images = config.images().map_err(|e| e.to_string())?;
+        let interval = Duration::from_secs(config.interval_seconds);
+        match self.show.as_mut() {
+            None => {
+                let mut candidate =
+                    Slideshow::new(images, config.shuffle).map_err(|e| e.to_string())?;
+                candidate.next_available(apply)?;
+                self.show = Some(candidate);
+                self.default_image = None;
+                self.timer = Scheduler::new(interval, now);
+                if self.paused_before_empty {
+                    self.timer.pause(now);
+                }
+            }
+            Some(show) => {
+                let mut candidate = show.clone();
+                let current = candidate.current().map(Path::to_path_buf);
+                candidate
+                    .update(images, config.shuffle)
+                    .map_err(|e| e.to_string())?;
+                let changed = match current {
+                    Some(path) if candidate.contains(&path) => {
+                        if self.fit_mode != config.fit_mode && apply(path.as_path()).is_err() {
+                            candidate.next_available(apply)?;
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    _ => {
+                        candidate.next_available(apply)?;
+                        true
+                    }
+                };
+                *show = candidate;
+                if self.timer.interval() != interval {
+                    let paused = self.timer.is_paused();
+                    self.timer = Scheduler::new(interval, now);
+                    if paused {
+                        self.timer.pause(now);
+                    }
+                } else if changed {
+                    self.timer.reset(now);
+                }
+            }
         }
+        self.fit_mode = config.fit_mode;
         Ok(())
     }
 }

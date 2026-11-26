@@ -39,6 +39,9 @@ impl Scheduler {
             self.deadline = now + remaining;
         }
     }
+    pub fn interval(&self) -> Duration {
+        self.interval
+    }
     pub fn is_paused(&self) -> bool {
         self.remaining.is_some()
     }

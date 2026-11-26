@@ -88,9 +88,20 @@ mod transport {
         });
         Ok(())
     }
+    /// How long a client waits for the running slideshow to answer. Long
+    /// enough for a reload of a large collection, short enough that a stuck
+    /// service cannot block callers indefinitely.
+    const RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
     pub fn send(command: Command) -> io::Result<Response> {
         let pipe_name = name()?;
-        send_name(&pipe_name, command)
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            let _ = tx.send(send_name(&pipe_name, command));
+        });
+        rx.recv_timeout(RESPONSE_TIMEOUT).map_err(|_| {
+            io::Error::new(io::ErrorKind::TimedOut, "slideshow did not respond in time")
+        })?
     }
     fn send_name(pipe_name: &str, command: Command) -> io::Result<Response> {
         let name = pipe_name.to_ns_name::<GenericNamespaced>()?;

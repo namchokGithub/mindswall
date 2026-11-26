@@ -7,7 +7,10 @@ use crate::{
 use std::{path::Path, sync::mpsc, time::Instant};
 
 fn apply(path: &Path) -> Result<(), crate::Error> {
-    SystemWallpaper.set_wallpaper(path)?;
+    if let Err(error) = SystemWallpaper.set_wallpaper(path) {
+        tracing::warn!(%error, "could not apply wallpaper");
+        return Err(error);
+    }
     if let Err(error) = crate::history::History::record(path, None) {
         tracing::warn!(%error, "could not record wallpaper history");
     }
@@ -32,13 +35,11 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
     ipc::listen(tx).map_err(|e| {
         format!("cannot start slideshow control listener (another instance may be running): {e}")
     })?;
-    apply(
-        playback
-            .show
-            .as_mut()
-            .expect("initial slideshow exists")
-            .next(),
-    )?;
+    playback
+        .show
+        .as_mut()
+        .expect("initial slideshow exists")
+        .next_available(apply)?;
     println!("Slideshow running. Press Ctrl+C to stop.");
     loop {
         let event = match playback.timer.wait(Instant::now()) {
@@ -128,40 +129,29 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                             Err("No enabled folders".into())
                         }
                     }
-                    Control::Next => {
-                        if let Some(mut candidate) = playback.show.clone() {
-                            let path = candidate.next();
-                            let result = apply(path)
-                                .map(|()| path.display().to_string())
+                    Control::Next => match playback.show.as_mut() {
+                        Some(show) => {
+                            let result = show
+                                .next_available(apply)
+                                .map(|path| path.display().to_string())
                                 .map_err(|e| e.to_string());
-                            if result.is_ok() {
-                                playback.show = Some(candidate);
-                            }
                             playback.timer.reset(now);
                             result
-                        } else {
-                            Err("No enabled folders".into())
                         }
-                    }
-                    Control::Previous => {
-                        if let Some(mut candidate) = playback.show.clone() {
-                            match candidate.previous() {
-                                Some(path) => {
-                                    let result = apply(path)
-                                        .map(|()| path.display().to_string())
-                                        .map_err(|e| e.to_string());
-                                    if result.is_ok() {
-                                        playback.show = Some(candidate);
-                                    }
-                                    playback.timer.reset(now);
-                                    result
-                                }
-                                None => Err("no previous wallpaper".into()),
+                        None => Err("No enabled folders".into()),
+                    },
+                    Control::Previous => match playback.show.as_mut() {
+                        Some(show) => match show.previous_available(apply) {
+                            Some(result) => {
+                                playback.timer.reset(now);
+                                result
+                                    .map(|path| path.display().to_string())
+                                    .map_err(|e| e.to_string())
                             }
-                        } else {
-                            Err("No enabled folders".into())
-                        }
-                    }
+                            None => Err("no previous wallpaper".into()),
+                        },
+                        None => Err("No enabled folders".into()),
+                    },
                 };
                 let response = match result {
                     Ok(message) => Response {
@@ -181,13 +171,12 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                 let _ = reply.send(response);
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                if let Some(mut candidate) = playback.show.clone() {
-                    match apply(candidate.next()) {
-                        Ok(()) => playback.show = Some(candidate),
-                        Err(error) => tracing::warn!(%error, "wallpaper update failed"),
-                    };
+                if let Some(show) = playback.show.as_mut() {
+                    if let Err(error) = show.next_available(apply) {
+                        tracing::warn!(%error, "wallpaper update failed");
+                    }
                     playback.timer.reset(Instant::now());
-                };
+                }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 return Err("control listener stopped".into());

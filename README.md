@@ -45,7 +45,11 @@ Copy `config.example.json` to `%APPDATA%\MindsWall\config\config.json` and
 edit the folder paths. JSON paths need doubled backslashes. Enable or disable
 each folder and set whether it includes subfolders. The interval is in seconds
 (60–86400); set `shuffle` to `false` for sequential order. Config changes are
-loaded when the slideshow starts.
+loaded when the slideshow starts. If the config file is invalid, it is renamed
+to `config.json.invalid-<timestamp>` and default settings are used, so the
+original file is kept. Folders or subfolders that cannot be read are logged
+and skipped, and images that cannot be applied (for example, deleted files)
+are skipped until the collection is reloaded.
 
 ```powershell
 New-Item -ItemType Directory -Force "$env:APPDATA\MindsWall\config"
@@ -95,7 +99,9 @@ image cannot be applied.
 
 Overview shows the current position and total in the active slideshow cycle.
 The total includes enabled subfolders and reflects active filters and exclusions.
-Use **Rescan collection** to pick up file changes; this starts a new cycle.
+Use **Rescan collection** to pick up file changes; new images join the current
+cycle. Saving settings keeps the current cycle: the wallpaper changes only when
+the current image leaves the collection or the fit mode changes.
 Use **Quick settings** on Overview to change the slideshow interval and fit mode.
 
 Feedback appears in a temporary snackbar on the page where the action was made.

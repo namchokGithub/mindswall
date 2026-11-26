@@ -1,7 +1,7 @@
 use crate::Error;
 use rand::seq::SliceRandom;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -79,6 +79,140 @@ impl Slideshow {
     }
     pub fn total(&self) -> usize {
         self.images.len()
+    }
+    pub fn contains(&self, path: &Path) -> bool {
+        self.images.iter().any(|image| image == path)
+    }
+
+    /// Advance to the next image that `apply` accepts. Images that fail are
+    /// removed so they cannot block the slideshow. When no image can be
+    /// applied, the slideshow is left unchanged and the last error returned.
+    pub fn next_available<E>(
+        &mut self,
+        mut apply: impl FnMut(&Path) -> Result<(), E>,
+    ) -> Result<PathBuf, E> {
+        let mut candidate = self.clone();
+        loop {
+            let path = candidate.next().to_owned();
+            match apply(path.as_path()) {
+                Ok(()) => {
+                    *self = candidate;
+                    return Ok(path);
+                }
+                Err(error) => {
+                    candidate.remove(&path);
+                    if candidate.images.is_empty() {
+                        return Err(error);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Go back to the most recent earlier image that `apply` accepts,
+    /// removing earlier images that fail. Returns `None` when there is no
+    /// earlier image. On failure the slideshow is left unchanged.
+    pub fn previous_available<E>(
+        &mut self,
+        mut apply: impl FnMut(&Path) -> Result<(), E>,
+    ) -> Option<Result<PathBuf, E>> {
+        let mut candidate = self.clone();
+        let mut path = candidate.previous()?.to_owned();
+        loop {
+            match apply(path.as_path()) {
+                Ok(()) => {
+                    *self = candidate;
+                    return Some(Ok(path));
+                }
+                Err(error) => {
+                    let cursor = candidate.cursor.unwrap_or(0);
+                    let earlier = candidate.history[..cursor]
+                        .iter()
+                        .any(|(entry, _)| entry != &path);
+                    candidate.remove(&path);
+                    if !earlier || candidate.images.is_empty() {
+                        return Some(Err(error));
+                    }
+                    // The cursor now points at the closest surviving earlier entry.
+                    path = candidate.current()?.to_owned();
+                }
+            }
+        }
+    }
+
+    /// Remove an image from the collection, the current queue, and history.
+    pub fn remove(&mut self, path: &Path) {
+        let mut paths = HashSet::new();
+        paths.insert(path.to_owned());
+        self.remove_all(&paths);
+    }
+
+    fn remove_all(&mut self, paths: &HashSet<PathBuf>) {
+        if paths.is_empty() {
+            return;
+        }
+        self.images.retain(|image| !paths.contains(image));
+        let played = self.index.min(self.queue.len());
+        let removed_played = self.queue[..played]
+            .iter()
+            .filter(|image| paths.contains(*image))
+            .count();
+        self.queue.retain(|image| !paths.contains(image));
+        self.index = played - removed_played;
+        for path in paths {
+            self.cycle_positions.remove(path);
+        }
+        let removed_before_cursor = self.cursor.map(|cursor| {
+            self.history[..=cursor]
+                .iter()
+                .filter(|(entry, _)| paths.contains(entry))
+                .count()
+        });
+        self.history.retain(|(entry, _)| !paths.contains(entry));
+        self.cursor = match (self.cursor, removed_before_cursor) {
+            _ if self.history.is_empty() => None,
+            (Some(cursor), Some(removed)) => Some((cursor + 1 - removed).saturating_sub(1)),
+            _ => None,
+        };
+    }
+
+    /// Replace the collection while keeping the current cycle. Removed images
+    /// leave the queue and history, new images join the unplayed part of the
+    /// queue, and only the unplayed part is reordered for the shuffle setting.
+    pub fn update(&mut self, images: Vec<PathBuf>, shuffle: bool) -> Result<(), Error> {
+        if images.is_empty() {
+            return Err(Error::NoImages);
+        }
+        let wanted: HashSet<&PathBuf> = images.iter().collect();
+        let removed: HashSet<PathBuf> = self
+            .images
+            .iter()
+            .filter(|image| !wanted.contains(image))
+            .cloned()
+            .collect();
+        self.remove_all(&removed);
+        let known: HashSet<&PathBuf> = self.images.iter().collect();
+        let added: Vec<PathBuf> = images
+            .iter()
+            .filter(|image| !known.contains(image))
+            .cloned()
+            .collect();
+        let reorder = !added.is_empty() || shuffle != self.shuffle;
+        if !self.queue.is_empty() {
+            self.queue.extend(added);
+            if reorder {
+                let index = self.index.min(self.queue.len());
+                let unplayed = &mut self.queue[index..];
+                if shuffle {
+                    unplayed.shuffle(&mut rand::rng());
+                } else {
+                    unplayed.sort();
+                }
+            }
+        }
+        self.images = images;
+        self.shuffle = shuffle;
+        Ok(())
     }
     pub fn select(&mut self, path: PathBuf) -> Result<(), Error> {
         if !self.images.contains(&path) {

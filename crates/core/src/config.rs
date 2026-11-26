@@ -4,7 +4,46 @@ use std::{
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
+    sync::Mutex,
+    time::{SystemTime, UNIX_EPOCH},
 };
+
+static QUARANTINED: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// Move an invalid configuration file aside. Returns `None` when another
+/// process already moved or removed it.
+fn quarantine(path: &Path) -> io::Result<Option<PathBuf>> {
+    let name = path.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "configuration has no name")
+    })?;
+    let seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    for attempt in 0..100u32 {
+        let mut backup_name = name.to_owned();
+        backup_name.push(format!(".invalid-{seconds}"));
+        if attempt > 0 {
+            backup_name.push(format!("-{attempt}"));
+        }
+        let backup = path.with_file_name(backup_name);
+        if backup.exists() {
+            continue;
+        }
+        return match fs::rename(path, &backup) {
+            Ok(()) => Ok(Some(backup)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(io::Error::new(
+                e.kind(),
+                format!("invalid configuration {path:?} could not be backed up: {e}"),
+            )),
+        };
+    }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        format!("invalid configuration {path:?} could not be backed up: too many backups"),
+    ))
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Folder {
@@ -191,6 +230,11 @@ impl Config {
                 io::Error::new(io::ErrorKind::NotFound, "user config directory unavailable")
             })
     }
+    /// Load the configuration, or defaults when the file does not exist.
+    ///
+    /// An invalid file is moved aside to `<name>.invalid-<unix seconds>` before
+    /// defaults are returned, so a later save cannot overwrite the user's
+    /// settings. The backup path is available from [`Config::take_quarantined`].
     pub fn load(path: &Path) -> io::Result<Self> {
         let contents = match fs::read(path) {
             Ok(bytes) => bytes,
@@ -199,11 +243,27 @@ impl Config {
         };
         match Self::parse_backup(&contents) {
             Ok(config) => Ok(config),
-            _ => {
-                tracing::warn!(path = ?path, "invalid configuration; using defaults");
+            Err(error) => {
+                let backup = quarantine(path)?;
+                tracing::warn!(
+                    path = ?path,
+                    backup = ?backup,
+                    %error,
+                    "invalid configuration moved aside; using defaults"
+                );
+                if let Some(backup) = backup
+                    && let Ok(mut slot) = QUARANTINED.lock()
+                {
+                    *slot = Some(backup);
+                }
                 Ok(Self::default())
             }
         }
+    }
+    /// Return and clear the backup path of the last invalid configuration
+    /// that [`Config::load`] moved aside in this process.
+    pub fn take_quarantined() -> Option<PathBuf> {
+        QUARANTINED.lock().ok().and_then(|mut slot| slot.take())
     }
     pub fn save(&self, path: &Path) -> io::Result<()> {
         self.validate()?;
@@ -218,11 +278,19 @@ impl Config {
         file.persist(path).map_err(|err| err.error)?;
         Ok(())
     }
+    /// Collect the images of all enabled folders. Folders and entries that
+    /// cannot be read are logged and skipped so one unavailable location does
+    /// not hide the rest of the collection.
     pub fn images(&self) -> Result<Vec<PathBuf>, Error> {
         let mut seen = std::collections::HashSet::new();
         let mut images = Vec::new();
         for folder in self.folders.iter().filter(|f| f.enabled) {
-            for image in scanner::scan(std::slice::from_ref(&folder.path), folder.recursive)? {
+            let report =
+                scanner::scan_lenient(std::slice::from_ref(&folder.path), folder.recursive);
+            for error in &report.skipped {
+                tracing::warn!(%error, "skipping unreadable location");
+            }
+            for image in report.images {
                 let identity = fs::canonicalize(&image).unwrap_or_else(|_| image.clone());
                 if self.excluded.contains(&image) {
                     continue;

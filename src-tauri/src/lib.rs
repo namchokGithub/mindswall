@@ -146,6 +146,17 @@ struct ServiceState {
     error: Arc<Mutex<Option<String>>>,
 }
 
+/// Run blocking work (folder scans, Windows API calls, slideshow IPC) on a
+/// worker thread. Synchronous commands run on the main thread and would
+/// freeze the window while they wait.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 fn tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let mut builder = MenuBuilder::new(app)
         .text("open", "Open MindsWall")
@@ -194,10 +205,14 @@ fn save_profile(app: tauri::AppHandle, name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn apply_profile(name: String) -> Result<String, String> {
+async fn apply_profile(name: String) -> Result<String, String> {
+    blocking(move || apply_profile_inner(name)).await
+}
+
+fn apply_profile_inner(name: String) -> Result<String, String> {
     let mut config = get_config()?;
     config.apply_profile(&name).map_err(|e| e.to_string())?;
-    save_config(config)
+    save_config_inner(config)
 }
 
 #[tauri::command]
@@ -296,7 +311,11 @@ fn edit_image_inner(
 }
 
 #[tauri::command]
-fn apply_edited(path: PathBuf) -> Result<(), String> {
+async fn apply_edited(path: PathBuf) -> Result<(), String> {
+    blocking(move || apply_edited_inner(path)).await
+}
+
+fn apply_edited_inner(path: PathBuf) -> Result<(), String> {
     let cache = std::fs::canonicalize(edited_cache()?).map_err(|e| e.to_string())?;
     let source = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
     if !source.starts_with(cache) || source.extension().is_none_or(|e| e != "png") {
@@ -410,23 +429,27 @@ async fn gallery_details(
 }
 
 #[tauri::command]
-fn apply_image(state: tauri::State<'_, GalleryState>, path: PathBuf) -> Result<(), String> {
-    if !state.0.lock().map_err(|e| e.to_string())?.contains(&path) {
-        return Err("Image is not in the current collection".into());
-    }
-    if ipc::send(Command::Status).is_ok() {
-        let result = ipc::send(Command::Set(path.clone())).map_err(|e| e.to_string())?;
-        return if result.ok {
-            Ok(())
-        } else {
-            Err(result.message)
-        };
-    }
-    SystemWallpaper
-        .set_wallpaper(&path)
-        .map_err(|e| e.to_string())?;
-    mindswall_core::history::History::record(&path, None)
-        .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
+async fn apply_image(state: tauri::State<'_, GalleryState>, path: PathBuf) -> Result<(), String> {
+    let gallery = state.0.clone();
+    blocking(move || {
+        if !gallery.lock().map_err(|e| e.to_string())?.contains(&path) {
+            return Err("Image is not in the current collection".into());
+        }
+        if ipc::send(Command::Status).is_ok() {
+            let result = ipc::send(Command::Set(path.clone())).map_err(|e| e.to_string())?;
+            return if result.ok {
+                Ok(())
+            } else {
+                Err(result.message)
+            };
+        }
+        SystemWallpaper
+            .set_wallpaper(&path)
+            .map_err(|e| e.to_string())?;
+        mindswall_core::history::History::record(&path, None)
+            .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -439,7 +462,11 @@ fn get_history() -> Result<Vec<mindswall_core::history::HistoryEntry>, String> {
 }
 
 #[tauri::command]
-fn reapply_history(path: PathBuf, monitor: Option<String>) -> Result<(), String> {
+async fn reapply_history(path: PathBuf, monitor: Option<String>) -> Result<(), String> {
+    blocking(move || reapply_history_inner(path, monitor)).await
+}
+
+fn reapply_history_inner(path: PathBuf, monitor: Option<String>) -> Result<(), String> {
     let history = mindswall_core::history::History::load(
         &mindswall_core::history::History::default_path().map_err(|e| e.to_string())?,
     )
@@ -477,15 +504,18 @@ fn reapply_history(path: PathBuf, monitor: Option<String>) -> Result<(), String>
 }
 
 #[tauri::command]
-fn monitors() -> Result<Vec<mindswall_core::wallpaper::MonitorInfo>, String> {
-    mindswall_core::wallpaper::list_monitors()
+async fn monitors() -> Result<Vec<mindswall_core::wallpaper::MonitorInfo>, String> {
+    blocking(mindswall_core::wallpaper::list_monitors).await
 }
 
 #[tauri::command]
-fn set_monitor_image(monitor: String, path: PathBuf) -> Result<(), String> {
-    mindswall_core::wallpaper::set_monitor_wallpaper(&monitor, &path)?;
-    mindswall_core::history::History::record(&path, Some(monitor))
-        .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
+async fn set_monitor_image(monitor: String, path: PathBuf) -> Result<(), String> {
+    blocking(move || {
+        mindswall_core::wallpaper::set_monitor_wallpaper(&monitor, &path)?;
+        mindswall_core::history::History::record(&path, Some(monitor))
+            .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -494,7 +524,21 @@ fn get_config() -> Result<Config, String> {
 }
 
 #[tauri::command]
-fn save_config(config: Config) -> Result<String, String> {
+fn config_warning() -> Option<String> {
+    Config::take_quarantined().map(|backup| {
+        format!(
+            "The configuration file was invalid and was moved to {}. Default settings are in use.",
+            backup.display()
+        )
+    })
+}
+
+#[tauri::command]
+async fn save_config(config: Config) -> Result<String, String> {
+    blocking(move || save_config_inner(config)).await
+}
+
+fn save_config_inner(config: Config) -> Result<String, String> {
     config.validate().map_err(|e| e.to_string())?;
     let previous = get_config()?;
     let disabled_last_folder = previous.folders.iter().any(|folder| folder.enabled)
@@ -528,14 +572,22 @@ fn save_config(config: Config) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn folder_count(path: PathBuf, recursive: bool) -> Result<usize, String> {
-    scanner::scan(&[path], recursive)
-        .map(|images| images.len())
-        .map_err(|e| e.to_string())
+async fn folder_count(path: PathBuf, recursive: bool) -> Result<usize, String> {
+    blocking(move || {
+        if !path.is_dir() {
+            return Err(mindswall_core::Error::InvalidFolder(path).to_string());
+        }
+        Ok(scanner::scan_lenient(&[path], recursive).images.len())
+    })
+    .await
 }
 
 #[tauri::command]
-fn control(action: &str) -> Result<String, String> {
+async fn control(action: String) -> Result<String, String> {
+    blocking(move || control_inner(&action)).await
+}
+
+fn control_inner(action: &str) -> Result<String, String> {
     let command = match action {
         "next" => Command::Next,
         "previous" => Command::Previous,
@@ -562,7 +614,11 @@ struct OverviewStatus {
 }
 
 #[tauri::command]
-fn overview_status() -> Result<OverviewStatus, String> {
+async fn overview_status() -> Result<OverviewStatus, String> {
+    blocking(overview_status_inner).await
+}
+
+fn overview_status_inner() -> Result<OverviewStatus, String> {
     let response = ipc::send(Command::Status).map_err(|e| e.to_string())?;
     if !response.ok {
         return Err(response.message);
@@ -589,7 +645,16 @@ fn overview_status() -> Result<OverviewStatus, String> {
 }
 
 #[tauri::command]
-fn start_service(state: tauri::State<'_, ServiceState>) -> Result<(), String> {
+async fn start_service(state: tauri::State<'_, ServiceState>) -> Result<(), String> {
+    let starting = state.starting.clone();
+    let error = state.error.clone();
+    blocking(move || start_service_inner(starting, error)).await
+}
+
+fn start_service_inner(
+    starting: Arc<AtomicBool>,
+    error: Arc<Mutex<Option<String>>>,
+) -> Result<(), String> {
     if let Ok(response) = ipc::send(Command::Status) {
         if response
             .status
@@ -605,12 +670,10 @@ fn start_service(state: tauri::State<'_, ServiceState>) -> Result<(), String> {
         }
         return Ok(());
     }
-    if state.starting.swap(true, Ordering::SeqCst) {
+    if starting.swap(true, Ordering::SeqCst) {
         return Ok(());
     }
-    *state.error.lock().map_err(|e| e.to_string())? = None;
-    let starting = state.starting.clone();
-    let error = state.error.clone();
+    *error.lock().map_err(|e| e.to_string())? = None;
     std::thread::spawn(move || {
         if let Err(e) = mindswall_core::service::run_slideshow()
             && let Ok(mut slot) = error.lock()
@@ -628,8 +691,12 @@ fn service_error(state: tauri::State<'_, ServiceState>) -> Option<String> {
 }
 
 #[tauri::command]
-fn current_preview(path: PathBuf) -> Result<Vec<u8>, String> {
-    let status = overview_status()?;
+async fn current_preview(path: PathBuf) -> Result<Vec<u8>, String> {
+    blocking(move || current_preview_inner(path)).await
+}
+
+fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
+    let status = overview_status_inner()?;
     if status.current.as_ref() != Some(&path) {
         return Err("Wallpaper has changed".into());
     }
@@ -712,6 +779,7 @@ pub fn run() {
         .manage(HotkeyState::default())
         .invoke_handler(tauri::generate_handler![
             get_config,
+            config_warning,
             save_config,
             folder_count,
             control,
@@ -763,7 +831,7 @@ pub fn run() {
                                 if let Ok(config) = get_config()
                                     && let Some(profile) = config.profiles.get(index)
                                 {
-                                    if let Err(error) = apply_profile(profile.name.clone()) {
+                                    if let Err(error) = apply_profile_inner(profile.name.clone()) {
                                         eprintln!("Could not apply profile: {error}");
                                     }
                                     refresh_tray(&handle);
@@ -800,7 +868,11 @@ pub fn run() {
                 }
             });
             if get_config().is_ok_and(|config| config.folders.iter().any(|folder| folder.enabled)) {
-                let _ = start_service(app.state());
+                let state = app.state::<ServiceState>();
+                let (starting, error) = (state.starting.clone(), state.error.clone());
+                std::thread::spawn(move || {
+                    let _ = start_service_inner(starting, error);
+                });
             }
             Ok(())
         })

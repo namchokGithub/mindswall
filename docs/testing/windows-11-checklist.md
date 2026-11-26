@@ -156,9 +156,31 @@ example from the log.
 
 ### Errors
 
-- [ ] Delete the next image while the slideshow runs: the failure is logged and
-      the slideshow keeps running (record whether it skips or stops changing)
+- [ ] Delete the next image while the slideshow runs: the failure is logged,
+      the image is skipped, and the next change shows another image
+- [ ] Delete several images, then press `next` repeatedly: every press shows
+      an available image
 - [ ] Disconnect a network or removable folder: record behavior
+- [ ] Add a folder that is missing or offline next to a working folder: the
+      slideshow starts with the working folder, and the log shows
+      `skipping unreadable location`
+- [ ] Add a drive root such as `D:\`: protected folders are skipped and the
+      remaining images are used
+- [ ] Write invalid JSON to the config file and start the app: the file is
+      renamed to `config.json.invalid-<timestamp>`, the app shows a warning
+      with that path, and saving a setting does not change the renamed file
+
+### Settings changes during a slideshow
+
+- [ ] Change the interval, shuffle, or a filter that keeps the current image:
+      the wallpaper does not change and images shown in this cycle do not
+      repeat before the cycle ends
+- [ ] Change the fit mode: the current image is applied again with the new
+      mode
+- [ ] Exclude the current image in Gallery: the wallpaper changes to another
+      image
+- [ ] While a large folder is rescanned or settings are saved, the window
+      stays responsive (it can be moved and pages can be switched)
 
 ## 3. Desktop app (Phase 3)
 

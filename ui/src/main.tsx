@@ -43,7 +43,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    invoke<Config>("get_config").then(setConfig).catch(e => setError(String(e)));
+    invoke<Config>("get_config").then(value => { setConfig(value); return invoke<string | null>("config_warning"); }).then(warning => { if (warning) setError(warning); }).catch(e => setError(String(e)));
     invoke<boolean>("get_autostart").then(setAutostart).catch(() => {});
     refreshStatus();
     const timer = window.setInterval(refreshStatus, 3000);
@@ -88,7 +88,7 @@ function App() {
       if (action === "start") { await invoke("start_service"); await new Promise(resolve => setTimeout(resolve, 700)); const failure = await invoke<string | null>("service_error"); if (failure) throw failure; }
       else await invoke("control", { action });
       await refreshStatus();
-      if (action === "reload") setMessage("Collection rescanned. A new cycle has started.");
+      if (action === "reload") setMessage("Collection rescanned. New images join the current cycle.");
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); }
   }
