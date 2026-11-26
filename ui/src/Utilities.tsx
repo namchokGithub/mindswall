@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import { Grid2X2, Grid3X3, Image, List, RefreshCw } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
@@ -80,7 +79,7 @@ export function MonitorsPage() {
   const refresh = useCallback(async () => { setLoading(true); setLoadFailed(false); try { setMonitors(await invoke<Monitor[]>("monitors")); setError(""); } catch (e) { setLoadFailed(true); setError(String(e)); } finally { setLoading(false); } }, [setError]);
   useEffect(() => { refresh(); }, [refresh]);
   async function choose(monitor: Monitor) {
-    try { const path = await open({ multiple: false, filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "bmp"] }] }); if (path) { await invoke("set_monitor_image", { monitor: monitor.id, path }); setNotice("Wallpaper changed for this monitor."); } }
+    try { const path = await invoke<string | null>("pick_image"); if (path) { await invoke("set_monitor_image", { monitor: monitor.id, path }); setNotice("Wallpaper changed for this monitor."); } }
     catch (e) { setError(String(e)); }
   }
   return <><div className="section-title"><div><span className="eyebrow">YOUR SCREENS</span><h2>Connected monitors</h2></div><button className="icon-button" aria-label="Refresh monitors" disabled={loading} onClick={refresh}><RefreshCw size={16}/></button></div>

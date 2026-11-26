@@ -17,6 +17,7 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[derive(Default)]
@@ -115,6 +116,39 @@ mod tests {
     }
 
     #[test]
+    fn folder_paths_include_profiles_and_grants_are_exact() {
+        use mindswall_core::config::{Folder, Profile, ProfileSettings};
+        let folder = |path: &str| Folder {
+            path: path.into(),
+            enabled: true,
+            recursive: true,
+        };
+        let config = Config {
+            folders: vec![folder("current")],
+            profiles: vec![Profile {
+                name: "Work".into(),
+                settings: ProfileSettings {
+                    folders: vec![folder("saved")],
+                    interval_seconds: 600,
+                    shuffle: true,
+                    filter: Default::default(),
+                    excluded: Vec::new(),
+                    fit_mode: Default::default(),
+                },
+            }],
+            ..Config::default()
+        };
+        let paths = folder_paths(&config);
+        assert!(paths.contains(&PathBuf::from("current")));
+        assert!(paths.contains(&PathBuf::from("saved")));
+        let chosen = std::env::temp_dir().join("mindswall-granted-test");
+        assert!(!is_granted(&chosen));
+        grant(chosen.clone());
+        assert!(is_granted(&chosen));
+        assert!(!is_granted(&chosen.join("child")));
+    }
+
+    #[test]
     fn accepts_recorded_keyboard_codes() {
         let hotkeys = mindswall_core::config::Hotkeys {
             next: "Ctrl+Alt+ArrowRight".into(),
@@ -184,6 +218,67 @@ fn refresh_tray(app: &tauri::AppHandle) {
     }
 }
 
+/// Paths the user chose in a native dialog during this session. Commands that
+/// read or write user files accept only these or paths the app already
+/// manages, so script running in the page cannot reach arbitrary files.
+static GRANTED_PATHS: std::sync::LazyLock<Mutex<std::collections::HashSet<PathBuf>>> =
+    std::sync::LazyLock::new(Default::default);
+
+fn grant(path: PathBuf) -> PathBuf {
+    if let Ok(mut granted) = GRANTED_PATHS.lock() {
+        granted.insert(path.clone());
+    }
+    path
+}
+
+fn is_granted(path: &std::path::Path) -> bool {
+    GRANTED_PATHS
+        .lock()
+        .is_ok_and(|granted| granted.contains(path))
+}
+
+fn file_dialog(app: &tauri::AppHandle) -> tauri_plugin_dialog::FileDialogBuilder<tauri::Wry> {
+    let dialog = app.dialog().file();
+    match app.get_webview_window("main") {
+        Some(window) => dialog.set_parent(&window),
+        None => dialog,
+    }
+}
+
+fn picked(path: Option<tauri_plugin_dialog::FilePath>) -> Result<Option<PathBuf>, String> {
+    path.map(|path| path.into_path().map_err(|e| e.to_string()))
+        .transpose()
+}
+
+#[tauri::command]
+async fn pick_folder(app: tauri::AppHandle) -> Result<Option<PathBuf>, String> {
+    blocking(move || Ok(picked(file_dialog(&app).blocking_pick_folder())?.map(grant))).await
+}
+
+#[tauri::command]
+async fn pick_image(app: tauri::AppHandle) -> Result<Option<PathBuf>, String> {
+    blocking(move || {
+        let dialog = file_dialog(&app).add_filter("Images", &["jpg", "jpeg", "png", "bmp"]);
+        Ok(picked(dialog.blocking_pick_file())?.map(grant))
+    })
+    .await
+}
+
+/// Every folder path in the configuration, including those in profiles.
+fn folder_paths(config: &Config) -> std::collections::HashSet<PathBuf> {
+    config
+        .folders
+        .iter()
+        .chain(
+            config
+                .profiles
+                .iter()
+                .flat_map(|profile| &profile.settings.folders),
+        )
+        .map(|folder| folder.path.clone())
+        .collect()
+}
+
 #[derive(Default)]
 struct GalleryState(std::sync::Arc<Mutex<Vec<PathBuf>>>);
 
@@ -229,16 +324,35 @@ fn delete_profile(app: tauri::AppHandle, name: String) -> Result<String, String>
     Ok("Profile removed.".into())
 }
 
+/// Ask for a destination and export the configuration. Returns `false` when
+/// the user cancels.
 #[tauri::command]
-fn export_backup(path: PathBuf) -> Result<(), String> {
-    get_config()?.save(&path).map_err(|e| e.to_string())
+async fn export_backup(app: tauri::AppHandle) -> Result<bool, String> {
+    blocking(move || {
+        let dialog = file_dialog(&app)
+            .add_filter("JSON", &["json"])
+            .set_file_name("mindswall-backup.json");
+        let Some(path) = picked(dialog.blocking_save_file())? else {
+            return Ok(false);
+        };
+        get_config()?.save(&path).map_err(|e| e.to_string())?;
+        Ok(true)
+    })
+    .await
 }
 
+/// Ask for a backup file and import it. Returns `false` when the user
+/// cancels.
 #[tauri::command]
-async fn import_backup(app: tauri::AppHandle, path: PathBuf) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || import_backup_inner(app, path))
-        .await
-        .map_err(|e| e.to_string())?
+async fn import_backup(app: tauri::AppHandle) -> Result<bool, String> {
+    blocking(move || {
+        let dialog = file_dialog(&app).add_filter("JSON", &["json"]);
+        let Some(path) = picked(dialog.blocking_pick_file())? else {
+            return Ok(false);
+        };
+        import_backup_inner(app, path).map(|_| true)
+    })
+    .await
 }
 
 fn import_backup_inner(app: tauri::AppHandle, path: PathBuf) -> Result<String, String> {
@@ -315,9 +429,10 @@ async fn edit_image(
     path: PathBuf,
     options: mindswall_core::editor::EditOptions,
 ) -> Result<EditedImage, String> {
-    tauri::async_runtime::spawn_blocking(move || edit_image_inner(path, options))
-        .await
-        .map_err(|e| e.to_string())?
+    if !is_granted(&path) {
+        return Err("Choose the image to edit first".into());
+    }
+    blocking(move || edit_image_inner(path, options)).await
 }
 
 fn edit_image_inner(
@@ -538,8 +653,16 @@ async fn monitors() -> Result<Vec<mindswall_core::wallpaper::MonitorInfo>, Strin
 }
 
 #[tauri::command]
-async fn set_monitor_image(monitor: String, path: PathBuf) -> Result<(), String> {
+async fn set_monitor_image(
+    state: tauri::State<'_, GalleryState>,
+    monitor: String,
+    path: PathBuf,
+) -> Result<(), String> {
+    let gallery = state.0.clone();
     blocking(move || {
+        if !is_granted(&path) && !gallery.lock().map_err(|e| e.to_string())?.contains(&path) {
+            return Err("Choose the image for this monitor first".into());
+        }
         mindswall_core::wallpaper::set_monitor_wallpaper(&monitor, &path)?;
         mindswall_core::history::History::record(&path, Some(monitor))
             .map_err(|e| format!("Wallpaper changed, but history could not be saved: {e}"))
@@ -570,6 +693,16 @@ async fn save_config(config: Config) -> Result<String, String> {
 fn save_config_inner(config: Config) -> Result<String, String> {
     config.validate().map_err(|e| e.to_string())?;
     let previous = get_config()?;
+    let known = folder_paths(&previous);
+    if let Some(path) = folder_paths(&config)
+        .into_iter()
+        .find(|path| !known.contains(path) && !is_granted(path))
+    {
+        return Err(format!(
+            "Add folders with the folder picker: {}",
+            path.display()
+        ));
+    }
     let disabled_last_folder = previous.folders.iter().any(|folder| folder.enabled)
         && !config.folders.iter().any(|folder| folder.enabled);
     config
@@ -603,6 +736,9 @@ fn save_config_inner(config: Config) -> Result<String, String> {
 #[tauri::command]
 async fn folder_count(path: PathBuf, recursive: bool) -> Result<usize, String> {
     blocking(move || {
+        if !is_granted(&path) && !folder_paths(&get_config()?).contains(&path) {
+            return Err("Folder is not in the collection".into());
+        }
         if !path.is_dir() {
             return Err(mindswall_core::Error::InvalidFolder(path).to_string());
         }
@@ -813,6 +949,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_config,
             config_warning,
+            pick_folder,
+            pick_image,
             save_config,
             folder_count,
             control,

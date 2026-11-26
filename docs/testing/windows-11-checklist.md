@@ -202,6 +202,16 @@ example from the log.
 - [ ] Exclude an image, then edit `config.json` so the exclusion uses a
       different letter case: the image stays excluded
 
+### File access from the desktop app
+
+- [ ] **Add folder**, Editor **Choose image**, Monitors image selection,
+      backup export, and backup import each open a native dialog
+- [ ] Cancelling a backup export or import shows no success message and
+      changes nothing
+- [ ] Backup export writes the chosen file; import restores it
+- [ ] Folders saved in a profile can still be counted and used after an app
+      restart
+
 ## 3. Desktop app (Phase 3)
 
 Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).

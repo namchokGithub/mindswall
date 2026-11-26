@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, Download, Upload } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { displayShortcut, shortcutFromKey } from "./shortcutCapture";
@@ -17,8 +16,14 @@ export function Profiles({ config, refresh }: Props) {
     setBusy(true); setError(""); setNotice("");
     try { await invoke(command, args); await refresh(); setNotice(message); return true; } catch (e) { await refresh().catch(() => {}); setError(String(e)); return false; } finally { setBusy(false); }
   }
-  async function exportFile() { try { const path = await saveDialog({ defaultPath: "mindswall-backup.json", filters: [{ name: "JSON", extensions: ["json"] }] }); if (path) await action("export_backup", { path }, "Backup exported."); } catch (e) { setError(String(e)); } }
-  async function importFile() { try { const path = await open({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] }); if (path) await action("import_backup", { path }, "Backup imported."); } catch (e) { setError(String(e)); } }
+  async function exportFile() {
+    setBusy(true); setError(""); setNotice("");
+    try { if (await invoke<boolean>("export_backup")) setNotice("Backup exported."); } catch (e) { setError(String(e)); } finally { setBusy(false); }
+  }
+  async function importFile() {
+    setBusy(true); setError(""); setNotice("");
+    try { if (await invoke<boolean>("import_backup")) { await refresh(); setNotice("Backup imported."); } } catch (e) { await refresh().catch(() => {}); setError(String(e)); } finally { setBusy(false); }
+  }
   return <><div className="section-title"><div><span className="eyebrow">YOUR COLLECTIONS</span><h2>Wallpaper profiles</h2></div></div>
     <div className="panel settings-panel"><div className="setting-row"><div><strong>Save current settings</strong><small>Keep your folders, slideshow and image preferences together.</small></div><div className="profile-create"><input aria-label="Profile name" maxLength={80} value={name} onChange={e => setName(e.target.value)} placeholder="Profile name"/><button className="primary" disabled={busy || !name.trim()} onClick={async () => { if (await action("save_profile", { name }, "Profile saved.")) setName(""); }}>Save</button></div></div>
     {config.profiles.length === 0 ? <p className="extended-empty">No profiles yet. Save your current setup to get started.</p> : config.profiles.map(profile => <div className="setting-row" key={profile.name}><div><strong>{profile.name}{config.active_profile === profile.name ? " · Active" : ""}</strong><small>Saved wallpaper collection</small></div><div className="profile-create"><button className="secondary" disabled={busy} onClick={() => action("apply_profile", { name: profile.name }, "Profile applied.")}>Use profile</button>{removing === profile.name ? <><button className="secondary" disabled={busy} onClick={async () => { await action("delete_profile", { name: profile.name }, "Profile removed."); setRemoving(""); }}>Confirm remove</button><button className="secondary" onClick={() => setRemoving("")}>Cancel</button></> : <button className="secondary" disabled={busy} onClick={() => setRemoving(profile.name)}>Remove</button>}</div></div>)}</div>
@@ -41,7 +46,7 @@ export function Editor({ active }: { active: boolean }) {
     setCompletion(null);
   }, [active, completion, setError, setNotice]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  async function choose() { try { const path = await open({ multiple: false, filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "bmp"] }] }); if (path) { setSource(path); setEdited(""); setPreview(""); setError(""); } } catch (e) { setError(String(e)); } }
+  async function choose() { try { const path = await invoke<string | null>("pick_image"); if (path) { setSource(path); setEdited(""); setPreview(""); setError(""); } } catch (e) { setError(String(e)); } }
   async function generate() {
     setError(""); setNotice(""); setCompletion(null);
     const number = (v: string) => /^\d+$/.test(v) ? Number(v) : null;

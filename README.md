@@ -131,6 +131,11 @@ copy listed in History. Caches are stored under `%LOCALAPPDATA%\MindsWall\cache`
 While the window is hidden in the tray, the app stops polling the slideshow
 status.
 
+Folders, images, and backup files are chosen through native dialogs opened by
+the app. The desktop app only reads or writes paths chosen this way during the
+current session, or paths that are already part of the collection, history,
+or configuration.
+
 These utilities remain in development. Folder watching and per-monitor slideshow
 sources are not yet implemented. Multi-monitor behavior and the gallery with a
 large collection still need interactive Windows verification.

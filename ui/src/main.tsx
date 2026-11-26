@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, ArrowRight, ChevronRight, FolderOpen, History, Image, LayoutGrid, Layers, Monitor, Paintbrush, Pause, Play, Plus, RefreshCw, Settings, Trash2 } from "lucide-react";
 import logo from "./assets/mindswall.png";
 import { Gallery, HistoryPage, MonitorsPage, type UtilityConfig } from "./Utilities";
@@ -106,7 +105,7 @@ function App() {
   }
   async function addFolder() {
     if (!config) return;
-    try { const path = await open({ directory: true, multiple: false }); if (path && !config.folders.some(f => f.path.toLowerCase() === path.toLowerCase())) await save({ ...config, folders: [...config.folders, { path, enabled: true, recursive: true }] }); }
+    try { const path = await invoke<string | null>("pick_folder"); if (path && !config.folders.some(f => f.path.toLowerCase() === path.toLowerCase())) await save({ ...config, folders: [...config.folders, { path, enabled: true, recursive: true }] }); }
     catch (e) { setError(String(e)); }
   }
   function navigatePage(next: Page) { navigate(next); setPage(next); }
