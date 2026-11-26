@@ -280,6 +280,10 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [ ] With the slideshow stopped, disabling the last enabled folder applies
       the Windows default image
 - [x] Removing a folder updates the config file
+- [ ] On **Folders**, the remove button asks for confirmation in the app's
+      theme (Cancel and Escape keep the folder); **Open folder** opens the
+      folder in File Explorer, and a folder that no longer exists shows an
+      error
 - [ ] Add a folder with a few thousand images that was not opened recently:
       the app responds within a few seconds; copy the `collection scanned` and
       `settings reloaded` log lines (images, `scan_ms`, `filter_ms`,

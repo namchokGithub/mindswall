@@ -40,8 +40,8 @@ All notable changes to MindsWall are recorded here. The format follows
   preview no longer shows the folder path.
 - The app shows how many images the folder watcher added or removed.
 - Folder paths show only their last folder; selecting a path copies it.
-- Monitors folders can be opened in File Explorer, and removing a
-  folder or forgetting a monitor asks for confirmation.
+- Folders and Monitors folders can be opened in File Explorer, and removing
+  a folder or forgetting a monitor asks for confirmation.
 - Monitor thumbnails and Overview cards keep the previous image while the new
   one loads, instead of flashing a placeholder.
 - The Editor previews the chosen image with its size, compares it with the
