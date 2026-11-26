@@ -123,7 +123,8 @@ large collection still need interactive Windows verification.
 **Profiles** saves named collections and can import or export settings and
 profiles as JSON. The **Editor** creates a cached copy with optional crop,
 resize, blur, and dim; the original image remains untouched. The Editor shows
-a loading indicator while creating a preview. Global shortcuts
+a loading indicator while creating a preview and keeps its work when switching
+pages during the same app session. Global shortcuts
 can be recorded using the keyboard in **Settings**, and saved profiles are available from the
 system tray. These features still need interactive Windows verification. A
 running slideshow may replace an edited wallpaper at its next change.

@@ -26,17 +26,24 @@ export function Profiles({ config, refresh }: Props) {
   </>;
 }
 
-export function Editor() {
+export function Editor({ active }: { active: boolean }) {
   const [source, setSource] = useState(""); const [edited, setEdited] = useState(""); const [preview, setPreview] = useState("");
   const [width, setWidth] = useState(""); const [height, setHeight] = useState(""); const [crop, setCrop] = useState(false);
   const [x, setX] = useState("0"); const [y, setY] = useState("0"); const [cropWidth, setCropWidth] = useState(""); const [cropHeight, setCropHeight] = useState("");
   const [blur, setBlur] = useState(0); const [dim, setDim] = useState(0); const { setError, setNotice } = useSnackbar("editor"); const [busy, setBusy] = useState(false);
+  const [completion, setCompletion] = useState<{ error?: string; notice?: string } | null>(null);
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    if (!active || !completion) return;
+    if (completion.error) setError(completion.error);
+    if (completion.notice) setNotice(completion.notice);
+    setCompletion(null);
+  }, [active, completion, setError, setNotice]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   async function choose() { try { const path = await open({ multiple: false, filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "bmp"] }] }); if (path) { setSource(path); setEdited(""); setPreview(""); setError(""); } } catch (e) { setError(String(e)); } }
   async function generate() {
-    setError(""); setNotice("");
+    setError(""); setNotice(""); setCompletion(null);
     const number = (v: string) => /^\d+$/.test(v) ? Number(v) : null;
     const w = width ? number(width) : null, h = height ? number(height) : null;
     const cropValues = [x, y, cropWidth, cropHeight].map(number);
@@ -45,8 +52,8 @@ export function Editor() {
     try {
       const result = await invoke<EditResult>("edit_image", { path: source, options: { width: w, height: h, crop: crop ? { x: cropValues[0], y: cropValues[1], width: cropValues[2], height: cropValues[3] } : null, blur, dim } });
       if (!mounted.current) return;
-      setEdited(result.path); setPreview(URL.createObjectURL(new Blob([new Uint8Array(result.preview)], { type: "image/png" }))); setNotice("Preview created. Your original image is unchanged.");
-    } catch (e) { if (mounted.current) setError(String(e)); } finally { if (mounted.current) setBusy(false); }
+      setEdited(result.path); setPreview(URL.createObjectURL(new Blob([new Uint8Array(result.preview)], { type: "image/png" }))); setCompletion({ notice: "Preview created. Your original image is unchanged." });
+    } catch (e) { if (mounted.current) setCompletion({ error: String(e) }); } finally { if (mounted.current) setBusy(false); }
   }
   return <><div className="section-title"><div><span className="eyebrow">MAKE IT YOURS</span><h2>Image editor</h2></div><button className="primary" disabled={busy} onClick={choose}><FolderOpen size={16}/> Choose image</button></div>
     {!source ? <div className="panel empty"><h3>Start with an image.</h3><p>Crop, resize, blur or dim a copy for your desktop.</p><button className="primary" disabled={busy} onClick={choose}>Choose image</button></div> : <><div className="panel editor-panel" onChange={() => setEdited("")}><strong title={source}>{source.split(/[\\/]/).pop()}</strong><small>{source}</small>{preview && <img className="edited-preview" src={preview} alt="Preview of the edited image"/>}
