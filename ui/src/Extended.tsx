@@ -7,7 +7,7 @@ import { displayShortcut, shortcutFromKey } from "./shortcutCapture";
 type Profile = { name: string };
 type ExtendedConfig = { profiles: Profile[]; active_profile: string | null };
 type Hotkeys = { next: string; previous: string; pause: string };
-type EditResult = { path: string; preview: number[] };
+type EditResult = { path: string };
 type Props = { config: ExtendedConfig; refresh: () => Promise<void> };
 
 export function Profiles({ config, refresh }: Props) {
@@ -56,8 +56,9 @@ export function Editor({ active }: { active: boolean }) {
     setEdited(""); setBusy(true);
     try {
       const result = await invoke<EditResult>("edit_image", { path: source, options: { width: w, height: h, crop: crop ? { x: cropValues[0], y: cropValues[1], width: cropValues[2], height: cropValues[3] } : null, blur, dim } });
+      const bytes = await invoke<ArrayBuffer>("edited_preview", { path: result.path });
       if (!mounted.current) return;
-      setEdited(result.path); setPreview(URL.createObjectURL(new Blob([new Uint8Array(result.preview)], { type: "image/png" }))); setCompletion({ notice: "Preview created. Your original image is unchanged." });
+      setEdited(result.path); setPreview(URL.createObjectURL(new Blob([bytes], { type: "image/png" }))); setCompletion({ notice: "Preview created. Your original image is unchanged." });
     } catch (e) { if (mounted.current) setCompletion({ error: String(e) }); } finally { if (mounted.current) setBusy(false); }
   }
   return <><div className="section-title"><div><span className="eyebrow">MAKE IT YOURS</span><h2>Image editor</h2></div><button className="primary" disabled={busy} onClick={choose}><FolderOpen size={16}/> Choose image</button></div>

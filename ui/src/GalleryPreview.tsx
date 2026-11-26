@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 
 type Properties = { width: number; height: number; bit_depth: number; size: number; created: number | null; modified: number | null };
-type Details = { properties: Properties; preview: number[] };
 
 function date(value: number | null) {
   return value === null ? "Unavailable" : new Date(value * 1000).toLocaleString();
@@ -29,10 +28,10 @@ export function GalleryPreview({ path, close }: { path: string; close: () => voi
   }, []);
   useEffect(() => {
     let active = true; let url = "";
-    invoke<Details>("gallery_details", { path }).then(result => {
+    Promise.all([invoke<Properties>("gallery_details", { path }), invoke<ArrayBuffer>("gallery_preview", { path })]).then(([properties, bytes]) => {
       if (!active) return;
-      url = URL.createObjectURL(new Blob([new Uint8Array(result.preview)], { type: "image/png" }));
-      setPreview(url); setDetails(result.properties);
+      url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
+      setPreview(url); setDetails(properties);
     }).catch(e => { if (active) setError(String(e)); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
   }, [path]);

@@ -386,7 +386,28 @@ fn import_backup_inner(app: tauri::AppHandle, path: PathBuf) -> Result<String, S
 #[derive(serde::Serialize)]
 struct EditedImage {
     path: PathBuf,
-    preview: Vec<u8>,
+}
+
+/// Encode a downscaled PNG preview of an image.
+fn png_preview(path: &std::path::Path, width: u32, height: u32) -> Result<Vec<u8>, String> {
+    let image = image::open(path)
+        .map_err(|e| e.to_string())?
+        .thumbnail(width, height);
+    let mut preview = std::io::Cursor::new(Vec::new());
+    image
+        .write_to(&mut preview, image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+    Ok(preview.into_inner())
+}
+
+/// Resolve `path` only if it is an edited copy in the editor cache.
+fn edited_copy(path: &std::path::Path) -> Result<PathBuf, String> {
+    let cache = std::fs::canonicalize(edited_cache()?).map_err(|e| e.to_string())?;
+    let source = std::fs::canonicalize(path).map_err(|e| e.to_string())?;
+    if !source.starts_with(cache) || source.extension().is_none_or(|e| e != "png") {
+        return Err("Image must be an edited copy".into());
+    }
+    Ok(source)
 }
 
 fn edited_cache() -> Result<PathBuf, String> {
@@ -444,17 +465,15 @@ fn edit_image_inner(
     if let Err(error) = prune_edits(&output.file_name().into_iter().collect::<Vec<_>>()) {
         eprintln!("Could not clean the edited image cache: {error}");
     }
-    let image = image::open(&output)
-        .map_err(|e| e.to_string())?
-        .thumbnail(800, 500);
-    let mut preview = std::io::Cursor::new(Vec::new());
-    image
-        .write_to(&mut preview, image::ImageFormat::Png)
-        .map_err(|e| e.to_string())?;
-    Ok(EditedImage {
-        path: output,
-        preview: preview.into_inner(),
-    })
+    Ok(EditedImage { path: output })
+}
+
+/// A downscaled preview of an edited copy, sent as raw PNG bytes.
+#[tauri::command]
+async fn edited_preview(path: PathBuf) -> Result<tauri::ipc::Response, String> {
+    blocking(move || png_preview(&edited_copy(&path)?, 800, 500))
+        .await
+        .map(tauri::ipc::Response::new)
 }
 
 #[tauri::command]
@@ -463,11 +482,7 @@ async fn apply_edited(path: PathBuf) -> Result<(), String> {
 }
 
 fn apply_edited_inner(path: PathBuf) -> Result<(), String> {
-    let cache = std::fs::canonicalize(edited_cache()?).map_err(|e| e.to_string())?;
-    let source = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
-    if !source.starts_with(cache) || source.extension().is_none_or(|e| e != "png") {
-        return Err("Image must be an edited copy".into());
-    }
+    let source = edited_copy(&path)?;
     SystemWallpaper
         .set_wallpaper(&source)
         .map_err(|e| e.to_string())?;
@@ -536,40 +551,46 @@ async fn history_thumbnail(path: PathBuf) -> Result<tauri::ipc::Response, String
     .map(tauri::ipc::Response::new)
 }
 
-#[derive(serde::Serialize)]
-struct GalleryDetails {
-    properties: mindswall_core::utilities::ImageProperties,
-    preview: Vec<u8>,
+/// Gallery commands accept images in the current collection or exclusions.
+fn gallery_image(gallery: &Mutex<Vec<PathBuf>>, path: &std::path::Path) -> Result<(), String> {
+    if !gallery
+        .lock()
+        .map_err(|e| e.to_string())?
+        .iter()
+        .any(|image| image == path)
+        && !get_config()?.excluded.iter().any(|image| image == path)
+    {
+        return Err("Image is not in the current collection".into());
+    }
+    Ok(())
 }
 
 #[tauri::command]
 async fn gallery_details(
     state: tauri::State<'_, GalleryState>,
     path: PathBuf,
-) -> Result<GalleryDetails, String> {
-    let state = state.0.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        if !state.lock().map_err(|e| e.to_string())?.contains(&path)
-            && !get_config()?.excluded.contains(&path)
-        {
-            return Err("Image is not in the current collection".into());
-        }
-        let properties =
-            mindswall_core::utilities::image_properties(&path).map_err(|e| e.to_string())?;
-        let image = image::open(&path)
-            .map_err(|e| e.to_string())?
-            .thumbnail(1280, 960);
-        let mut preview = std::io::Cursor::new(Vec::new());
-        image
-            .write_to(&mut preview, image::ImageFormat::Png)
-            .map_err(|e| e.to_string())?;
-        Ok(GalleryDetails {
-            properties,
-            preview: preview.into_inner(),
-        })
+) -> Result<mindswall_core::utilities::ImageProperties, String> {
+    let gallery = state.0.clone();
+    blocking(move || {
+        gallery_image(&gallery, &path)?;
+        mindswall_core::utilities::image_properties(&path).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+}
+
+/// A large preview for the gallery dialog, sent as raw PNG bytes.
+#[tauri::command]
+async fn gallery_preview(
+    state: tauri::State<'_, GalleryState>,
+    path: PathBuf,
+) -> Result<tauri::ipc::Response, String> {
+    let gallery = state.0.clone();
+    blocking(move || {
+        gallery_image(&gallery, &path)?;
+        png_preview(&path, 1280, 960)
+    })
+    .await
+    .map(tauri::ipc::Response::new)
 }
 
 #[tauri::command]
@@ -964,6 +985,7 @@ pub fn run() {
             gallery_thumbnail,
             history_thumbnail,
             gallery_details,
+            gallery_preview,
             apply_image,
             get_history,
             reapply_history,
@@ -975,6 +997,7 @@ pub fn run() {
             export_backup,
             import_backup,
             edit_image,
+            edited_preview,
             apply_edited,
             set_hotkeys,
             hotkey_error

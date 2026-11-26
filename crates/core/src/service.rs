@@ -11,6 +11,7 @@ fn apply(path: &Path) -> Result<(), crate::Error> {
         tracing::warn!(%error, "could not apply wallpaper");
         return Err(error);
     }
+    tracing::info!(path = ?path, "wallpaper changed");
     if let Err(error) = crate::history::History::record(path, None) {
         tracing::warn!(%error, "could not record wallpaper history");
     }

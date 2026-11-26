@@ -98,8 +98,9 @@ Trigger it if possible (for example in a session where the COM API is
 unavailable), otherwise mark it skipped.
 
 - [ ] Fallback changes the wallpaper
-- [ ] Fallback keeps the existing fit setting (current behavior; D3 says Fill —
-      see the open decision in `docs/progress.md`)
+- [ ] Fallback keeps the existing Windows fit setting (as recorded in D3)
+- [ ] With a fit mode other than Fill, a desktop API failure reports an error
+      instead of using the fallback
 
 ## 2. CLI slideshow (Phase 2)
 
@@ -117,6 +118,8 @@ Set `interval_seconds` to `60` in the config for faster checks.
       `invalid configuration; using defaults`
 - [x] `interval_seconds` outside 60–86400 is rejected or handled (record which)
 - [x] The log file is created and records wallpaper changes and errors
+- [ ] After the 2026-11-26 logging change, each successful change adds a
+      `wallpaper changed` line with the image path
 
 ### Single instance and control pipe
 

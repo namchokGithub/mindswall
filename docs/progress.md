@@ -40,9 +40,9 @@ Completed items move from the phase checklists to the
   gallery check, and other unchecked cases remain open.
 - **Performance notes**: the checklist reports 9–10 MB RAM without a process or
   open/hidden breakdown, so it does not establish the performance target.
-- **Logging discrepancy**: the checklist marks wallpaper-change logging as
-  passed, but the current slideshow service logs failures and does not log
-  successful changes. Confirm the observed log and address any gap.
+- **Logging**: the slideshow service now logs successful wallpaper changes as
+  well as failures. Re-check the log file on Windows, because the earlier
+  checklist pass was recorded before successful changes were logged.
 - **Not implemented**:
   - WebView is not released or suspended when the window is hidden (RAM).
     Status polling now stops while the window is hidden.
@@ -55,9 +55,6 @@ Completed items move from the phase checklists to the
 - **Phase 5 partly started**: error recovery is implemented in code but not
   verified on Windows. Benchmarks, CI, installer and portable ZIP, and the
   release workflow have not started.
-- **Documentation conflict**: the wallpaper fallback keeps the existing fit
-  setting, but D3 says Phases 1 to 3 apply Fill. Choose one and record the
-  reason.
 
 ### Recent changes awaiting verification
 
@@ -94,11 +91,11 @@ Completed Log.
    [manual test checklist](testing/windows-11-checklist.md), starting with the
    sections for the recent changes.
 2. Set up CI on Windows.
-3. Resolve the D3 fallback decision and log successful wallpaper changes.
-4. Finish the remaining Phase 3 work.
-5. Implement the folder watcher.
-6. Measure performance, then optimize.
-7. Packaging and release when the user decides to proceed with release work.
+3. Finish the remaining Phase 3 work.
+4. Implement the folder watcher.
+5. Measure performance, then optimize.
+6. Packaging and release when the user decides to proceed with release work;
+   the bundle already targets the per-user NSIS installer from D4.
 
 Phase 6 development began before release at the user's request. Continue to
 track its untested features alongside the remaining P1 and P2 work.
@@ -150,8 +147,8 @@ The checklist records passing CLI and wallpaper-change checks, including the
 corrupt-image case. Its environment summary lists an administrator account;
 clarify the account used when documenting the standard-user requirement. The
 fallback checks are unchecked and may be marked skipped with a reason if the
-COM failure cannot be triggered. The fallback currently retains the existing fit
-setting rather than forcing Fill; the D3 decision remains open.
+COM failure cannot be triggered. The fallback keeps the existing Windows fit
+setting, as recorded in D3.
 
 ## Phase 2 — Slideshow Engine
 
@@ -166,8 +163,9 @@ settings survive restarts, and unit tests cover shuffle, scheduler, and config.
 The checklist records passing interactive checks for slideshow cycles, timing,
 sleep/resume, history navigation, and control commands. Missing-image and
 disconnected-folder cases remain unchecked. Images that cannot be applied are
-now skipped and logged (`ca0a272`); this needs Windows verification. Phase 2
-remains in progress while the logging discrepancy above is resolved.
+now skipped and logged (`ca0a272`); this needs Windows verification. Successful
+wallpaper changes are logged since 2026-11-26; Phase 2 remains in progress
+until the log is re-checked on Windows.
 
 ## Phase 3 — Desktop App
 
@@ -253,8 +251,11 @@ Goal: measured performance, robust error recovery, and repeatable releases.
       images, corrupt config, Windows API failures; the slideshow skips bad
       items and keeps running. Implemented in `ca0a272` and `f8d2046` (see
       Recent changes awaiting verification); needs Windows verification
-- [ ] **Packaging (D4)**: per-user NSIS installer through the Tauri bundler
-      and a portable ZIP; neither needs administrator rights
+- [~] **Packaging (D4)**: per-user NSIS installer through the Tauri bundler
+      and a portable ZIP; neither needs administrator rights. The bundle
+      targets only NSIS with `installMode: currentUser` since 2026-11-26 (it
+      previously used `all`, which included the per-machine MSI); the
+      installer build and the portable ZIP are not yet produced or verified
 - [ ] **CI**: GitHub Actions on Windows for `fmt`, `clippy`, `test`, frontend
       lint and type-check, and build
 - [ ] **Release workflow**: tag-triggered build that produces release
@@ -345,9 +346,18 @@ mindswall/
 
 ### D3. Wallpaper fit mode: default Fill, configurable in Phase 4
 
-- Phase 1 to 3 apply wallpapers with the Fill position.
+- Wallpapers are applied through `IDesktopWallpaper` with the configured fit
+  mode. The default mode is Fill.
 - Phase 4 adds a fit mode setting (Fill, Fit, Stretch, Center, Tile, Span)
   together with multi-monitor work, since both use `IDesktopWallpaper`.
+- When `IDesktopWallpaper` fails, the `SystemParametersInfoW` fallback is used
+  only if the configured mode is Fill. The fallback changes the image and
+  keeps the existing Windows fit setting; it does not force Fill. Other modes
+  report an error instead of applying an image with the wrong fit.
+
+Revised on 2026-11-26 to match the implemented behavior. The fallback API sets
+only the image; forcing Fill there would require writing the per-user
+`WallpaperStyle` registry values.
 
 ### D4. Installer: per-user NSIS installer plus portable ZIP
 

@@ -7,7 +7,6 @@ license = "MIT"
 [dependencies]
 directories = "6.0.0"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "bmp"] }
-interprocess = "2.4.10"
 rand = "0.10.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
@@ -17,7 +16,8 @@ tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = "0.3.23"
 walkdir = "2.5.1"
-widestring = "1.2.1"
 
 [target."cfg(windows)".dependencies]
+interprocess = "2.4.10"
+widestring = "1.2.1"
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Com", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }

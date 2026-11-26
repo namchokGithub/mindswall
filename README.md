@@ -36,8 +36,10 @@ cargo run -p mindswall-cli -- random "C:\Pictures"
 Scanning includes subfolders by default; use `--no-recursive` to restrict it to
 the supplied folders or `--recursive` to make the default explicit. Supported
 extensions are JPG, JPEG, PNG, and BMP. Errors are reported to stderr. Wallpaper
-commands require Windows. The Windows fallback uses the existing fit setting if
-the desktop wallpaper API is unavailable.
+commands require Windows. If the desktop wallpaper API is unavailable and the
+fit mode is Fill, the Windows fallback changes the image and keeps the existing
+fit setting; other fit modes report an error. The slideshow log records each
+successful change and each failure.
 
 ### Slideshow (Windows)
 
