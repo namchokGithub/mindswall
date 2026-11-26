@@ -291,6 +291,15 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
       (expanded) with the user name shown as `******` and no tooltip with the name;
       **Copy path** copies the full, unmasked path to the clipboard
 - [ ] The **Rescan collection** tooltip says the current cycle is kept
+- [ ] The Overview preview shows the file name but not its folder; clicking
+      it (or Tab then Enter) opens image details with the folder, size, and
+      dates, without opening Gallery first; Escape closes it
+- [ ] With a combined wallpaper, the details list the other images under
+      **Shown with**
+- [ ] With a monitor that has its own folders, clicking a monitor on Overview
+      opens the details of that monitor's image (a shared monitor opens the
+      main slideshow's image); the Previous/Next buttons on a monitor still
+      change the image without opening details
 
 ### Tray
 

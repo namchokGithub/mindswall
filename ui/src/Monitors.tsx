@@ -78,7 +78,7 @@ export function MonitorThumb({ monitor }: { monitor: Monitor }) {
 /** Monitor arrangement drawn to scale, like Windows display settings. With
  * `select`, each monitor is a button; otherwise `actions` adds controls that
  * appear when the pointer or focus is on a monitor. */
-function MonitorLayout({ monitors, names, selected = null, select, detail, actions }: { monitors: Monitor[]; names: MonitorName[]; selected?: string | null; select?: (id: string) => void; detail?: (monitor: Monitor) => ReactNode; actions?: (monitor: Monitor) => ReactNode }) {
+function MonitorLayout({ monitors, names, selected = null, select, detail, actions, open }: { monitors: Monitor[]; names: MonitorName[]; selected?: string | null; select?: (id: string) => void; detail?: (monitor: Monitor) => ReactNode; actions?: (monitor: Monitor) => ReactNode; open?: (monitor: Monitor) => (() => void) | null }) {
   const left = Math.min(...monitors.map(m => m.x)), top = Math.min(...monitors.map(m => m.y));
   const width = Math.max(...monitors.map(m => m.x + m.width)) - left;
   const height = Math.max(...monitors.map(m => m.y + m.height)) - top;
@@ -88,14 +88,14 @@ function MonitorLayout({ monitors, names, selected = null, select, detail, actio
       const label = <span className="monitor-tile-label"><strong>{index + 1}</strong>{monitorLabel(monitor.id, monitors, names)}{detail ? detail(monitor) : monitor.primary && <small>Primary</small>}</span>;
       return select
         ? <button key={monitor.id} type="button" className={`monitor-tile${selected === monitor.id ? " selected" : ""}`} aria-pressed={selected === monitor.id} title={monitor.name ?? undefined} onClick={() => select(monitor.id)} style={style}><MonitorThumb monitor={monitor}/>{label}</button>
-        : <div key={monitor.id} className="monitor-tile" title={monitor.name ?? undefined} style={style}><MonitorThumb monitor={monitor}/>{actions && <div className="monitor-tile-actions">{actions(monitor)}</div>}{label}</div>;
+        : <div key={monitor.id} className="monitor-tile" title={monitor.name ?? undefined} style={style}><MonitorThumb monitor={monitor}/>{(() => { const show = open?.(monitor); return show && <button type="button" className="monitor-tile-open" aria-label={`Show details of the wallpaper on ${monitorLabel(monitor.id, monitors, names)}`} onClick={show}/>; })()}{actions && <div className="monitor-tile-actions">{actions(monitor)}</div>}{label}</div>;
     })}
   </div>;
 }
 
 /** Overview: the wallpaper on each monitor when some monitors run their own
  * slideshow, with Previous and Next for each of those monitors. */
-export function MonitorStrip({ config, shows, stopped, busy, step }: { config: UtilityConfig; shows: MonitorPlayback[]; stopped: boolean; busy: boolean; step: (monitor: string, action: "next" | "previous") => void }) {
+export function MonitorStrip({ config, shows, main, stopped, busy, step, openDetails }: { config: UtilityConfig; shows: MonitorPlayback[]; main: { path: string; combined: string[] }; stopped: boolean; busy: boolean; step: (monitor: string, action: "next" | "previous") => void; openDetails: (path: string, combined: string[]) => void }) {
   const active = config.monitor_folders.some(entry => entry.folders.some(folder => folder.enabled));
   const { monitors } = useMonitors(active);
   if (!active || monitors.length === 0) return null;
@@ -104,13 +104,19 @@ export function MonitorStrip({ config, shows, stopped, busy, step }: { config: U
   const showOf = (id: string) => shows.find(show => same(show.monitor, id));
   return <div className="overview-monitors">
     <MonitorLayout monitors={monitors} names={config.monitor_names}
+      open={monitor => {
+        // A monitor without its own slideshow shows the main slideshow's image.
+        const show = showOf(monitor.id);
+        const path = show ? show.current : main.path;
+        return path ? () => openDetails(path, show ? show.combined ?? [] : main.combined) : null;
+      }}
       detail={monitor => { const show = showOf(monitor.id); return <small>{show ? `${show.position ?? "—"} / ${show.total}` : "Main"}</small>; }}
       actions={monitor => {
         const label = monitorLabel(monitor.id, monitors, config.monitor_names);
         if (span || stopped || !showOf(monitor.id)) return null;
         return <><button className="icon-button" disabled={busy} aria-label={`Previous wallpaper on ${label}`} title="Previous on this monitor" onClick={() => step(monitor.id, "previous")}><ArrowLeft size={15}/></button><button className="icon-button" disabled={busy} aria-label={`Next wallpaper on ${label}`} title="Next on this monitor" onClick={() => step(monitor.id, "next")}><ArrowRight size={15}/></button></>;
       }}/>
-    <p className="footnote">{span ? "The Span fit mode shows one image across every monitor, so monitors cannot change on their own." : "Point at a monitor with its own folders to change only that monitor. The buttons below change every monitor."}</p>
+    <p className="footnote">{span ? "The Span fit mode shows one image across every monitor, so monitors cannot change on their own." : "Select a monitor to see its image details. Point at a monitor with its own folders to change only that monitor; the buttons below change every monitor."}</p>
   </div>;
 }
 

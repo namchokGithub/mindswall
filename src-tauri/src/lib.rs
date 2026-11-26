@@ -606,10 +606,26 @@ fn gallery_image(gallery: &Mutex<Vec<PathBuf>>, path: &std::path::Path) -> Resul
         .iter()
         .any(|image| image == path)
         && !get_config()?.excluded.iter().any(|image| image == path)
+        && !is_shown(path)
     {
         return Err("Image is not in the current collection".into());
     }
     Ok(())
+}
+
+/// Whether the running slideshow shows `path` now, on the main slideshow or
+/// on a monitor with its own folders, alone or in a combined wallpaper. Lets
+/// Overview open image details before the gallery has been loaded.
+fn is_shown(path: &std::path::Path) -> bool {
+    let Ok(status) = overview_status_inner() else {
+        return false;
+    };
+    let main = status.current.iter().chain(&status.combined);
+    let monitors = status
+        .monitors
+        .iter()
+        .flat_map(|show| show.current.iter().chain(&show.combined));
+    main.chain(monitors).any(|image| image == path)
 }
 
 #[tauri::command]

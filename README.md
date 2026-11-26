@@ -116,7 +116,9 @@ it stays paused. When the slideshow service is not running, use **Start
 slideshow** after enabling a folder. The app reports an error if the Windows
 image cannot be applied.
 
-Overview shows the current position and total in the active slideshow cycle.
+Overview shows the current file name and its position and total in the active
+slideshow cycle. Select the preview to open the image details (location, size,
+dates, and the other images of a combined wallpaper).
 The total includes enabled subfolders and reflects active filters and exclusions.
 While the slideshow runs, enabled folders are watched: images that are added,
 removed, or renamed update the collection about two seconds after the last
@@ -180,7 +182,8 @@ monitor device path. Profiles do not include per-monitor folders or names.
 While a display has its own folders, Overview labels the large preview as the
 main slideshow and draws the display arrangement below it with each display's
 current wallpaper and its position in its own cycle. Pointing at a display with
-its own folders shows Previous and Next buttons that change only that display;
+its own folders shows Previous and Next buttons that change only that display,
+and selecting a display opens the details of its image;
 the shared interval timer is not restarted. Displays that share the main
 slideshow, and every display in the Span fit mode, change only together.
 Windows may retain unavailable display records, such as displays connected
