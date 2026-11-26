@@ -111,7 +111,9 @@ While the slideshow runs, enabled folders are watched: images that are added,
 removed, or renamed update the collection about two seconds after the last
 change, without a full rescan, and new images join the current cycle. Files
 whose image header cannot be read yet, such as files still being copied, are
-picked up by a later change. Use **Rescan collection** to force a full rescan. Saving settings keeps the current cycle: the wallpaper changes only when
+picked up by a later change. When the desktop app runs the slideshow, the
+Overview total, the **Folders** image counts, and an open **Gallery** refresh
+after such a change. Use **Rescan collection** to force a full rescan. Saving settings keeps the current cycle: the wallpaper changes only when
 the current image leaves the collection or the fit mode changes.
 Use **Quick settings** on Overview to change the slideshow interval and fit mode.
 

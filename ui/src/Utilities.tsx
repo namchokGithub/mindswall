@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FolderOpen, Grid2X2, Grid3X3, Image, List, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
@@ -35,7 +35,7 @@ function Thumbnail({ path, source = "gallery_thumbnail" }: { path: string; sourc
   return src ? <img src={src} alt="" loading="lazy" /> : <div className="thumbnail-placeholder">{failed ? "Preview unavailable" : "Loading…"}</div>;
 }
 
-export function Gallery({ config, busy, openSettings, exclude, restore }: { config: UtilityConfig; busy: boolean; openSettings: () => void; exclude: (path: string) => Promise<void>; restore: (path: string) => Promise<void> }) {
+export function Gallery({ config, busy, collectionVersion, openSettings, exclude, restore }: { config: UtilityConfig; busy: boolean; collectionVersion: number; openSettings: () => void; exclude: (path: string) => Promise<void>; restore: (path: string) => Promise<void> }) {
   const [paths, setPaths] = useState<string[]>([]); const [total, setTotal] = useState(0);
   const [view, setView] = useState<"collection" | "excluded">("collection");
   const [layout, setLayout] = useState<GalleryLayout>(initialGalleryLayout);
@@ -48,6 +48,13 @@ export function Gallery({ config, busy, openSettings, exclude, restore }: { conf
     catch (e) { setLoadFailed(true); setError(String(e)); } finally { setLoading(false); }
   }, [setError]);
   useEffect(() => { load(0); }, [load]);
+  // Reload the first page when the folder watcher changes the collection.
+  const shownVersion = useRef(collectionVersion);
+  useEffect(() => {
+    if (shownVersion.current === collectionVersion) return;
+    shownVersion.current = collectionVersion;
+    if (view === "collection") load(0);
+  }, [collectionVersion, view, load]);
   async function apply(path: string) { setError(""); try { await invoke("apply_image", { path }); setNotice("Wallpaper changed."); } catch (e) { setError(String(e)); } }
   const activeFilters = [config.filter.orientation !== "any" && `Orientation: ${config.filter.orientation}`, config.filter.aspect_ratio !== "any" && "Aspect ratio", (config.filter.min_width > 0 || config.filter.min_height > 0) && "Minimum resolution", config.excluded.length > 0 && `${config.excluded.length} excluded`].filter(Boolean);
   const visiblePaths = view === "excluded" ? config.excluded.slice(0, excludedLimit) : paths;

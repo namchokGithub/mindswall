@@ -34,6 +34,17 @@ pub struct ServiceOptions {
     pub listen_retry: Duration,
 }
 
+/// What changed when the service calls `on_change`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Change {
+    /// The playback state changed: a new wallpaper, pause, resume, or a
+    /// reloaded configuration.
+    Playback,
+    /// The folder watcher added, removed, or renamed images in the main or a
+    /// per-monitor collection. The playback state may have changed as well.
+    Collection,
+}
+
 enum Event {
     Control(ipc::Request),
     Files(Vec<PathBuf>),
@@ -206,16 +217,17 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
             allow_handoff: true,
             ..ServiceOptions::default()
         },
-        |_| {},
+        |_, _| {},
     )
 }
 
 /// Run the slideshow and call `on_change` after every state change, such as a
-/// new wallpaper, pause, resume, or a reloaded collection. Returns `Ok` when
-/// the slideshow was handed over to the desktop app.
+/// new wallpaper, pause, resume, a reloaded configuration, or images changed in
+/// a watched folder. Returns `Ok` when the slideshow was handed over to the
+/// desktop app.
 pub fn run_slideshow_with(
     options: ServiceOptions,
-    on_change: impl Fn(&PlaybackStatus),
+    on_change: impl Fn(&PlaybackStatus, Change),
 ) -> Result<(), Box<dyn std::error::Error>> {
     let log = log_path().ok_or("user data directory unavailable")?;
     let log_dir = log.parent().ok_or("user data directory unavailable")?;
@@ -288,7 +300,7 @@ pub fn run_slideshow_with(
         playback.timer.pause(Instant::now());
     }
     monitors.reapply(&monitors.active(), &apply_monitor);
-    on_change(&snapshot(&playback));
+    on_change(&snapshot(&playback), Change::Playback);
     println!("Slideshow running. Press Ctrl+C to stop.");
 
     let mut changed_files = HashSet::new();
@@ -466,12 +478,13 @@ pub fn run_slideshow_with(
                     watcher = watch(&config, event_tx.clone());
                 }
                 if notify_change {
-                    on_change(&snapshot(&playback));
+                    on_change(&snapshot(&playback), Change::Playback);
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let now = Instant::now();
                 let mut changed = false;
+                let mut collection_changed = false;
                 if monitors_due.is_some_and(|due| now >= due) {
                     monitors_due = Some(now + MONITOR_CHECK);
                     let (layout_changed, added) = check_monitors(&mut monitors);
@@ -497,13 +510,14 @@ pub fn run_slideshow_with(
                                 paths = paths.len(),
                                 "collection updated from folder changes"
                             );
-                            changed = true;
+                            collection_changed = true;
                         }
                         Ok(false) => {}
                         Err(error) => tracing::warn!(%error, "could not apply folder changes"),
                     }
                     if monitors.apply_file_changes(&config, &paths, &apply_monitor) {
                         tracing::info!("monitor collections updated from folder changes");
+                        collection_changed = true;
                     }
                 }
                 if playback.timer.is_due(now)
@@ -517,8 +531,10 @@ pub fn run_slideshow_with(
                     playback.timer.reset(Instant::now());
                     changed = true;
                 }
-                if changed {
-                    on_change(&snapshot(&playback));
+                if collection_changed {
+                    on_change(&snapshot(&playback), Change::Collection);
+                } else if changed {
+                    on_change(&snapshot(&playback), Change::Playback);
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {

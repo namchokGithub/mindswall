@@ -81,7 +81,9 @@ Completed Log.
   enabled folders are watched while the slideshow runs and changes update the
   collection without a full rescan; the app's slideshow sends a
   `slideshow-changed` event to the UI, and fallback polling is every 30
-  seconds.
+  seconds. The first Windows pass found that Folders counts and Gallery did
+  not refresh after a watcher change; a `collection-changed` event now
+  refreshes them (re-check on Windows).
 - **Window lifecycle** (2026-11-26, not committed yet): closing the window
   destroys it and its WebView; the tray, slideshow, and shortcuts keep running,
   and **Open MindsWall** creates a new window. "Start with Windows" registers

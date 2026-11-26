@@ -209,8 +209,10 @@ example from the log.
 ### Folder watcher and slideshow events
 
 - [ ] Copy new images into a watched folder while the slideshow runs: within
-      a few seconds the Overview total increases, and the log shows
-      `collection updated from folder changes`
+      a few seconds the Overview total, the **Folders** image count, and the
+      open **Gallery** update without changing pages, and the log shows
+      `collection updated from folder changes` (the first pass saw the log
+      line, but Folders and Gallery updated only after a page change)
 - [ ] Copy a large image slowly (or over the network): it is added after the
       copy finishes and never applied while incomplete
 - [ ] Delete or rename an image in a watched folder: the total updates; if it

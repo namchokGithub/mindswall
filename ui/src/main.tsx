@@ -23,6 +23,9 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [counts, setCounts] = useState<Record<string, number | string>>({});
+  // Bumped when the folder watcher changes the collection, so folder counts
+  // and the gallery reload without a page change.
+  const [collectionVersion, setCollectionVersion] = useState(0);
   const [preview, setPreview] = useState("");
   const [imagePath, setImagePath] = useState("");
   const [imagePosition, setImagePosition] = useState<number | null>(null);
@@ -60,6 +63,7 @@ function App() {
     const keep = (dispose: () => void) => { if (active) disposers.push(dispose); else dispose(); };
     document.addEventListener("visibilitychange", update);
     listen("slideshow-changed", () => { if (visible()) refreshStatus(); }).then(keep).catch(() => {});
+    listen("collection-changed", () => setCollectionVersion(version => version + 1)).then(keep).catch(() => {});
     update();
     return () => { active = false; disposers.forEach(dispose => dispose()); document.removeEventListener("visibilitychange", update); if (timer !== undefined) window.clearInterval(timer); };
   }, [refreshStatus]);
@@ -88,7 +92,7 @@ function App() {
     }));
     setCounts(Object.fromEntries(entries));
   }, []);
-  useEffect(() => { if (config) scanFolders(config.folders); }, [config?.folders, scanFolders]);
+  useEffect(() => { if (config) scanFolders(config.folders); }, [config?.folders, collectionVersion, scanFolders]);
 
   async function save(next: Config, propagateError = false) {
     setBusy(true); setError(""); setMessage("");
@@ -135,7 +139,7 @@ function App() {
         {page === "folders" && <><div className="section-title"><div><span className="eyebrow">COLLECTION SOURCES</span><h2>Folders <span className="count-pill">{config.folders.length}</span></h2></div><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add folder</button></div>
           {config.folders.length === 0 ? <div className="panel empty"><div className="empty-icon"><FolderOpen size={25}/></div><h3>It starts with a folder.</h3><p>Add a folder of images and make this space your own.</p><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add your first folder</button></div> : <div className="panel folder-list">{config.folders.map((folder, index) => <div className="folder-row" key={folder.path}><div className="folder-icon"><FolderOpen size={19}/></div><div className="folder-info"><strong title={folder.path}>{folder.path.split(/[\\/]/).pop() || folder.path}</strong><small title={folder.path}>{folder.path}</small><span>{counts[folder.path] === undefined ? "Scanning…" : typeof counts[folder.path] === "number" ? `${counts[folder.path]} images` : counts[folder.path]}</span></div><label className="inline-check"><input type="checkbox" checked={folder.recursive} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, recursive: e.target.checked } : f) })}/> Include subfolders</label><label className="switch" title="Enable folder"><input type="checkbox" aria-label={`Enable ${folder.path}`} checked={folder.enabled} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, enabled: e.target.checked } : f) })}/><span/></label><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => save({ ...config, folders: config.folders.filter((_, i) => i !== index) })}><Trash2 size={16}/></button></div>)}</div>}
           <div className="footnote"><Image size={16}/> JPG, JPEG, PNG and BMP images are supported.</div></>}
-        {page === "gallery" && <Gallery config={config} busy={busy} openSettings={() => navigatePage("settings")} exclude={async path => { await save({ ...config, excluded: [...config.excluded, path] }, true); }} restore={async path => { await save({ ...config, excluded: config.excluded.filter(item => item !== path) }, true); }}/>}
+        {page === "gallery" && <Gallery config={config} busy={busy} collectionVersion={collectionVersion} openSettings={() => navigatePage("settings")} exclude={async path => { await save({ ...config, excluded: [...config.excluded, path] }, true); }} restore={async path => { await save({ ...config, excluded: config.excluded.filter(item => item !== path) }, true); }}/>}
         {page === "history" && <HistoryPage/>}
         {page === "monitors" && <MonitorsPage config={config} busy={busy} saveMonitorFolders={monitor_folders => save({ ...config, monitor_folders })}/>}
         {page === "profiles" && <Profiles config={config} refresh={async () => { setConfig(await invoke<Config>("get_config")); await refreshStatus(); }}/>}

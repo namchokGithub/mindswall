@@ -2,6 +2,7 @@ use mindswall_core::{
     config::Config,
     ipc::{self, Command},
     scanner,
+    service::Change,
     wallpaper::{SystemWallpaper, WallpaperSetter},
 };
 use std::{
@@ -884,8 +885,12 @@ fn start_service_inner(
     std::thread::spawn(move || {
         // Tell the UI about every change so it does not need to poll a
         // slideshow that this app runs.
-        let notify = |status: &ipc::PlaybackStatus| {
+        let notify = |status: &ipc::PlaybackStatus, change: Change| {
             let _ = app.emit("slideshow-changed", status);
+            if change == Change::Collection {
+                // Folder counts and the gallery are not part of the status.
+                let _ = app.emit("collection-changed", ());
+            }
         };
         let options = mindswall_core::service::ServiceOptions {
             listen_retry: if resume.is_some() {
