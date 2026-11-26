@@ -528,6 +528,12 @@ Use a folder with several portrait images (for example 948×2048 and
 
 ### Editor
 
+- [ ] After **Choose image**, the image and its size (for example
+      **1920 × 1080 px**) appear right away; **Create preview** shows
+      **Original** and **Edited** side by side
+- [ ] **Clear** returns to the empty Editor and resets width, height, crop,
+      blur, and dim; **Choose another** replaces the image and removes the old
+      edited preview
 - [ ] Creating a preview shows a loading state and prevents changing edit
       settings until the preview succeeds or fails
 - [ ] Switch to another page while a preview is processing, then return before

@@ -515,6 +515,26 @@ fn edit_image_inner(
     Ok(EditedImage { path: output })
 }
 
+/// A downscaled preview of the image chosen for editing, sent as raw PNG bytes.
+#[tauri::command]
+async fn source_preview(path: PathBuf) -> Result<tauri::ipc::Response, String> {
+    if !is_granted(&path) {
+        return Err("Choose the image to edit first".into());
+    }
+    blocking(move || png_preview(&path, 800, 500))
+        .await
+        .map(tauri::ipc::Response::new)
+}
+
+/// The width and height of the image chosen for editing.
+#[tauri::command]
+async fn source_size(path: PathBuf) -> Result<(u32, u32), String> {
+    if !is_granted(&path) {
+        return Err("Choose the image to edit first".into());
+    }
+    blocking(move || mindswall_core::utilities::dimensions(&path).map_err(|e| e.to_string())).await
+}
+
 /// A downscaled preview of an edited copy, sent as raw PNG bytes.
 #[tauri::command]
 async fn edited_preview(path: PathBuf) -> Result<tauri::ipc::Response, String> {
@@ -1225,6 +1245,8 @@ pub fn run() {
             import_backup,
             edit_image,
             edited_preview,
+            source_preview,
+            source_size,
             apply_edited,
             set_hotkeys,
             hotkey_error

@@ -225,7 +225,9 @@ exclusions, and fit mode. The active profile is shown at the top of every page
 and checked in the tray **Profiles** submenu. When those settings change after
 a profile was applied, it is marked **changed**: **Update profile** saves the
 current settings into it, and **Revert** applies its saved settings again. The **Editor** creates a cached copy with optional crop,
-resize, blur, and dim; the original image remains untouched. The Editor shows
+resize, blur, and dim; the original image remains untouched. The chosen image
+and its size appear as soon as it is picked, the edited preview is shown next
+to it, and **Clear** starts over with default settings. The Editor shows
 a loading indicator while creating a preview and keeps its work when switching
 pages during the same app session. Global shortcuts
 can be recorded using the keyboard in **Settings**, and saved profiles are available from the

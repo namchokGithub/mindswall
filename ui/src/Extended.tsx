@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FolderOpen, Download, Upload } from "lucide-react";
+import { FolderOpen, Download, Upload, X } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
+import { useLoadedImage } from "./useLoadedImage";
 import { displayShortcut, shortcutFromKey } from "./shortcutCapture";
 
 type Profile = { name: string };
@@ -46,7 +47,22 @@ export function Editor({ active }: { active: boolean }) {
     setCompletion(null);
   }, [active, completion, setError, setNotice]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  // The chosen image, shown as soon as it is picked.
+  const original = useLoadedImage(source, source ? () => invoke<ArrayBuffer>("source_preview", { path: source }) : null, "image/png");
+  const [size, setSize] = useState<[number, number] | null>(null);
+  useEffect(() => {
+    setSize(null);
+    if (!source) return;
+    let active = true;
+    invoke<[number, number]>("source_size", { path: source }).then(value => { if (active) setSize(value); }).catch(() => {});
+    return () => { active = false; };
+  }, [source]);
   async function choose() { try { const path = await invoke<string | null>("pick_image"); if (path) { setSource(path); setEdited(""); setPreview(""); setError(""); } } catch (e) { setError(String(e)); } }
+  /** Start over: forget the chosen image, the edited preview, and every setting. */
+  function clear() {
+    setSource(""); setEdited(""); setPreview(""); setWidth(""); setHeight(""); setCrop(false);
+    setX("0"); setY("0"); setCropWidth(""); setCropHeight(""); setBlur(0); setDim(0); setError(""); setNotice("");
+  }
   async function generate() {
     setError(""); setNotice(""); setCompletion(null);
     const number = (v: string) => /^\d+$/.test(v) ? Number(v) : null;
@@ -61,8 +77,12 @@ export function Editor({ active }: { active: boolean }) {
       setEdited(result.path); setPreview(URL.createObjectURL(new Blob([bytes], { type: "image/png" }))); setCompletion({ notice: "Preview created. Your original image is unchanged." });
     } catch (e) { if (mounted.current) setCompletion({ error: String(e) }); } finally { if (mounted.current) setBusy(false); }
   }
-  return <><div className="section-title"><div><span className="eyebrow">MAKE IT YOURS</span><h2>Image editor</h2></div><button className="primary" disabled={busy} onClick={choose}><FolderOpen size={16}/> Choose image</button></div>
-    {!source ? <div className="panel empty"><h3>Start with an image.</h3><p>Crop, resize, blur or dim a copy for your desktop.</p><button className="primary" disabled={busy} onClick={choose}>Choose image</button></div> : <><div className="panel editor-panel" onChange={() => setEdited("")}><strong title={source}>{source.split(/[\\/]/).pop()}</strong><small>{source}</small>{preview && <img className="edited-preview" src={preview} alt="Preview of the edited image"/>}
+  return <><div className="section-title"><div><span className="eyebrow">MAKE IT YOURS</span><h2>Image editor</h2></div><div className="profile-create">{source && <button className="secondary" disabled={busy} onClick={clear}><X size={14}/> Clear</button>}<button className="primary" disabled={busy} onClick={choose}><FolderOpen size={16}/> {source ? "Choose another" : "Choose image"}</button></div></div>
+    {!source ? <div className="panel empty"><h3>Start with an image.</h3><p>Crop, resize, blur or dim a copy for your desktop.</p><button className="primary" disabled={busy} onClick={choose}>Choose image</button></div> : <><div className="panel editor-panel" onChange={() => setEdited("")}><strong className="selectable">{source.split(/[\\/]/).pop()}</strong><small>{size ? `${size[0]} × ${size[1]} px` : "\u00a0"}</small>
+      <div className={`editor-previews${preview ? " compare" : ""}`}>
+        <figure><div className="editor-image">{original.src ? <img key={original.src} className="loaded-image" src={original.src} alt="Preview of the chosen image"/> : <div className="thumbnail-placeholder">{original.failed ? "No preview" : "Loading…"}</div>}{original.loading && original.src && <span className="image-loading" aria-hidden="true"/>}</div>{preview && <figcaption>Original</figcaption>}</figure>
+        {preview && <figure><div className="editor-image"><img className="loaded-image" src={preview} alt="Preview of the edited image"/></div><figcaption>Edited</figcaption></figure>}
+      </div>
       {busy && <div className="editor-loading" role="status"><span className="editor-spinner" aria-hidden="true"/><div><strong>Creating preview…</strong><p>This may take a moment for large images.</p></div></div>}
       <fieldset className="editor-controls" disabled={busy} aria-busy={busy}>
       <div className="editor-fields"><label>Width (px)<input type="number" min="1" max="8192" value={width} onChange={e => setWidth(e.target.value)} placeholder="Original"/></label><label>Height (px)<input type="number" min="1" max="8192" value={height} onChange={e => setHeight(e.target.value)} placeholder="Original"/></label><label>Blur ({blur})<input type="range" min="0" max="20" step="1" value={blur} onChange={e => setBlur(Number(e.target.value))}/></label><label>Dim ({dim}%)<input type="range" min="0" max="90" step="5" value={dim} onChange={e => setDim(Number(e.target.value))}/></label></div>
