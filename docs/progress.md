@@ -21,13 +21,19 @@ Completed items move from the phase checklists to the
   passing checks for core CLI, slideshow, desktop, utilities, and hotkeys at
   commit `2bf16d4`. Some checks remain incomplete or need clarification;
   CI does not exist yet.
+- Commits `ca0a272`, `f8d2046`, and `f4f7d30` fixed slideshow recovery, IPC,
+  cache, and file-access issues found in a code review. Their automated tests
+  pass, but the matching checklist sections have not been run on Windows yet;
+  see [Recent changes awaiting verification](#recent-changes-awaiting-verification).
 
 ## Remaining Work (2026-11-26)
 
 ### Gaps
 
 - **Windows 11 verification**: checked items in the manual checklist are
-  recorded as passed. The environment summary says administrator and one
+  recorded as passed. The checklist sections added for the recent changes
+  (Errors, Settings changes during a slideshow, Control pipe, caches, and
+  history, and File access from the desktop app) are still open. The environment summary says administrator and one
   1920×1080 monitor at 100% scaling, while checked items include standard-user
   startup and multi-monitor scenarios; clarify which account and monitor setup
   were used for those checks. Fallback, offline operation, the 5,000-image
@@ -39,26 +45,56 @@ Completed items move from the phase checklists to the
   successful changes. Confirm the observed log and address any gap.
 - **Not implemented**:
   - WebView is not released or suspended when the window is hidden (RAM).
+    Status polling now stops while the window is hidden.
   - No event-driven wallpaper updates from the core to the UI; profile changes
     do emit a configuration event.
   - No named pipe handoff from a running CLI instance to the app.
   - No folder watcher.
   - No per-monitor slideshow folders.
   - No automatic handling of monitors being connected or disconnected.
-- **Phase 5 not started**: benchmarks, error recovery, CI, installer and
-  portable ZIP, release workflow.
-- **Documentation conflicts**:
-  - The wallpaper fallback keeps the existing fit setting, but D3 says Phases
-    1 to 3 apply Fill. Choose one and record the reason.
-  - The config path in Phase 2 (`%APPDATA%\MindsWall\config.json`) differs from
-    the README (`%APPDATA%\MindsWall\config\config.json`).
+- **Phase 5 partly started**: error recovery is implemented in code but not
+  verified on Windows. Benchmarks, CI, installer and portable ZIP, and the
+  release workflow have not started.
+- **Documentation conflict**: the wallpaper fallback keeps the existing fit
+  setting, but D3 says Phases 1 to 3 apply Fill. Choose one and record the
+  reason.
+
+### Recent changes awaiting verification
+
+Implemented on 2026-11-26 with automated tests on macOS and a Windows-target
+compile check. Each needs the matching manual checks before it moves to the
+Completed Log.
+
+- **Slideshow recovery** (`ca0a272`): images that cannot be applied are
+  skipped and removed until the next reload; unreadable or offline folders and
+  subfolders are logged and skipped; an invalid config file is renamed to
+  `config.json.invalid-<timestamp>` before defaults are used, and the app
+  shows a warning.
+- **Settings changes keep the cycle** (`ca0a272`): saving settings updates the
+  collection without restarting the shuffle cycle; the wallpaper changes only
+  when the current image leaves the collection or the fit mode changes.
+- **Responsive desktop commands** (`ca0a272`): slow Tauri commands run off the
+  main thread, and slideshow IPC requests time out after 30 seconds.
+- **Control pipe** (`f8d2046`): the pipe name uses a stable FNV-1a hash, and
+  clients refuse a pipe server that runs as another user.
+- **Resource use** (`f8d2046`): thumbnails and previews are sent as raw bytes;
+  status polling stops while the window is hidden; the edited-image cache keeps
+  20 copies (1 GB) plus copies in History, and the thumbnail cache is limited
+  to 20,000 files (512 MB) at startup.
+- **History and exclusions** (`f8d2046`): an invalid `history.json` is renamed
+  aside and a new history starts; exclusions use a hash set and, on Windows,
+  ignore letter case and `/` versus `\`.
+- **File access** (`f4f7d30`): file and folder dialogs open from Rust, and
+  commands accept only paths chosen in this session or already managed by the
+  app.
 
 ### Next steps (in order)
 
 1. Complete and clarify the outstanding Windows 11 checks in the
-   [manual test checklist](testing/windows-11-checklist.md).
+   [manual test checklist](testing/windows-11-checklist.md), starting with the
+   sections for the recent changes.
 2. Set up CI on Windows.
-3. Make the slideshow skip broken or missing images and keep running.
+3. Resolve the D3 fallback decision and log successful wallpaper changes.
 4. Finish the remaining Phase 3 work.
 5. Implement the folder watcher.
 6. Measure performance, then optimize.
@@ -76,7 +112,7 @@ track its untested features alongside the remaining P1 and P2 work.
 | 2     | Slideshow engine and configuration     | P1                | In progress |
 | 3     | Tauri desktop app and system tray      | P1, P2 (startup)  | In progress |
 | 4     | Wallpaper utilities                    | P2                | In progress |
-| 5     | Release hardening and distribution     | Quality, release  | Not started |
+| 5     | Release hardening and distribution     | Quality, release  | In progress |
 | 6     | Extended features                      | P3                | In progress |
 
 Each phase builds on the previous one. Phases 1 and 2 keep all logic in a
@@ -129,9 +165,9 @@ settings survive restarts, and unit tests cover shuffle, scheduler, and config.
 
 The checklist records passing interactive checks for slideshow cycles, timing,
 sleep/resume, history navigation, and control commands. Missing-image and
-disconnected-folder cases remain unchecked. Failed wallpaper changes are logged
-and do not advance history; skipping unavailable images is planned for Phase 5.
-Phase 2 remains in progress while the logging discrepancy above is resolved.
+disconnected-folder cases remain unchecked. Images that cannot be applied are
+now skipped and logged (`ca0a272`); this needs Windows verification. Phase 2
+remains in progress while the logging discrepancy above is resolved.
 
 ## Phase 3 — Desktop App
 
@@ -178,6 +214,12 @@ Goal: complete the P2 feature set.
   loading or virtualized list for large libraries; set-as-wallpaper and
   exclude actions
 
+- [~] **Wallpaper history**: persisted list of the 10 most recently shown
+  images with timestamps and monitor; History page with thumbnails and a
+  re-apply action; handles files that no longer exist. The checks passed with
+  the earlier 100-entry limit; the 10-entry limit and thumbnails still need
+  Windows verification.
+
 - [ ] **Folder watcher**: `notify` with debouncing; update the image set and
       shuffle queue on add/remove/rename without a full rescan; skip images
       still being written
@@ -204,11 +246,13 @@ Goal: measured performance, robust error recovery, and repeatable releases.
 - [ ] **Benchmarks**: measure idle CPU and background RAM with the window
       hidden and with it open; record method and results in `docs/`
 - [ ] **Optimization**: fix whatever the measurements show exceeds the targets
-- [ ] **Test coverage**: fill gaps in core unit tests; add integration tests
-      for CLI commands
-- [ ] **Error recovery**: missing or offline folders, deleted images, corrupt
+- [~] **Test coverage**: fill gaps in core unit tests; add integration tests
+      for CLI commands. Recovery, cache, and history tests were added on
+      2026-11-26; a CLI integration test covers `scan` and errors.
+- [~] **Error recovery**: missing or offline folders, deleted images, corrupt
       images, corrupt config, Windows API failures; the slideshow skips bad
-      items and keeps running
+      items and keeps running. Implemented in `ca0a272` and `f8d2046` (see
+      Recent changes awaiting verification); needs Windows verification
 - [ ] **Packaging (D4)**: per-user NSIS installer through the Tauri bundler
       and a portable ZIP; neither needs administrator rights
 - [ ] **CI**: GitHub Actions on Windows for `fmt`, `clippy`, `test`, frontend
@@ -368,7 +412,9 @@ commit that delivered them, except for learning items without a recorded date.
 - **Phase 2 — JSON configuration**: `serde` + `serde_json`; stored in the
   per-user config directory; a `version` field for future migrations; atomic
   writes (temp file + rename); falls back to defaults with a logged warning on
-  invalid JSON (`36a4142`).
+  invalid JSON (`36a4142`). Since `ca0a272`, an invalid file is first renamed
+  to `config.json.invalid-<timestamp>`; that behavior awaits Windows
+  verification.
 - **Phase 2 — `config.example.json`** in the repository root (`36a4142`).
 - **Phase 2 — Tests**: shuffle no-repeat guarantee, reshuffle boundary,
   previous/next behavior, scheduler logic with an injectable clock, config
@@ -383,7 +429,8 @@ commit that delivered them, except for learning items without a recorded date.
   (`7fdc651`).
 - **Phase 3 — System tray and startup**: tray controls, hide, quit, and startup
   scenarios were marked passed in the `2bf16d4` manual checklist (`5e82fdb`).
-- **Phase 4 — Fit modes and wallpaper history**: all listed modes and history
-  checks were marked passed in the `2bf16d4` manual checklist (`7fdc651`).
+- **Phase 4 — Fit modes**: all listed modes were marked passed in the
+  `2bf16d4` manual checklist (`7fdc651`). Wallpaper history moved back to
+  Phase 4 as `[~]` after its limit changed to 10 entries.
 - **Phase 6 — Global hotkeys**: next, previous, pause/resume, conflict handling,
   hidden-window behavior, and restart checks recorded for `2bf16d4` (`c0acdf7`).
