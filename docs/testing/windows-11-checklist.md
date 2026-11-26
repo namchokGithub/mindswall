@@ -318,8 +318,11 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [ ] The Overview preview shows the file name but not its folder; clicking
       it (or Tab then Enter) opens image details with the folder, size, and
       dates, without opening Gallery first; Escape closes it
-- [ ] With a combined wallpaper, the details list the other images under
-      **Shown with**
+- [ ] With a combined wallpaper, the details show **1 / N** with arrows: the
+      arrows and the Left/Right keys move through every image of the
+      wallpaper (wrapping around), each with its own name, folder, size, and
+      dates; the previous image stays visible while the next one loads; the
+      list under **In this wallpaper** jumps to an image
 - [ ] Clicking a monitor's card opens the details of that monitor's image;
       its Previous/Next buttons change the image without opening details
 

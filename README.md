@@ -124,7 +124,8 @@ image cannot be applied.
 
 Overview shows the current file name and its position and total in the active
 slideshow cycle. Select the preview to open the image details (location, size,
-dates, and the other images of a combined wallpaper).
+and dates); for a combined wallpaper, arrows or the Left and Right keys move
+through each of its images.
 The total includes enabled subfolders and reflects active filters and exclusions.
 While the slideshow runs, enabled folders are watched: images that are added,
 removed, or renamed update the collection about two seconds after the last

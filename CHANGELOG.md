@@ -49,6 +49,8 @@ All notable changes to MindsWall are recorded here. The format follows
 - Settings can open the log folder and show the last 100 log lines.
 - Overview cards load cached, downscaled previews, and the log records how
   long each wallpaper change and preview takes.
+- Image details of a combined wallpaper move through each of its images with
+  arrows or the Left and Right keys.
 - Optional combined wallpapers: an image that leaves much of a monitor empty
   (portrait, square, or landscape on a portrait monitor) is shown with other
   images in up to three rows, like a mosaic, over a blurred background, with
