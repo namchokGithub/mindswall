@@ -310,6 +310,11 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 
 ### Overview and settings
 
+- [ ] Record memory in Task Manager (**Details** tab, `MindsWall.exe`, Memory
+      (active private working set)) with the window closed, during automatic
+      changes with combining on and off, and while scrolling a Gallery of
+      large photos; copy the `ram_mb` / `peak_mb` values from the timing log
+      lines; WebView2 runs as separate `msedgewebview2.exe` processes
 - [ ] Press Next several times and copy the timing lines from the log
       (`wallpaper change timing`, `wallpaper changed`, `combined wallpaper
       prepared`, `preview created` / `preview read from cache`); note whether

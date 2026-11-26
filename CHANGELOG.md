@@ -57,6 +57,9 @@ All notable changes to MindsWall are recorded here. The format follows
 - New profile names are limited to 50 characters.
 - An About page shows the version and opens the source code, releases,
   issues, and license on GitHub.
+- Thumbnails, previews, and combined wallpapers decode large JPEG images at a
+  reduced size, the Gallery builds two thumbnails at a time, and timing log
+  lines record memory use.
 - Optional combined wallpapers: an image that leaves much of a monitor empty
   (portrait, square, or landscape on a portrait monitor) is shown with other
   images in up to three rows, like a mosaic, over a blurred background, with

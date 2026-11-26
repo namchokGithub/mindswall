@@ -439,7 +439,7 @@ struct EditedImage {
 
 /// Encode a downscaled PNG preview of an image.
 fn png_preview(path: &std::path::Path, width: u32, height: u32) -> Result<Vec<u8>, String> {
-    let image = image::open(path)
+    let image = mindswall_core::utilities::open_scaled(path, (width, height))
         .map_err(|e| e.to_string())?
         .thumbnail(width, height);
     let mut preview = std::io::Cursor::new(Vec::new());

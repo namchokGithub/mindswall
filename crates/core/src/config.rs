@@ -472,6 +472,8 @@ impl Config {
             scan_ms = total_ms.saturating_sub(filter_ms),
             filter_ms,
             total_ms,
+            ram_mb = crate::utilities::ram_mb(),
+            peak_mb = crate::utilities::peak_ram_mb(),
             "collection scanned"
         );
         Ok(images)

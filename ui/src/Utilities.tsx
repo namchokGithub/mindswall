@@ -22,7 +22,8 @@ function initialGalleryLayout(): GalleryLayout {
   } catch { return "large"; }
 }
 
-const loadThumbnail = createThumbnailQueue(4);
+// Two at a time keeps the memory used for decoding low.
+const loadThumbnail = createThumbnailQueue(2);
 
 function Thumbnail({ path, source = "gallery_thumbnail" }: { path: string; source?: "gallery_thumbnail" | "history_thumbnail" }) {
   const [src, setSrc] = useState("");

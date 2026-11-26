@@ -309,9 +309,11 @@ pub fn render(
         return Ok(file);
     }
 
+    // Each image is only needed at its tile's size.
     let decoded = images
         .iter()
-        .map(image::open)
+        .zip(tiles)
+        .map(|(path, tile)| crate::utilities::open_scaled(path, (tile.width, tile.height)))
         .collect::<Result<Vec<DynamicImage>, _>>()?;
     let mut canvas = background(&decoded[0], target);
     for (image, tile) in decoded.iter().zip(tiles) {
@@ -469,6 +471,8 @@ impl Collages {
                     sizes_ms,
                     plan_ms,
                     render_ms = elapsed_ms(render_started),
+                    ram_mb = crate::utilities::ram_mb(),
+                    peak_mb = crate::utilities::peak_ram_mb(),
                     "combined wallpaper prepared"
                 );
                 file

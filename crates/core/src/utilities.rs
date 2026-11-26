@@ -222,12 +222,93 @@ pub fn thumbnail(
         return Ok(target);
     }
     fs::create_dir_all(cache)?;
-    let img = image::open(path)?.thumbnail(240, 150);
+    let img = open_scaled(path, (240, 150))?.thumbnail(240, 150);
     let mut file = tempfile::NamedTempFile::new_in(cache)?;
     img.write_to(&mut file, image::ImageFormat::Png)?;
     file.persist(&target)
         .map_err(|e| io::Error::other(e.error))?;
     Ok(target)
+}
+
+/// This process's working set and its peak so far, in MB, for timing logs.
+/// `None` where the system does not report them.
+pub fn memory_mb() -> Option<(u64, u64)> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::{
+            ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS},
+            Threading::GetCurrentProcess,
+        };
+        let mut counters = PROCESS_MEMORY_COUNTERS::default();
+        let size = u32::try_from(std::mem::size_of::<PROCESS_MEMORY_COUNTERS>()).ok()?;
+        // SAFETY: the counters live on the stack for the call, `cb` is their
+        // size, and the pseudo handle of the current process needs no closing.
+        unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, size) }.ok()?;
+        let mb = |bytes: usize| u64::try_from(bytes / (1024 * 1024)).unwrap_or(u64::MAX);
+        Some((mb(counters.WorkingSetSize), mb(counters.PeakWorkingSetSize)))
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// The current working set in MB, for timing logs.
+pub fn ram_mb() -> Option<u64> {
+    memory_mb().map(|(current, _)| current)
+}
+
+/// The highest working set so far in MB, for timing logs.
+pub fn peak_ram_mb() -> Option<u64> {
+    memory_mb().map(|(_, peak)| peak)
+}
+
+/// Open an image that will be shown no larger than `max` (it is fitted inside
+/// it, keeping its shape). JPEG files are decoded at 1/2, 1/4, or 1/8 size
+/// when that is still large enough, which needs far less memory and time than
+/// decoding every pixel; other files, and JPEG files the scaling decoder
+/// cannot read, are opened normally. The result can be larger than `max`, so
+/// resize it afterwards.
+pub fn open_scaled(path: &Path, max: (u32, u32)) -> image::ImageResult<image::DynamicImage> {
+    if matches!(
+        image::ImageFormat::from_path(path),
+        Ok(image::ImageFormat::Jpeg)
+    ) && let Some(image) = open_jpeg_scaled(path, max)
+    {
+        return Ok(image);
+    }
+    image::open(path)
+}
+
+fn open_jpeg_scaled(
+    path: &Path,
+    (max_width, max_height): (u32, u32),
+) -> Option<image::DynamicImage> {
+    use jpeg_decoder::{Decoder, PixelFormat};
+    let file = fs::File::open(path).ok()?;
+    let mut decoder = Decoder::new(io::BufReader::new(file));
+    decoder.read_info().ok()?;
+    let info = decoder.info()?;
+    let (width, height) = (f64::from(info.width), f64::from(info.height));
+    // The fitted size; the decoder picks the smallest scale that reaches it.
+    let factor = (f64::from(max_width) / width)
+        .min(f64::from(max_height) / height)
+        .min(1.0);
+    let side = |length: f64| (length * factor).ceil().clamp(1.0, f64::from(u16::MAX)) as u16;
+    decoder.scale(side(width), side(height)).ok()?;
+    let pixels = decoder.decode().ok()?;
+    let info = decoder.info()?;
+    let (width, height) = (u32::from(info.width), u32::from(info.height));
+    match info.pixel_format {
+        PixelFormat::RGB24 => {
+            image::RgbImage::from_raw(width, height, pixels).map(image::DynamicImage::ImageRgb8)
+        }
+        PixelFormat::L8 => {
+            image::GrayImage::from_raw(width, height, pixels).map(image::DynamicImage::ImageLuma8)
+        }
+        // CMYK and 16-bit images are rare; the regular decoder handles them.
+        _ => None,
+    }
 }
 
 /// Milliseconds since `started`, for timing logs.
@@ -259,7 +340,7 @@ pub fn preview(
         return Ok((target, true));
     }
     fs::create_dir_all(cache)?;
-    let image = image::open(path)?;
+    let image = open_scaled(path, PREVIEW_SIZE)?;
     let decode_ms = elapsed_ms(started);
     let (width, height) = PREVIEW_SIZE;
     let image = if image.width() > width || image.height() > height {
@@ -282,6 +363,8 @@ pub fn preview(
         bytes = meta.len(),
         decode_ms,
         ms = elapsed_ms(started),
+        ram_mb = ram_mb(),
+        peak_mb = peak_ram_mb(),
         "preview created"
     );
     Ok((target, false))

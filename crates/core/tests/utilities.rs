@@ -105,3 +105,41 @@ fn previews_are_downscaled_and_cached() {
     let (file, _) = preview(&small, &cache).unwrap();
     assert_eq!(image::image_dimensions(&file).unwrap(), (300, 200));
 }
+
+#[test]
+fn jpeg_images_decode_at_a_reduced_size_when_shown_small() {
+    use mindswall_core::utilities::open_scaled;
+    let dir = tempfile::tempdir().unwrap();
+    let jpeg = dir.path().join("photo.jpg");
+    image::RgbImage::from_pixel(4000, 3000, image::Rgb([120, 80, 40]))
+        .save(&jpeg)
+        .unwrap();
+    // A thumbnail needs 200 × 150, so 1/8 (500 × 375) is enough.
+    let small = open_scaled(&jpeg, (240, 150)).unwrap();
+    assert_eq!((small.width(), small.height()), (500, 375));
+    // A 1600 × 900 preview needs 1200 × 900, so 1/2 (2000 × 1500) is used.
+    let preview = open_scaled(&jpeg, (1600, 900)).unwrap();
+    assert_eq!((preview.width(), preview.height()), (2000, 1500));
+    // The colour survives scaled decoding.
+    let pixel = small.to_rgb8().get_pixel(250, 180).0;
+    assert!(
+        pixel
+            .iter()
+            .zip([120u8, 80, 40])
+            .all(|(a, b)| a.abs_diff(b) <= 3),
+        "{pixel:?}"
+    );
+
+    // Other formats, and requests at least as large as the image, are full size.
+    let png = dir.path().join("picture.png");
+    image::RgbImage::new(400, 300).save(&png).unwrap();
+    let full = open_scaled(&png, (40, 30)).unwrap();
+    assert_eq!((full.width(), full.height()), (400, 300));
+    let full = open_scaled(&jpeg, (8000, 6000)).unwrap();
+    assert_eq!((full.width(), full.height()), (4000, 3000));
+
+    // A broken JPEG reports an error instead of panicking.
+    let broken = dir.path().join("broken.jpg");
+    std::fs::write(&broken, b"not a jpeg").unwrap();
+    assert!(open_scaled(&broken, (240, 150)).is_err());
+}
