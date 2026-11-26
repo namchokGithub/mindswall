@@ -220,7 +220,15 @@ paths without regard to letter case or `/` and `\` separators.
 
 Local caches are limited: at startup the app keeps at most 20,000 thumbnails
 (512 MB), and the Editor keeps the 20 most recent edited copies (1 GB) plus any
-copy listed in History. Caches are stored under `%LOCALAPPDATA%\MindsWall\cache`.
+copy listed in History. Overview cards use JPEG previews of at most 1600×900
+pixels, kept in the `previews` cache (the 100 most recent, at most 200 MB), so
+an image that was shown before appears at once. Caches are stored under
+`%LOCALAPPDATA%\MindsWall\cache`. The log records how long each wallpaper
+change takes (`wallpaper change timing`, with `combine_ms` and `total_ms`;
+`wallpaper changed`, with `set_ms` and `history_ms`; and, while images are
+combined, `combined wallpaper prepared`, with `monitor_ms`, `sizes_ms`,
+`plan_ms`, and `render_ms`) and each preview (`preview created` or `preview
+read from cache`).
 While the window is minimized, the app stops polling the slideshow status.
 
 Folders, images, and backup files are chosen through native dialogs opened by

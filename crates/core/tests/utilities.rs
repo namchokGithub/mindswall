@@ -84,3 +84,24 @@ fn tail_lines_reads_only_the_last_lines() {
     );
     assert_eq!(tail_lines(&path, 1).unwrap(), ["last without newline"]);
 }
+
+#[test]
+fn previews_are_downscaled_and_cached() {
+    use mindswall_core::utilities::{PREVIEW_SIZE, preview};
+    let dir = tempfile::tempdir().unwrap();
+    let cache = dir.path().join("previews");
+    let large = dir.path().join("large.png");
+    image::RgbImage::new(4000, 3000).save(&large).unwrap();
+    let (file, cached) = preview(&large, &cache).unwrap();
+    assert!(!cached);
+    let (width, height) = image::image_dimensions(&file).unwrap();
+    assert!(width <= PREVIEW_SIZE.0 && height <= PREVIEW_SIZE.1);
+    assert_eq!((width, height), (1200, 900));
+    assert_eq!(preview(&large, &cache).unwrap(), (file, true));
+
+    // Small images keep their size.
+    let small = dir.path().join("small.png");
+    image::RgbImage::new(300, 200).save(&small).unwrap();
+    let (file, _) = preview(&small, &cache).unwrap();
+    assert_eq!(image::image_dimensions(&file).unwrap(), (300, 200));
+}

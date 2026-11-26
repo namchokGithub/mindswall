@@ -230,6 +230,63 @@ pub fn thumbnail(
     Ok(target)
 }
 
+/// Milliseconds since `started`, for timing logs.
+pub fn elapsed_ms(started: std::time::Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+/// Largest preview the app shows for a wallpaper, in pixels.
+pub const PREVIEW_SIZE: (u32, u32) = (1600, 900);
+
+/// A JPEG copy of `path` that fits in [`PREVIEW_SIZE`] (smaller images keep
+/// their size), cached in `cache` by path, size, and modification time.
+/// Returns the file and whether it was already cached.
+pub fn preview(
+    path: &Path,
+    cache: &Path,
+) -> Result<(PathBuf, bool), Box<dyn std::error::Error + Send + Sync>> {
+    use image::ImageEncoder;
+    let started = std::time::Instant::now();
+    let meta = fs::metadata(path)?;
+    let mut hash = DefaultHasher::new();
+    path.hash(&mut hash);
+    meta.len().hash(&mut hash);
+    meta.modified()?.hash(&mut hash);
+    PREVIEW_SIZE.hash(&mut hash);
+    let target = cache.join(format!("{:016x}.jpg", hash.finish()));
+    if target.is_file() {
+        tracing::info!(path = ?path, ms = elapsed_ms(started), "preview read from cache");
+        return Ok((target, true));
+    }
+    fs::create_dir_all(cache)?;
+    let image = image::open(path)?;
+    let decode_ms = elapsed_ms(started);
+    let (width, height) = PREVIEW_SIZE;
+    let image = if image.width() > width || image.height() > height {
+        image.thumbnail(width, height)
+    } else {
+        image
+    };
+    let rgb = image.to_rgb8();
+    let mut file = tempfile::NamedTempFile::new_in(cache)?;
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut file, 85).write_image(
+        rgb.as_raw(),
+        rgb.width(),
+        rgb.height(),
+        image::ExtendedColorType::Rgb8,
+    )?;
+    file.persist(&target)
+        .map_err(|e| io::Error::other(e.error))?;
+    tracing::info!(
+        path = ?path,
+        bytes = meta.len(),
+        decode_ms,
+        ms = elapsed_ms(started),
+        "preview created"
+    );
+    Ok((target, false))
+}
+
 /// The last `count` lines of a text file, oldest first. Only the end of the
 /// file is read (at most 4 MB), so a large log stays cheap. Invalid UTF-8 is
 /// replaced. A missing file has no lines.

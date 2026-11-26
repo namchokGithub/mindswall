@@ -290,6 +290,16 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 
 ### Overview and settings
 
+- [ ] Press Next several times and copy the timing lines from the log
+      (`wallpaper change timing`, `wallpaper changed`, `combined wallpaper
+      prepared`, `preview created` / `preview read from cache`); note whether
+      the desktop or the Overview card is the slow part
+- [ ] Press Previous: the card appears at once and the log shows `preview
+      read from cache`; `%LOCALAPPDATA%\MindsWall\cache\previews` holds at most
+      100 files
+- [ ] A very large image (over 15 MB) shows a sharp card, not a blurry
+      thumbnail
+
 - [x] **Start slideshow** starts it; status shows Playing
 - [x] Previous, Pause/Resume, and Next work; status updates
 - [x] Changing **Change picture every** takes effect (record whether a restart
@@ -423,8 +433,9 @@ some landscape images.
       monitor, landscape images are stacked
 - [ ] `%LOCALAPPDATA%\MindsWall\cache\collages` keeps at most 10 files; the
       original images are unchanged
-- [ ] Record how long a change takes with 3–4 large portrait images (log
-      timestamps) and whether CPU stays low between changes
+- [ ] Record how long a change takes with 3–4 large portrait images (the
+      `combined wallpaper prepared` and `wallpaper change timing` log lines)
+      and whether CPU stays low between changes
 
 ### Gallery
 

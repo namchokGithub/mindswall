@@ -4,6 +4,7 @@ use crate::{
     ipc::{self, Command as Control, MonitorPlayback, PlaybackStatus, Response},
     monitors::{MonitorShows, SharedTarget},
     playback::Playback,
+    utilities::elapsed_ms,
     wallpaper::{SystemWallpaper, WallpaperSetter, default_wallpaper_path},
 };
 use notify::{RecursiveMode, Watcher};
@@ -159,25 +160,29 @@ fn record(path: &Path, monitor: Option<String>, shown: Option<Combined>) {
 /// desktop.
 fn apply(path: &Path, shown: Option<Combined>) -> Result<(), String> {
     let file = shown.as_ref().map_or(path, |shown| shown.file.as_path());
+    let started = Instant::now();
     if let Err(error) = SystemWallpaper.set_wallpaper(file) {
         tracing::warn!(%error, "could not apply wallpaper");
         return Err(error.to_string());
     }
+    let set_ms = elapsed_ms(started);
     let combined = shown.as_ref().map_or(0, |shown| shown.combined.len());
-    tracing::info!(path = ?path, combined, "wallpaper changed");
     record(path, None, shown);
+    tracing::info!(path = ?path, combined, set_ms, history_ms = elapsed_ms(started) - set_ms, "wallpaper changed");
     Ok(())
 }
 
 /// Apply an image, or the combined wallpaper made from it, to one monitor.
 fn apply_monitor(monitor: &str, path: &Path, shown: Option<Combined>) -> Result<(), String> {
     let file = shown.as_ref().map_or(path, |shown| shown.file.as_path());
+    let started = Instant::now();
     crate::wallpaper::set_monitor_wallpaper(monitor, file).inspect_err(|error| {
         tracing::warn!(%monitor, %error, "could not apply monitor wallpaper");
     })?;
+    let set_ms = elapsed_ms(started);
     let combined = shown.as_ref().map_or(0, |shown| shown.combined.len());
-    tracing::info!(%monitor, path = ?path, combined, "monitor wallpaper changed");
     record(path, Some(monitor.to_owned()), shown);
+    tracing::info!(%monitor, path = ?path, combined, set_ms, history_ms = elapsed_ms(started) - set_ms, "monitor wallpaper changed");
     Ok(())
 }
 
@@ -192,6 +197,7 @@ fn apply_shared(target: &SharedTarget, path: &Path, shown: Option<Combined>) -> 
         return Ok(());
     }
     let file = shown.as_ref().map_or(path, |shown| shown.file.as_path());
+    let started = Instant::now();
     let mut failure = None;
     let mut applied = false;
     for monitor in monitors {
@@ -206,9 +212,10 @@ fn apply_shared(target: &SharedTarget, path: &Path, shown: Option<Combined>) -> 
     if !applied {
         return Err(failure.unwrap_or_default());
     }
+    let set_ms = elapsed_ms(started);
     let combined = shown.as_ref().map_or(0, |shown| shown.combined.len());
-    tracing::info!(path = ?path, monitors = monitors.len(), combined, "wallpaper changed");
     record(path, None, shown);
+    tracing::info!(path = ?path, monitors = monitors.len(), combined, set_ms, history_ms = elapsed_ms(started) - set_ms, "wallpaper changed");
     Ok(())
 }
 
@@ -263,14 +270,21 @@ fn show_shared(
     path: &Path,
     upcoming: &[PathBuf],
 ) -> Result<Vec<PathBuf>, String> {
+    let started = Instant::now();
     let shown = collages.combine(MAIN, path, upcoming, || {
         shared_size(target, collages.span())
     });
+    let combine_ms = elapsed_ms(started);
     let used = shown
         .as_ref()
         .map(|shown| shown.combined.clone())
         .unwrap_or_default();
     apply_shared(target, path, shown)?;
+    tracing::info!(
+        combine_ms,
+        total_ms = elapsed_ms(started),
+        "wallpaper change timing"
+    );
     Ok(used)
 }
 
@@ -281,12 +295,15 @@ fn show_monitor(
     path: &Path,
     upcoming: &[PathBuf],
 ) -> Result<Vec<PathBuf>, String> {
+    let started = Instant::now();
     let shown = collages.combine(monitor, path, upcoming, || monitor_size(monitor));
+    let combine_ms = elapsed_ms(started);
     let used = shown
         .as_ref()
         .map(|shown| shown.combined.clone())
         .unwrap_or_default();
     apply_monitor(monitor, path, shown)?;
+    tracing::info!(%monitor, combine_ms, total_ms = elapsed_ms(started), "monitor wallpaper change timing");
     Ok(used)
 }
 

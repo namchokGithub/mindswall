@@ -426,25 +426,53 @@ impl Collages {
         if upcoming.is_empty() {
             return self.remembered(target, first);
         }
+        let elapsed_ms = crate::utilities::elapsed_ms;
+        let started = std::time::Instant::now();
         let first_size = crate::utilities::dimensions(first).ok()?;
         let size = size()?;
-        let candidates = upcoming
+        let monitor_ms = elapsed_ms(started);
+        let candidates: Vec<(PathBuf, (u32, u32))> = upcoming
             .iter()
             .filter(|path| path.as_path() != first)
             .take(SCAN_LIMIT)
-            .filter_map(|path| Some((path.clone(), crate::utilities::dimensions(path).ok()?)));
+            .filter_map(|path| Some((path.clone(), crate::utilities::dimensions(path).ok()?)))
+            .collect();
+        let sizes_ms = elapsed_ms(started) - monitor_ms;
         let settings = self.settings.get();
-        let plan = match settings.layout {
+        let planned = match settings.layout {
             CollageLayout::Row => plan_row(first_size, candidates, size, settings.gap),
             CollageLayout::Mosaic => plan(first_size, candidates, size, settings.gap),
-        }?;
+        };
+        let plan_ms = elapsed_ms(started) - monitor_ms - sizes_ms;
+        let Some(plan) = planned else {
+            tracing::info!(
+                target,
+                monitor_ms,
+                sizes_ms,
+                plan_ms,
+                "showing one image; nothing to combine"
+            );
+            return None;
+        };
+        let render_started = std::time::Instant::now();
         let combined = plan.companions;
         let images: Vec<PathBuf> = std::iter::once(first.to_owned())
             .chain(combined.iter().cloned())
             .collect();
         let cache = self.cache.as_ref()?;
         let file = match render(&images, &plan.tiles, size, cache) {
-            Ok(file) => file,
+            Ok(file) => {
+                tracing::info!(
+                    target,
+                    companions = combined.len(),
+                    monitor_ms,
+                    sizes_ms,
+                    plan_ms,
+                    render_ms = elapsed_ms(render_started),
+                    "combined wallpaper prepared"
+                );
+                file
+            }
             Err(error) => {
                 tracing::warn!(%error, "could not combine images; showing one image");
                 return None;

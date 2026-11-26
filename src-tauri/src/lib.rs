@@ -472,6 +472,8 @@ fn thumbnail_cache() -> Result<PathBuf, String> {
 const MAX_EDITS: usize = 20;
 const MAX_EDIT_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_THUMBNAILS: usize = 20_000;
+const MAX_PREVIEWS: usize = 100;
+const MAX_PREVIEW_BYTES: u64 = 200 * 1024 * 1024;
 const MAX_THUMBNAIL_BYTES: u64 = 512 * 1024 * 1024;
 
 /// Remove old edited copies, keeping any that appear in the wallpaper history
@@ -1083,13 +1085,31 @@ fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
     if !shown.flatten().any(|image| image == &path) {
         return Err("Wallpaper has changed".into());
     }
-    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
-    if meta.len() > 15 * 1024 * 1024 {
-        let thumbnail = mindswall_core::utilities::thumbnail(&path, &thumbnail_cache()?)
-            .map_err(|e| e.to_string())?;
-        return std::fs::read(thumbnail).map_err(|e| e.to_string());
+    // A downscaled, cached copy keeps the transfer and decoding in the
+    // WebView small; previews of images shown before load from the cache.
+    let cache = preview_cache()?;
+    let (file, cached) =
+        mindswall_core::utilities::preview(&path, &cache).map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(&file).map_err(|e| e.to_string())?;
+    if !cached {
+        let keep = file
+            .file_name()
+            .map(ToOwned::to_owned)
+            .into_iter()
+            .collect();
+        if let Err(error) =
+            mindswall_core::utilities::prune_cache(&cache, MAX_PREVIEWS, MAX_PREVIEW_BYTES, &keep)
+        {
+            eprintln!("Could not clean the preview cache: {error}");
+        }
     }
-    std::fs::read(&path).map_err(|e| e.to_string())
+    Ok(bytes)
+}
+
+fn preview_cache() -> Result<PathBuf, String> {
+    directories::ProjectDirs::from("", "", "MindsWall")
+        .map(|d| d.cache_dir().join("previews"))
+        .ok_or_else(|| "Cache directory unavailable".into())
 }
 
 #[tauri::command]
