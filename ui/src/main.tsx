@@ -7,6 +7,7 @@ import logo from "./assets/mindswall.png";
 import { Gallery, HistoryPage, type UtilityConfig } from "./Utilities";
 import { MonitorStrip, MonitorsPage } from "./Monitors";
 import { Editor, HotkeySettings, Profiles } from "./Extended";
+import { maskUserName } from "./maskPath";
 import { SnackbarProvider, useSnackbar } from "./Snackbar";
 import { FitModeSelect, IntervalSelect } from "./SettingControls";
 import "./style.css";
@@ -180,7 +181,7 @@ function UtilitySettings({ config, busy, save }: { config: Config; busy: boolean
     <div className="setting-row"><div><strong>Orientation</strong><small>Only show images with this orientation.</small></div><select aria-label="Image orientation" value={config.filter.orientation} disabled={busy} onChange={e => save({ ...config, filter: { ...config.filter, orientation: e.target.value as Config["filter"]["orientation"] } })}><option value="any">Any</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option><option value="square">Square</option></select></div>
     <div className="setting-row"><div><strong>Aspect ratio</strong><small>Allow a 5% difference from the selected ratio.</small></div><select aria-label="Image aspect ratio" value={config.filter.aspect_ratio} disabled={busy} onChange={e => save({ ...config, filter: { ...config.filter, aspect_ratio: e.target.value as Config["filter"]["aspect_ratio"] } })}><option value="any">Any</option><option value="wide">16:9</option><option value="wide_ten">16:10</option><option value="standard">4:3</option><option value="square">1:1</option></select></div>
     <div className="setting-row"><div><strong>Minimum resolution</strong><small>Use 0 to accept any width or height.</small></div><div className="resolution"><input aria-label="Minimum width" type="number" min="0" max="100000" value={width} onChange={e => setWidth(e.target.value)}/><span>×</span><input aria-label="Minimum height" type="number" min="0" max="100000" value={height} onChange={e => setHeight(e.target.value)}/><button className="secondary" disabled={busy} onClick={applyFilter}>Apply</button></div></div>
-    <div className="setting-row"><div><strong>Log file</strong><small className="log-path" title={logPath ?? undefined}>{logPath ?? "Log location unavailable."}</small></div><button className="secondary" disabled={!logPath} onClick={copyLogPath}>Copy path</button></div>
+    <div className="setting-row"><div><strong>Log file</strong><small className="log-path">{logPath ? maskUserName(logPath) : "Log location unavailable."}</small>{logPath && <small>The user name is hidden; <b>Copy path</b> copies the full path.</small>}</div><button className="secondary" disabled={!logPath} onClick={copyLogPath}>Copy path</button></div>
     <div className="setting-row"><div><strong>Excluded images</strong><small>{config.excluded.length} images excluded from your collection.</small></div><button className="secondary" disabled={busy || config.excluded.length === 0} onClick={() => save({ ...config, excluded: [] })}>Restore all</button></div>
   </div></>;
 }

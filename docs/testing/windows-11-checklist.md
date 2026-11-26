@@ -269,7 +269,8 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [x] Toggling **Shuffle wallpapers** takes effect
 - [x] Settings persist after quitting and reopening the app
 - [ ] **Settings** > **Log file** shows `%APPDATA%\MindsWall\data\mindswall.log`
-      (expanded) and **Copy path** copies it to the clipboard
+      (expanded) with the user name shown as `******` and no tooltip with the name;
+      **Copy path** copies the full, unmasked path to the clipboard
 - [ ] The **Rescan collection** tooltip says the current cycle is kept
 
 ### Tray
