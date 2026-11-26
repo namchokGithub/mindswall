@@ -454,7 +454,15 @@ Use a folder with several portrait images (for example 948×2048 and
       monitor without folders: the folders and name move, and that monitor
       starts its own slideshow
 - [ ] With a monitor that has its own folders, Overview labels the large
-      preview **Main slideshow** and shows one thumbnail per monitor
+      preview **Main slideshow** and draws the monitor arrangement with each
+      monitor's wallpaper; a monitor with its own folders shows its position
+      (for example **3 / 20**), the others show **Main**
+- [ ] Point at a monitor with its own folders on Overview: Previous and Next
+      appear and change only that monitor; other monitors and the countdown to
+      the next change are not affected; Previous at the first image shows an
+      error
+- [ ] Monitors that share the main slideshow show no buttons; with the Span
+      fit mode or a stopped slideshow, no monitor shows buttons
 - [ ] History names the monitor of each entry, and the filter shows only the
       main slideshow or one monitor
 - [ ] Remove the last folder of a monitor: it returns to the main slideshow

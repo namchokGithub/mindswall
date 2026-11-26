@@ -445,6 +445,11 @@ only the image; forcing Fill there would require writing the per-user
   (`IDesktopWallpaper::SetPosition`), so fit mode cannot differ per monitor.
 - History keeps the latest 10 changes across all monitors and filters them by
   monitor in the UI.
+- Overview can move one monitor with its own folders to its next or previous
+  image (`next_monitor` / `previous_monitor` pipe commands). This does not
+  restart the shared timer, so every monitor still changes together at the
+  next interval. Monitors that share the main slideshow, and all monitors in
+  the Span fit mode, cannot change alone.
 
 ### D8. Combined portrait wallpapers
 

@@ -854,6 +854,25 @@ fn control_inner(action: &str) -> Result<String, String> {
     }
 }
 
+/// Show the next or previous image on one monitor with its own folders.
+#[tauri::command]
+async fn monitor_control(monitor: String, action: String) -> Result<String, String> {
+    blocking(move || {
+        let command = match action.as_str() {
+            "next" => Command::NextMonitor(monitor),
+            "previous" => Command::PreviousMonitor(monitor),
+            _ => return Err("Unknown action".into()),
+        };
+        let response = ipc::send(command).map_err(|e| e.to_string())?;
+        if response.ok {
+            Ok(response.message)
+        } else {
+            Err(response.message)
+        }
+    })
+    .await
+}
+
 #[derive(serde::Serialize)]
 struct OverviewStatus {
     state: String,
@@ -864,6 +883,8 @@ struct OverviewStatus {
     combined: Vec<PathBuf>,
     /// The combined wallpaper file, used for the preview.
     display: Option<PathBuf>,
+    /// Connected monitors that run their own slideshow.
+    monitors: Vec<ipc::MonitorPlayback>,
 }
 
 #[tauri::command]
@@ -884,6 +905,7 @@ fn overview_status_inner() -> Result<OverviewStatus, String> {
             total: Some(status.total),
             combined: status.combined,
             display: status.display,
+            monitors: status.monitors,
         })
     } else {
         let (state, path) = response
@@ -897,6 +919,7 @@ fn overview_status_inner() -> Result<OverviewStatus, String> {
             total: None,
             combined: Vec::new(),
             display: None,
+            monitors: Vec::new(),
         })
     }
 }
@@ -1124,6 +1147,7 @@ pub fn run() {
             save_config,
             folder_count,
             control,
+            monitor_control,
             start_service,
             service_error,
             current_preview,

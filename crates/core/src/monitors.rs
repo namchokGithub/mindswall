@@ -144,6 +144,43 @@ impl MonitorShows {
         }
     }
 
+    /// The slideshow of a monitor with its own folders.
+    pub fn show(&self, monitor: &str) -> Option<&Slideshow> {
+        self.shows.get(monitor)
+    }
+
+    /// The slideshow of a connected monitor, or why it has none.
+    fn active_show(&mut self, monitor: &str) -> Result<&mut Slideshow, String> {
+        if !self.connected.iter().any(|connected| connected == monitor) {
+            return Err("This monitor is not connected".into());
+        }
+        self.shows
+            .get_mut(monitor)
+            .ok_or_else(|| "This monitor shares the main slideshow".into())
+    }
+
+    /// Move only `monitor` forward; see [`MonitorShows::advance_with`].
+    /// Fails when the monitor is not connected or has no own slideshow.
+    pub fn advance_one(
+        &mut self,
+        monitor: &str,
+        apply: &impl Fn(&str, &Path, &[PathBuf]) -> Result<Vec<PathBuf>, String>,
+    ) -> Result<PathBuf, String> {
+        self.active_show(monitor)?
+            .next_available_with(|path, upcoming| apply(monitor, path, upcoming))
+    }
+
+    /// Go back only on `monitor`. Fails when it has no earlier image.
+    pub fn previous_one(
+        &mut self,
+        monitor: &str,
+        apply: &impl Fn(&str, &Path) -> Result<(), String>,
+    ) -> Result<PathBuf, String> {
+        self.active_show(monitor)?
+            .previous_available(|path| apply(monitor, path))
+            .unwrap_or_else(|| Err("No previous wallpaper on this monitor".into()))
+    }
+
     /// Go back on every connected monitor that has an earlier image.
     pub fn previous(&mut self, apply: &impl Fn(&str, &Path) -> Result<(), String>) {
         for monitor in self.active() {

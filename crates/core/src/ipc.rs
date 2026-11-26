@@ -10,6 +10,12 @@ pub enum Command {
     Status,
     Reload,
     Set(std::path::PathBuf),
+    /// Show the next image on one connected monitor that runs its own
+    /// slideshow. Other monitors and the timer are not changed.
+    NextMonitor(String),
+    /// Go back to the previous image on one connected monitor that runs its
+    /// own slideshow.
+    PreviousMonitor(String),
     /// Ask a slideshow started from the CLI to stop so the desktop app can
     /// take over. The response carries the status to continue from.
     Handoff,
@@ -34,6 +40,21 @@ pub struct PlaybackStatus {
     /// The combined wallpaper file, when `current` is shown with other images.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display: Option<std::path::PathBuf>,
+    /// Connected monitors that run their own slideshow.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub monitors: Vec<MonitorPlayback>,
+}
+
+/// The slideshow of one monitor with its own folders.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitorPlayback {
+    pub monitor: String,
+    pub current: Option<std::path::PathBuf>,
+    pub position: Option<usize>,
+    pub total: usize,
+    /// Images combined with `current` in the shown wallpaper.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub combined: Vec<std::path::PathBuf>,
 }
 
 #[cfg(windows)]

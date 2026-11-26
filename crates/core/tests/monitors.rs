@@ -153,6 +153,46 @@ fn folder_changes_update_monitor_slideshows() {
 }
 
 #[test]
+fn one_monitor_moves_without_the_others() {
+    let main = tempfile::tempdir().unwrap();
+    let left = tempfile::tempdir().unwrap();
+    image(&main.path().join("main.png"));
+    let a = left.path().join("a.png");
+    let b = left.path().join("b.png");
+    image(&a);
+    image(&b);
+    let config = config(main.path(), left.path());
+    let mut shows = MonitorShows::default();
+    shows.configure(&config);
+    let applied = Applied::default();
+    let next = |monitor: &str, path: &Path, _: &[PathBuf]| {
+        recorder(&applied)(monitor, path).map(|()| Vec::new())
+    };
+
+    // Not connected yet.
+    assert!(shows.advance_one("left", &next).is_err());
+    shows.set_connected(vec!["left".into(), "right".into()]);
+    // The right monitor shares the main slideshow.
+    assert!(shows.advance_one("right", &next).is_err());
+    assert!(shows.previous_one("left", &recorder(&applied)).is_err());
+
+    assert_eq!(shows.advance_one("left", &next), Ok(a.clone()));
+    assert_eq!(shows.advance_one("left", &next), Ok(b.clone()));
+    assert_eq!(
+        shows.previous_one("left", &recorder(&applied)),
+        Ok(a.clone())
+    );
+    assert_eq!(shows.current("left"), Some(a.as_path()));
+    assert!(
+        applied
+            .borrow()
+            .iter()
+            .all(|(monitor, _)| monitor == "left")
+    );
+    assert_eq!(shows.show("left").unwrap().position(), Some(1));
+}
+
+#[test]
 fn monitor_folders_are_validated() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = config(dir.path(), dir.path());

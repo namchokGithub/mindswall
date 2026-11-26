@@ -168,7 +168,7 @@ image to one display; a running slideshow can replace it at its next change.
 In **Monitors**, a display can also get its own folders. It then runs its own
 slideshow at the same interval, with the same shuffle, filter, exclusion, and
 fit settings, while other displays share the main slideshow. Next, Previous,
-and Pause apply to every display. The slideshow still needs at least one
+and Pause on Overview and in the tray apply to every display. The slideshow still needs at least one
 enabled folder in **Folders**. While any display has its own folders, the
 slideshow lists monitors every 10 seconds: a reconnected display gets its image
 again and continues its own cycle, and a disconnected display is skipped.
@@ -178,7 +178,11 @@ that has no folders of its own, for example when a monitor was moved to another
 port and got a new device path. The configuration keys them by the Windows
 monitor device path. Profiles do not include per-monitor folders or names.
 While a display has its own folders, Overview labels the large preview as the
-main slideshow and shows a thumbnail for each display below it.
+main slideshow and draws the display arrangement below it with each display's
+current wallpaper and its position in its own cycle. Pointing at a display with
+its own folders shows Previous and Next buttons that change only that display;
+the shared interval timer is not restarted. Displays that share the main
+slideshow, and every display in the Span fit mode, change only together.
 Windows may retain unavailable display records, such as displays connected
 earlier or turned off; Monitors skips records whose dimensions cannot be read
 (`0x80004005`) while showing the displays that are available. These skips are

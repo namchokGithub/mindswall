@@ -1,7 +1,7 @@
 use crate::{
     collage::{Collages, Combined},
     config::Config,
-    ipc::{self, Command as Control, PlaybackStatus, Response},
+    ipc::{self, Command as Control, MonitorPlayback, PlaybackStatus, Response},
     monitors::{MonitorShows, SharedTarget},
     playback::Playback,
     wallpaper::{SystemWallpaper, WallpaperSetter, default_wallpaper_path},
@@ -51,7 +51,7 @@ enum Event {
     Files(Vec<PathBuf>),
 }
 
-fn snapshot(playback: &Playback, collages: &Collages) -> PlaybackStatus {
+fn snapshot(playback: &Playback, collages: &Collages, monitors: &MonitorShows) -> PlaybackStatus {
     let shown = playback
         .show
         .as_ref()
@@ -78,6 +78,26 @@ fn snapshot(playback: &Playback, collages: &Collages) -> PlaybackStatus {
             .map(|shown| shown.combined.clone())
             .unwrap_or_default(),
         display: shown.map(|shown| shown.file),
+        monitors: monitors
+            .active()
+            .into_iter()
+            .filter_map(|monitor| {
+                let show = monitors.show(&monitor)?;
+                let current = show.current().map(Path::to_path_buf);
+                let combined = current
+                    .as_deref()
+                    .and_then(|current| collages.remembered(&monitor, current))
+                    .map(|shown| shown.combined)
+                    .unwrap_or_default();
+                Some(MonitorPlayback {
+                    monitor,
+                    current,
+                    position: show.position(),
+                    total: show.total(),
+                    combined,
+                })
+            })
+            .collect(),
     }
 }
 
@@ -408,7 +428,7 @@ pub fn run_slideshow_with(
         playback.timer.pause(Instant::now());
     }
     monitors.reapply(&monitors.active(), &monitor_again);
-    on_change(&snapshot(&playback, &collages), Change::Playback);
+    on_change(&snapshot(&playback, &collages, &monitors), Change::Playback);
     println!("Slideshow running. Press Ctrl+C to stop.");
 
     let mut changed_files = HashSet::new();
@@ -438,7 +458,7 @@ pub fn run_slideshow_with(
                         let _ = reply.send(Response {
                             ok: true,
                             message: "handed over".into(),
-                            status: Some(snapshot(&playback, &collages)),
+                            status: Some(snapshot(&playback, &collages, &monitors)),
                         });
                         tracing::info!("slideshow handed over to the desktop app");
                         println!("Slideshow handed over to the MindsWall app.");
@@ -454,7 +474,7 @@ pub fn run_slideshow_with(
                 let notify_change = !matches!(command, Control::Status);
                 let mut reloaded = None;
                 let status = if matches!(command, Control::Status) {
-                    Some(snapshot(&playback, &collages))
+                    Some(snapshot(&playback, &collages, &monitors))
                 } else {
                     None
                 };
@@ -561,6 +581,13 @@ pub fn run_slideshow_with(
                         },
                         None => Err("No enabled folders".into()),
                     },
+                    // Only this monitor changes; the shared timer keeps running.
+                    Control::NextMonitor(monitor) => monitors
+                        .advance_one(&monitor, &monitor_next)
+                        .map(|path| path.display().to_string()),
+                    Control::PreviousMonitor(monitor) => monitors
+                        .previous_one(&monitor, &monitor_again)
+                        .map(|path| path.display().to_string()),
                     Control::Handoff => unreachable!("handled above"),
                 };
                 let response = match result {
@@ -589,7 +616,7 @@ pub fn run_slideshow_with(
                     watcher = watch(&config, event_tx.clone());
                 }
                 if notify_change {
-                    on_change(&snapshot(&playback, &collages), Change::Playback);
+                    on_change(&snapshot(&playback, &collages, &monitors), Change::Playback);
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
@@ -645,9 +672,12 @@ pub fn run_slideshow_with(
                     changed = true;
                 }
                 if collection_changed {
-                    on_change(&snapshot(&playback, &collages), Change::Collection);
+                    on_change(
+                        &snapshot(&playback, &collages, &monitors),
+                        Change::Collection,
+                    );
                 } else if changed {
-                    on_change(&snapshot(&playback, &collages), Change::Playback);
+                    on_change(&snapshot(&playback, &collages, &monitors), Change::Playback);
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {

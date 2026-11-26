@@ -7,7 +7,7 @@ import { TitleBar } from "./TitleBar";
 import { Select } from "./Select";
 import { applyTheme, type ThemeSetting } from "./theme";
 import { Gallery, HistoryPage, type UtilityConfig } from "./Utilities";
-import { MonitorStrip, MonitorsPage } from "./Monitors";
+import { MonitorStrip, MonitorsPage, type MonitorPlayback } from "./Monitors";
 import { Editor, HotkeySettings, Profiles } from "./Extended";
 import { maskUserName } from "./maskPath";
 import { SnackbarProvider, useSnackbar } from "./Snackbar";
@@ -18,7 +18,7 @@ type Folder = { path: string; enabled: boolean; recursive: boolean };
 type ProfileStatus = { active: string | null; changed: boolean };
 type Config = { theme: ThemeSetting; collage: { enabled: boolean; gap: number } } & { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
 type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings";
-type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null; combined: string[]; display: string | null };
+type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null; combined: string[]; display: string | null; monitors?: MonitorPlayback[] };
 
 function App() {
   const [page, setPage] = useState<Page>("overview");
@@ -39,6 +39,7 @@ function App() {
   const [displayPath, setDisplayPath] = useState("");
   const [imagePosition, setImagePosition] = useState<number | null>(null);
   const [imageTotal, setImageTotal] = useState<number | null>(null);
+  const [monitorShows, setMonitorShows] = useState<MonitorPlayback[]>([]);
   const statusRequest = useRef(0);
 
   const refreshStatus = useCallback(async () => {
@@ -52,7 +53,8 @@ function App() {
       setDisplayPath(value.display ?? "");
       setImagePosition(value.position);
       setImageTotal(value.total);
-    } catch { if (request === statusRequest.current) { setStatus("stopped"); setImagePath(""); setCombined([]); setDisplayPath(""); setImagePosition(null); setImageTotal(null); } }
+      setMonitorShows(value.monitors ?? []);
+    } catch { if (request === statusRequest.current) { setStatus("stopped"); setImagePath(""); setCombined([]); setDisplayPath(""); setImagePosition(null); setImageTotal(null); setMonitorShows([]); } }
   }, []);
 
   useEffect(() => {
@@ -122,6 +124,12 @@ function App() {
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); }
   }
+  async function stepMonitor(monitor: string, action: "next" | "previous") {
+    setBusy(true); setError(""); setMessage("");
+    try { await invoke("monitor_control", { monitor, action }); await refreshStatus(); }
+    catch (e) { setError(String(e)); }
+    finally { setBusy(false); }
+  }
   async function addFolder() {
     if (!config) return;
     try { const path = await invoke<string | null>("pick_folder"); if (path && !config.folders.some(f => f.path.toLowerCase() === path.toLowerCase())) await save({ ...config, folders: [...config.folders, { path, enabled: true, recursive: true }] }); }
@@ -148,7 +156,7 @@ function App() {
         {!config ? <div className="panel empty">Loading your workspace…</div> : <>
         {page === "overview" && <><div className="section-title"><div><span className="eyebrow">CURRENT WALLPAPER</span><h2>Your desktop, right now</h2></div><span className="subtle">A moment for yourself</span></div>
           <div className="preview" style={preview ? { backgroundImage: `linear-gradient(0deg, rgba(12,13,25,.85), transparent 58%), url("${preview}")` } : undefined}><div className="preview-content"><div className="preview-tag"><span className="local-dot"/> {!imagePath ? "YOUR NEXT FAVORITE" : ownMonitors ? "MAIN SLIDESHOW" : "NOW SHOWING"}</div><h3 className={fileName ? "selectable" : undefined}>{fileName || "A blank canvas."}{combined.length > 0 && <span className="combined-badge" title={combined.join("\n")}>+{combined.length} {combined.length === 1 ? "image" : "images"}</span>}</h3><p className={imagePath ? "selectable" : undefined}>{imagePath ? imagePath : "Add a folder to bring your collection to life."}</p></div><span className="preview-number" aria-label="Image position in slideshow">{imagePosition !== null && imageTotal !== null ? `${imagePosition} / ${imageTotal}` : "— / —"}</span></div>
-          <MonitorStrip config={config}/>
+          <MonitorStrip config={config} shows={monitorShows} stopped={status === "stopped"} busy={busy} step={stepMonitor}/>
           <div className="footnote overview-collection">{filtersActive && <>Image filters or exclusions are active. <button className="text-link" onClick={() => navigatePage("settings")}>Review settings <ArrowRight size={14}/></button></>}{status !== "stopped" && <button className="text-link" disabled={busy} onClick={() => act("reload")} title="Rescans enabled folders and keeps the current cycle"><RefreshCw size={14}/> Rescan collection</button>}</div>
           <div className="player"><div><strong>Slideshow</strong><small>{status === "stopped" ? "Ready when you are" : `Changing every ${config.interval_seconds / 60} minutes`}</small></div><div className="player-actions"><button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("previous")} aria-label="Previous wallpaper"><ArrowLeft size={17}/></button>{status === "stopped" ? <button className="primary" disabled={busy || !config.folders.some(f => f.enabled)} onClick={() => act("start")}><Play size={16}/> Start slideshow</button> : <button className="primary" disabled={busy} onClick={() => act(running ? "pause" : "resume")}>{running ? <Pause size={16}/> : <Play size={16}/>} {running ? "Pause" : "Resume"}</button>}<button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("next")} aria-label="Next wallpaper"><ArrowRight size={17}/></button></div></div>
           <section className="quick-settings" aria-labelledby="quick-settings-title"><div className="section-title"><div><span className="eyebrow">SLIDESHOW</span><h2 id="quick-settings-title">Quick settings</h2></div></div><div className="panel settings-panel"><div className="setting-row"><div><strong>Change picture every</strong><small>Set the time between wallpapers.</small></div><IntervalSelect value={config.interval_seconds} disabled={busy} onChange={interval_seconds => save({ ...config, interval_seconds })}/></div><div className="setting-row"><div><strong>Fit mode</strong><small>Choose how wallpapers fit your screen.</small></div><FitModeSelect value={config.fit_mode} disabled={busy} onChange={fit_mode => save({ ...config, fit_mode })}/></div></div></section>
