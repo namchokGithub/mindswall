@@ -87,3 +87,25 @@ fn recursive_collection_includes_nested_images_matching_filter() {
     config.folders[0].recursive = false;
     assert!(config.images().unwrap().is_empty());
 }
+
+#[test]
+fn restoring_one_excluded_image_keeps_other_exclusions() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first.jpg");
+    let second = dir.path().join("second.jpg");
+    std::fs::write(&first, []).unwrap();
+    std::fs::write(&second, []).unwrap();
+    let mut config = Config {
+        folders: vec![Folder {
+            path: dir.path().to_owned(),
+            enabled: true,
+            recursive: true,
+        }],
+        excluded: vec![first.clone(), second.clone()],
+        ..Config::default()
+    };
+    assert!(config.images().unwrap().is_empty());
+    config.excluded.retain(|path| path != &first);
+    assert_eq!(config.images().unwrap(), vec![first]);
+    assert_eq!(config.excluded, vec![second]);
+}

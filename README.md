@@ -104,7 +104,9 @@ Notifications are cleared when navigating to another page.
 The desktop **Gallery** shows a loading state while it finds images, loads them
 in pages, and keeps local thumbnails. It includes enabled subfolders, shows each
 image's source folder, and identifies active filters and exclusions. Use **Load
-more** to view additional images. You can set or exclude an image, and restore exclusions in **Settings**. Settings
+more** to view additional images. You can set or exclude an image, then use
+**Excluded** in Gallery to restore individual images or **Settings** to restore
+all exclusions. Restored images still need to match enabled folders and filters. Settings
 also contains fit, resolution, orientation, and aspect-ratio filters. **History**
 keeps the most recent 100 applied images locally, and **Monitors** lists
 connected displays and can apply an image to one display. A running slideshow

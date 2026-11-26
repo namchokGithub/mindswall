@@ -76,10 +76,10 @@ function App() {
   }, []);
   useEffect(() => { if (config) scanFolders(config.folders); }, [config?.folders, scanFolders]);
 
-  async function save(next: Config) {
+  async function save(next: Config, propagateError = false) {
     setBusy(true); setError(""); setMessage("");
     try { const result = await invoke<string>("save_config", { config: next }); setConfig(next); setMessage(result); await refreshStatus(); }
-    catch (e) { try { setConfig(await invoke<Config>("get_config")); } catch { /* Preserve the original failure. */ } setError(String(e)); }
+    catch (e) { try { setConfig(await invoke<Config>("get_config")); } catch { /* Preserve the original failure. */ } setError(String(e)); if (propagateError) throw e; }
     finally { setBusy(false); }
   }
   async function act(action: string) {
@@ -121,7 +121,7 @@ function App() {
         {page === "folders" && <><div className="section-title"><div><span className="eyebrow">COLLECTION SOURCES</span><h2>Folders <span className="count-pill">{config.folders.length}</span></h2></div><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add folder</button></div>
           {config.folders.length === 0 ? <div className="panel empty"><div className="empty-icon"><FolderOpen size={25}/></div><h3>It starts with a folder.</h3><p>Add a folder of images and make this space your own.</p><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add your first folder</button></div> : <div className="panel folder-list">{config.folders.map((folder, index) => <div className="folder-row" key={folder.path}><div className="folder-icon"><FolderOpen size={19}/></div><div className="folder-info"><strong title={folder.path}>{folder.path.split(/[\\/]/).pop() || folder.path}</strong><small title={folder.path}>{folder.path}</small><span>{counts[folder.path] === undefined ? "Scanning…" : typeof counts[folder.path] === "number" ? `${counts[folder.path]} images` : counts[folder.path]}</span></div><label className="inline-check"><input type="checkbox" checked={folder.recursive} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, recursive: e.target.checked } : f) })}/> Include subfolders</label><label className="switch" title="Enable folder"><input type="checkbox" aria-label={`Enable ${folder.path}`} checked={folder.enabled} disabled={busy} onChange={e => save({ ...config, folders: config.folders.map((f, i) => i === index ? { ...f, enabled: e.target.checked } : f) })}/><span/></label><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => save({ ...config, folders: config.folders.filter((_, i) => i !== index) })}><Trash2 size={16}/></button></div>)}</div>}
           <div className="footnote"><Image size={16}/> JPG, JPEG, PNG and BMP images are supported.</div></>}
-        {page === "gallery" && <Gallery config={config} openSettings={() => navigatePage("settings")} exclude={async path => { await save({ ...config, excluded: [...config.excluded, path] }); }}/>}
+        {page === "gallery" && <Gallery config={config} busy={busy} openSettings={() => navigatePage("settings")} exclude={async path => { await save({ ...config, excluded: [...config.excluded, path] }, true); }} restore={async path => { await save({ ...config, excluded: config.excluded.filter(item => item !== path) }, true); }}/>}
         {page === "history" && <HistoryPage/>}
         {page === "monitors" && <MonitorsPage/>}
         {page === "profiles" && <Profiles config={config} refresh={async () => { setConfig(await invoke<Config>("get_config")); await refreshStatus(); }}/>}

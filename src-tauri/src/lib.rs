@@ -327,7 +327,9 @@ async fn gallery_thumbnail(
 ) -> Result<Vec<u8>, String> {
     let state = state.0.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        if !state.lock().map_err(|e| e.to_string())?.contains(&path) {
+        if !state.lock().map_err(|e| e.to_string())?.contains(&path)
+            && !get_config()?.excluded.contains(&path)
+        {
             return Err("Image is not in the current collection".into());
         }
         let cache = directories::ProjectDirs::from("", "", "MindsWall")
