@@ -6,15 +6,53 @@ and how each phase is considered done. Update the checkboxes and the status
 table as work lands.
 
 Status legend: `[ ]` not started, `[~]` in progress, `[x]` done and verified.
+Completed items move from the phase checklists to the
+[Completed Log](#completed-log) at the end of this document.
 
-## Current State (2026-11-25)
+## Current State (2026-11-26)
 
 - The CLI provides `scan`, `set`, and `random` commands using the shared core.
   Scanning supports multiple folders and reports unreadable entries.
 - The slideshow engine, JSON configuration, control commands and Windows named
-  pipe are implemented. A Tauri desktop app is under development. Interactive
-  Windows 11 slideshow, desktop and wallpaper API verification remains; CI does
-  not exist yet.
+  pipe are implemented. A Tauri desktop app is under development with the
+  Phase 4 utilities (gallery, filters, fit modes, history, monitors) and the
+  Phase 6 extended features (profiles, editor, hotkeys, import/export).
+- Interactive Windows 11 slideshow, desktop and wallpaper API verification
+  remains; CI does not exist yet.
+
+## Remaining Work (2026-11-26)
+
+### Gaps
+
+- **Windows 11 verification**: most features are implemented but stay `[~]`
+  until they are checked in an interactive Windows 11 session.
+- **Not implemented**:
+  - WebView is not released or suspended when the window is hidden (RAM).
+  - No event-driven updates from the core to the UI.
+  - No named pipe handoff from a running CLI instance to the app.
+  - No folder watcher.
+  - No per-monitor slideshow folders.
+  - No automatic handling of monitors being connected or disconnected.
+- **Phase 5 not started**: benchmarks, error recovery, CI, installer and
+  portable ZIP, release workflow.
+- **Documentation conflicts**:
+  - The wallpaper fallback keeps the existing fit setting, but D3 says Phases
+    1 to 3 apply Fill. Choose one and record the reason.
+  - The config path in Phase 2 (`%APPDATA%\MindsWall\config.json`) differs from
+    the README (`%APPDATA%\MindsWall\config\config.json`).
+
+### Next steps (in order)
+
+1. Verify P1 to P3 on Windows 11 with the
+   [manual test checklist](testing/windows-11-checklist.md).
+2. Set up CI on Windows.
+3. Make the slideshow skip broken or missing images and keep running.
+4. Finish the remaining Phase 3 work.
+5. Implement the folder watcher.
+6. Measure performance, then optimize.
+7. Packaging and release.
+
+Hold new P3 features until P1 and P2 pass Windows verification.
 
 ## Phase Overview
 
@@ -36,15 +74,10 @@ GUI-independent Rust core so the CLI and the desktop app share the same code.
 Goal: be comfortable with the Rust concepts the core needs, and shape the
 repository so later phases do not require a large restructure.
 
-- [X] Install Rust and Cargo
-- [ ] Learn ownership, borrowing, and references
-- [ ] Learn structs, enums, and traits
-- [ ] Learn `Result`, `Option`, and error handling with `thiserror`
-- [ ] Learn modules, crates, and filesystem APIs
-- [X] Convert the repository to the Cargo workspace from D1, with
-  `crates/core` and `crates/cli`
-- [X] Move the scanner from `main.rs` into a `scanner` module in
-  `mindswall-core`
+- [x] Learn ownership, borrowing, and references
+- [x] Learn structs, enums, and traits
+- [x] Learn `Result`, `Option`, and error handling with `thiserror`
+- [x] Learn modules, crates, and filesystem APIs
 
 Done when: `cargo check`, `cargo fmt --check`, and `cargo clippy` pass for the
 whole workspace, and the scanner lives in its own module in the core crate.
@@ -55,26 +88,15 @@ The workspace checks pass; the learning items remain for the developer to comple
 Goal: a reusable core that can find images and set one as the desktop
 wallpaper, driven from a CLI.
 
-- [X] **Scanner**: scan multiple roots, optionally recursive; match
-  `jpg`/`jpeg`/`png`/`bmp` case-insensitively; keep `PathBuf`s without
-  assuming valid Unicode; report unreadable entries instead of dropping
-  them silently
-
 - [~] **Wallpaper service**: define a platform-neutral `WallpaperSetter` trait
   in `wallpaper/mod.rs`; implement it for Windows in `wallpaper/windows.rs`
   using the `windows` crate (`IDesktopWallpaper`, with
   `SystemParametersInfoW` as a fallback); validate the file exists before
   calling the API
-
-- [X] **Random pick**: choose one random image from the scan result with `rand`
-
 - [~] **Error model**: one `thiserror` error enum for scan, config, and Windows
   API failures, with paths included in messages
 - [~] **CLI (`clap`)**: `scan <folder>...`, `set <file>`, `random <folder>...`,
   and `--recursive` / `--no-recursive`
-
-- [X] **Tests**: scanner tests using temporary directories (extensions, case,
-  nesting, non-image files, missing folder)
 
 Done when: on Windows 11, `mindswall random <folder>` changes the wallpaper
 without administrator rights, scanner tests pass, and the README documents the
@@ -89,34 +111,16 @@ The fallback currently retains the existing fit setting rather than forcing Fill
 Goal: a background slideshow that rotates wallpapers on a timer, with a shuffle
 queue that avoids repeats and persisted settings.
 
-- [X] **Multiple folders**: config holds a list of folders with per-folder
-  enable flag and recursive flag; deduplicate images found through
-  overlapping folders
-- [X] **Shuffle queue**: shuffle the full set, play it through without repeats,
-  reshuffle when exhausted, and avoid showing the last image of the old
-  cycle first in the new one; sequential order when shuffle is off
-
 - [~] **History cursor**: keep a short in-memory history so `Previous` returns
   to the actual previous image
 - [~] **Scheduler**: interval-based timer (for example 1 min to 24 h) that
   sleeps until the next change instead of polling; supports pause, resume,
   next, and previous; tolerates sleep/resume of the PC
-
-- [X] **JSON configuration**: `serde` + `serde_json`; stored in the per-user
-  config directory (for example `%APPDATA%\MindsWall\config.json`); a
-  `version` field for future migrations; atomic writes (temp file +
-  rename); fall back to defaults with a logged warning on invalid JSON
-- [X] **`config.example.json`** in the repository root
-
 - [~] **Logging**: `tracing` with a file log in the per-user data directory
 - [~] **Single instance and IPC (D2)**: `run` refuses to start a second
   slideshow; it serves control requests over a per-user named pipe
 - [~] **CLI**: `run` (foreground slideshow), `next`, `previous`, `pause`,
   `resume`, `status` (sent to the running instance), `config show`
-
-- [X] **Tests**: shuffle no-repeat guarantee, reshuffle boundary, previous/next
-  behavior, scheduler logic with an injectable clock, config round-trip and
-  invalid-file handling
 
 Done when: a slideshow runs for multiple cycles with no repeat inside a cycle,
 settings survive restarts, and unit tests cover shuffle, scheduler, and config.
@@ -149,7 +153,7 @@ and Windows startup.
   while it runs
 
 - [ ] **Resource check**: destroy or suspend the WebView when hidden so the
-  background process can approach the RAM target
+      background process can approach the RAM target
 
 Done when: the app runs from the tray on Windows 11, all P1 controls work from
 both the UI and the tray, settings persist, and startup registration works for
@@ -175,8 +179,8 @@ Goal: complete the P2 feature set.
   exclude actions
 
 - [ ] **Folder watcher**: `notify` with debouncing; update the image set and
-  shuffle queue on add/remove/rename without a full rescan; skip images
-  still being written
+      shuffle queue on add/remove/rename without a full rescan; skip images
+      still being written
 
 - [~] **Resolution / aspect ratio filtering**: read image dimensions from
   headers only; filter by minimum resolution and orientation or aspect
@@ -203,19 +207,19 @@ the running slideshow may replace it at its next change.
 Goal: measured performance, robust error recovery, and repeatable releases.
 
 - [ ] **Benchmarks**: measure idle CPU and background RAM with the window
-  hidden and with it open; record method and results in `docs/`
+      hidden and with it open; record method and results in `docs/`
 - [ ] **Optimization**: fix whatever the measurements show exceeds the targets
 - [ ] **Test coverage**: fill gaps in core unit tests; add integration tests
-  for CLI commands
+      for CLI commands
 - [ ] **Error recovery**: missing or offline folders, deleted images, corrupt
-  images, corrupt config, Windows API failures; the slideshow skips bad
-  items and keeps running
+      images, corrupt config, Windows API failures; the slideshow skips bad
+      items and keeps running
 - [ ] **Packaging (D4)**: per-user NSIS installer through the Tauri bundler
-  and a portable ZIP; neither needs administrator rights
+      and a portable ZIP; neither needs administrator rights
 - [ ] **CI**: GitHub Actions on Windows for `fmt`, `clippy`, `test`, frontend
-  lint and type-check, and build
+      lint and type-check, and build
 - [ ] **Release workflow**: tag-triggered build that produces release
-  artifacts; changelog; version bump process
+      artifacts; changelog; version bump process
 - [ ] **Docs**: README with installation, usage, and screenshots
 
 Done when: performance targets are measured and met (or the gap is documented),
@@ -331,3 +335,39 @@ mindswall/
 - Very large libraries can make scanning, thumbnailing, and dimension reads
   slow; caching and incremental updates are needed.
 - Network drives or removable folders may disappear while the slideshow runs.
+
+## Completed Log
+
+Items moved here from the phase checklists once done. Dates are taken from the
+commit that delivered them.
+
+### 2026-11-25
+
+- **Phase 0**: Installed Rust and Cargo.
+- **Phase 0**: Converted the repository to the Cargo workspace from D1, with
+  `crates/core` and `crates/cli` (`0911d64`).
+- **Phase 0**: Moved the scanner from `main.rs` into a `scanner` module in
+  `mindswall-core` (`0911d64`).
+- **Phase 1 — Scanner**: scans multiple roots, optionally recursive; matches
+  `jpg`/`jpeg`/`png`/`bmp` case-insensitively; keeps `PathBuf`s without
+  assuming valid Unicode; reports unreadable entries instead of dropping them
+  silently (`af68080`).
+- **Phase 1 — Random pick**: chooses one random image from the scan result with
+  `rand` (`af68080`).
+- **Phase 1 — Tests**: scanner tests using temporary directories (extensions,
+  case, nesting, non-image files, missing folder) (`af68080`).
+- **Phase 2 — Multiple folders**: config holds a list of folders with
+  per-folder enable and recursive flags; images found through overlapping
+  folders are deduplicated (`36a4142`).
+- **Phase 2 — Shuffle queue**: shuffles the full set, plays it through without
+  repeats, reshuffles when exhausted, and avoids showing the last image of the
+  old cycle first in the new one; sequential order when shuffle is off
+  (`36a4142`).
+- **Phase 2 — JSON configuration**: `serde` + `serde_json`; stored in the
+  per-user config directory; a `version` field for future migrations; atomic
+  writes (temp file + rename); falls back to defaults with a logged warning on
+  invalid JSON (`36a4142`).
+- **Phase 2 — `config.example.json`** in the repository root (`36a4142`).
+- **Phase 2 — Tests**: shuffle no-repeat guarantee, reshuffle boundary,
+  previous/next behavior, scheduler logic with an injectable clock, config
+  round-trip and invalid-file handling (`36a4142`).
