@@ -344,6 +344,42 @@ async fn gallery_thumbnail(
     .map_err(|e| e.to_string())?
 }
 
+#[derive(serde::Serialize)]
+struct GalleryDetails {
+    properties: mindswall_core::utilities::ImageProperties,
+    preview: Vec<u8>,
+}
+
+#[tauri::command]
+async fn gallery_details(
+    state: tauri::State<'_, GalleryState>,
+    path: PathBuf,
+) -> Result<GalleryDetails, String> {
+    let state = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !state.lock().map_err(|e| e.to_string())?.contains(&path)
+            && !get_config()?.excluded.contains(&path)
+        {
+            return Err("Image is not in the current collection".into());
+        }
+        let properties =
+            mindswall_core::utilities::image_properties(&path).map_err(|e| e.to_string())?;
+        let image = image::open(&path)
+            .map_err(|e| e.to_string())?
+            .thumbnail(1280, 960);
+        let mut preview = std::io::Cursor::new(Vec::new());
+        image
+            .write_to(&mut preview, image::ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
+        Ok(GalleryDetails {
+            properties,
+            preview: preview.into_inner(),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn apply_image(state: tauri::State<'_, GalleryState>, path: PathBuf) -> Result<(), String> {
     if !state.0.lock().map_err(|e| e.to_string())?.contains(&path) {
@@ -658,6 +694,7 @@ pub fn run() {
             set_autostart,
             gallery_images,
             gallery_thumbnail,
+            gallery_details,
             apply_image,
             get_history,
             reapply_history,

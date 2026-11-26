@@ -98,6 +98,39 @@ pub fn dimensions(path: &Path) -> Result<(u32, u32), image::ImageError> {
     Ok(dimensions)
 }
 
+#[derive(Serialize)]
+pub struct ImageProperties {
+    pub width: u32,
+    pub height: u32,
+    pub bit_depth: u16,
+    pub size: u64,
+    pub created: Option<u64>,
+    pub modified: Option<u64>,
+}
+
+pub fn image_properties(path: &Path) -> Result<ImageProperties, image::ImageError> {
+    use image::ImageDecoder;
+    use std::time::UNIX_EPOCH;
+    let metadata = fs::metadata(path)?;
+    let decoder = image::ImageReader::open(path)?
+        .with_guessed_format()?
+        .into_decoder()?;
+    let (width, height) = decoder.dimensions();
+    let timestamp = |time: io::Result<std::time::SystemTime>| {
+        time.ok()
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map(|time| time.as_secs())
+    };
+    Ok(ImageProperties {
+        width,
+        height,
+        bit_depth: decoder.color_type().bits_per_pixel(),
+        size: metadata.len(),
+        created: timestamp(metadata.created()),
+        modified: timestamp(metadata.modified()),
+    })
+}
+
 pub fn thumbnail(
     path: &Path,
     cache: &Path,

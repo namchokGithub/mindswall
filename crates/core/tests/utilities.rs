@@ -1,6 +1,18 @@
 use mindswall_core::utilities::{AspectRatio, ImageFilter, Orientation, matches_filter, thumbnail};
 
 #[test]
+fn image_properties_report_actual_dimensions_bit_depth_and_file_size() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("picture.png");
+    image::RgbImage::new(40, 25).save(&path).unwrap();
+    let info = mindswall_core::utilities::image_properties(&path).unwrap();
+    assert_eq!((info.width, info.height), (40, 25));
+    assert_eq!(info.bit_depth, 24);
+    assert_eq!(info.size, std::fs::metadata(&path).unwrap().len());
+    assert!(mindswall_core::utilities::image_properties(&dir.path().join("missing.png")).is_err());
+}
+
+#[test]
 fn filters_dimensions_and_orientation() {
     let filter = ImageFilter {
         min_width: 1920,
