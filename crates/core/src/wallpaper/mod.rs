@@ -9,6 +9,29 @@ pub struct MonitorInfo {
 pub trait WallpaperSetter {
     fn set_wallpaper(&self, path: &Path) -> Result<(), Error>;
 }
+
+#[cfg(windows)]
+pub fn default_wallpaper_path() -> Result<std::path::PathBuf, String> {
+    let root = std::env::var_os("SystemRoot").ok_or("Windows system directory is unavailable")?;
+    let path = std::path::PathBuf::from(root)
+        .join("Web")
+        .join("Wallpaper")
+        .join("Windows")
+        .join("img0.jpg");
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "Windows default wallpaper was not found: {}",
+            path.display()
+        ))
+    }
+}
+
+#[cfg(not(windows))]
+pub fn default_wallpaper_path() -> Result<std::path::PathBuf, String> {
+    Err("Windows default wallpaper is only available on Windows".into())
+}
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]

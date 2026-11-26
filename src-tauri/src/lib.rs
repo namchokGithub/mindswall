@@ -417,6 +417,9 @@ fn get_config() -> Result<Config, String> {
 #[tauri::command]
 fn save_config(config: Config) -> Result<String, String> {
     config.validate().map_err(|e| e.to_string())?;
+    let previous = get_config()?;
+    let disabled_last_folder = previous.folders.iter().any(|folder| folder.enabled)
+        && !config.folders.iter().any(|folder| folder.enabled);
     config
         .save(&Config::default_path().map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
@@ -429,8 +432,20 @@ fn save_config(config: Config) -> Result<String, String> {
                 result.message
             ));
         }
+    } else if disabled_last_folder {
+        let path = mindswall_core::wallpaper::default_wallpaper_path().map_err(|e| {
+            format!("Settings saved, but Windows default wallpaper could not be applied: {e}")
+        })?;
+        SystemWallpaper.set_wallpaper(&path).map_err(|e| {
+            format!("Settings saved, but Windows default wallpaper could not be applied: {e}")
+        })?;
     }
-    Ok("Settings saved.".into())
+    Ok(if disabled_last_folder {
+        "All folders disabled. Using Windows default wallpaper."
+    } else {
+        "Settings saved."
+    }
+    .into())
 }
 
 #[tauri::command]
@@ -496,7 +511,19 @@ fn overview_status() -> Result<OverviewStatus, String> {
 
 #[tauri::command]
 fn start_service(state: tauri::State<'_, ServiceState>) -> Result<(), String> {
-    if ipc::send(Command::Status).is_ok() {
+    if let Ok(response) = ipc::send(Command::Status) {
+        if response
+            .status
+            .as_ref()
+            .is_some_and(|status| status.state == "stopped")
+        {
+            let result = ipc::send(Command::Reload).map_err(|e| e.to_string())?;
+            return if result.ok {
+                Ok(())
+            } else {
+                Err(result.message)
+            };
+        }
         return Ok(());
     }
     if state.starting.swap(true, Ordering::SeqCst) {

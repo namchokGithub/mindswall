@@ -176,6 +176,12 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [x] The image count appears and matches `scan`
 - [x] **Include subfolders** changes the count
 - [x] Disabling a folder excludes its images from the slideshow
+- [ ] Disabling the last enabled folder applies the Windows default image and
+      stops slideshow changes
+- [ ] Enabling a folder again resumes a previously running slideshow and keeps
+      a previously paused slideshow paused
+- [ ] With the slideshow stopped, disabling the last enabled folder applies
+      the Windows default image
 - [x] Removing a folder updates the config file
 - [x] Non-ASCII folder paths display and work
 

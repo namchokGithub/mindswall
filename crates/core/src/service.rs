@@ -1,15 +1,10 @@
 use crate::{
     config::Config,
     ipc::{self, Command as Control, PlaybackStatus, Response},
-    scheduler::Scheduler,
-    slideshow::Slideshow,
-    wallpaper::{SystemWallpaper, WallpaperSetter},
+    playback::Playback,
+    wallpaper::{SystemWallpaper, WallpaperSetter, default_wallpaper_path},
 };
-use std::{
-    path::Path,
-    sync::mpsc,
-    time::{Duration, Instant},
-};
+use std::{path::Path, sync::mpsc, time::Instant};
 
 fn apply(path: &Path) -> Result<(), crate::Error> {
     SystemWallpaper.set_wallpaper(path)?;
@@ -32,16 +27,21 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
         .ok();
     let path = Config::default_path()?;
     let config = Config::load(&path)?;
-    let mut show = Slideshow::new(config.images()?, config.shuffle)?;
+    let mut playback = Playback::new(&config, Instant::now())?;
     let (tx, rx) = mpsc::channel();
     ipc::listen(tx).map_err(|e| {
         format!("cannot start slideshow control listener (another instance may be running): {e}")
     })?;
-    let mut timer = Scheduler::new(Duration::from_secs(config.interval_seconds), Instant::now());
-    apply(show.next())?;
+    apply(
+        playback
+            .show
+            .as_mut()
+            .expect("initial slideshow exists")
+            .next(),
+    )?;
     println!("Slideshow running. Press Ctrl+C to stop.");
     loop {
-        let event = match timer.wait(Instant::now()) {
+        let event = match playback.timer.wait(Instant::now()) {
             Some(wait) => rx.recv_timeout(wait),
             None => rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected),
         };
@@ -50,94 +50,116 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                 let now = Instant::now();
                 let status = if matches!(command, Control::Status) {
                     Some(PlaybackStatus {
-                        state: if timer.is_paused() {
+                        state: if playback.show.is_none() {
+                            "stopped"
+                        } else if playback.timer.is_paused() {
                             "paused"
                         } else {
                             "running"
                         }
                         .to_owned(),
-                        current: show.current().map(Path::to_path_buf),
-                        position: show.position(),
-                        total: show.total(),
+                        current: playback
+                            .show
+                            .as_ref()
+                            .and_then(|show| show.current().map(Path::to_path_buf))
+                            .or_else(|| playback.default_image.clone()),
+                        position: playback.show.as_ref().and_then(|show| show.position()),
+                        total: playback.show.as_ref().map_or(0, |show| show.total()),
                     })
                 } else {
                     None
                 };
                 let result: Result<String, String> = match command {
                     Control::Pause => {
-                        timer.pause(now);
-                        Ok("paused".into())
+                        if playback.show.is_none() {
+                            Err("No enabled folders".into())
+                        } else {
+                            playback.timer.pause(now);
+                            Ok("paused".into())
+                        }
                     }
                     Control::Resume => {
-                        timer.resume(now);
-                        Ok("running".into())
+                        if playback.show.is_none() {
+                            Err("No enabled folders".into())
+                        } else {
+                            playback.timer.resume(now);
+                            Ok("running".into())
+                        }
                     }
                     Control::Status => Ok(format!(
                         "{}: {}",
-                        if timer.is_paused() {
-                            "paused"
-                        } else {
-                            "running"
-                        },
-                        show.current()
-                            .map(|p| p.display().to_string())
+                        status
+                            .as_ref()
+                            .map_or("stopped", |status| status.state.as_str()),
+                        status
+                            .as_ref()
+                            .and_then(|status| status.current.as_ref())
+                            .map(|path| path.display().to_string())
                             .unwrap_or_default()
                     )),
                     Control::Reload => (|| -> Result<String, String> {
                         let config =
                             Config::load(&Config::default_path().map_err(|e| e.to_string())?)
                                 .map_err(|e| e.to_string())?;
-                        let mut candidate = Slideshow::new(
-                            config.images().map_err(|e| e.to_string())?,
-                            config.shuffle,
-                        )
-                        .map_err(|e| e.to_string())?;
-                        apply(candidate.next()).map_err(|e| e.to_string())?;
-                        show = candidate;
-                        let paused = timer.is_paused();
-                        timer = Scheduler::new(Duration::from_secs(config.interval_seconds), now);
-                        if paused {
-                            timer.pause(now);
+                        playback.reload(
+                            &config,
+                            now,
+                            &|path| apply(path).map_err(|e| e.to_string()),
+                            &default_wallpaper_path,
+                        )?;
+                        Ok(if playback.show.is_none() {
+                            "No enabled folders; using Windows default wallpaper"
+                        } else {
+                            "settings reloaded"
                         }
-                        Ok("settings reloaded".into())
+                        .into())
                     })(),
                     Control::Set(path) => {
-                        let mut candidate = show.clone();
-                        match candidate.select(path.clone()).and_then(|()| apply(&path)) {
-                            Ok(()) => {
-                                show = candidate;
-                                timer.reset(now);
-                                Ok(path.display().to_string())
+                        if let Some(mut candidate) = playback.show.clone() {
+                            match candidate.select(path.clone()).and_then(|()| apply(&path)) {
+                                Ok(()) => {
+                                    playback.show = Some(candidate);
+                                    playback.timer.reset(now);
+                                    Ok(path.display().to_string())
+                                }
+                                Err(error) => Err(error.to_string()),
                             }
-                            Err(error) => Err(error.to_string()),
+                        } else {
+                            Err("No enabled folders".into())
                         }
                     }
                     Control::Next => {
-                        let mut candidate = show.clone();
-                        let path = candidate.next();
-                        let result = apply(path)
-                            .map(|()| path.display().to_string())
-                            .map_err(|e| e.to_string());
-                        if result.is_ok() {
-                            show = candidate;
+                        if let Some(mut candidate) = playback.show.clone() {
+                            let path = candidate.next();
+                            let result = apply(path)
+                                .map(|()| path.display().to_string())
+                                .map_err(|e| e.to_string());
+                            if result.is_ok() {
+                                playback.show = Some(candidate);
+                            }
+                            playback.timer.reset(now);
+                            result
+                        } else {
+                            Err("No enabled folders".into())
                         }
-                        timer.reset(now);
-                        result
                     }
                     Control::Previous => {
-                        let mut candidate = show.clone();
-                        match candidate.previous() {
-                            Some(path) => {
-                                let result = apply(path)
-                                    .map(|()| path.display().to_string())
-                                    .map_err(|e| e.to_string());
-                                if result.is_ok() {
-                                    show = candidate;
+                        if let Some(mut candidate) = playback.show.clone() {
+                            match candidate.previous() {
+                                Some(path) => {
+                                    let result = apply(path)
+                                        .map(|()| path.display().to_string())
+                                        .map_err(|e| e.to_string());
+                                    if result.is_ok() {
+                                        playback.show = Some(candidate);
+                                    }
+                                    playback.timer.reset(now);
+                                    result
                                 }
-                                timer.reset(now);
-                                result
+                                None => Err("no previous wallpaper".into()),
                             }
-                            None => Err("no previous wallpaper".into()),
+                        } else {
+                            Err("No enabled folders".into())
                         }
                     }
                 };
@@ -159,12 +181,13 @@ pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
                 let _ = reply.send(response);
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                let mut candidate = show.clone();
-                match apply(candidate.next()) {
-                    Ok(()) => show = candidate,
-                    Err(error) => tracing::warn!(%error, "wallpaper update failed"),
+                if let Some(mut candidate) = playback.show.clone() {
+                    match apply(candidate.next()) {
+                        Ok(()) => playback.show = Some(candidate),
+                        Err(error) => tracing::warn!(%error, "wallpaper update failed"),
+                    };
+                    playback.timer.reset(Instant::now());
                 };
-                timer.reset(Instant::now());
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 return Err("control listener stopped".into());

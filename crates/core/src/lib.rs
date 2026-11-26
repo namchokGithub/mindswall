@@ -2,6 +2,7 @@ pub mod config;
 pub mod editor;
 pub mod history;
 pub mod ipc;
+pub mod playback;
 pub mod scanner;
 pub mod scheduler;
 pub mod service;

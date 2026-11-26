@@ -86,6 +86,13 @@ startup option. The app and the CLI use the same local configuration and control
 pipe. Desktop interactions and startup behavior still require interactive
 Windows verification.
 
+Disabling or removing the last enabled folder stops the slideshow and applies
+the Windows image at `%SystemRoot%\Web\Wallpaper\Windows\img0.jpg`. If the
+slideshow was running, enabling a folder again resumes it; if it was paused,
+it stays paused. When the slideshow service is not running, use **Start
+slideshow** after enabling a folder. The app reports an error if the Windows
+image cannot be applied.
+
 Overview shows the current position and total in the active slideshow cycle.
 The total includes enabled subfolders and reflects active filters and exclusions.
 Use **Rescan collection** to pick up file changes; this starts a new cycle.
