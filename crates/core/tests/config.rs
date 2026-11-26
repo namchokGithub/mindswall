@@ -63,6 +63,40 @@ fn enabled_folders_are_deduplicated_and_respect_recursion() {
 }
 
 #[test]
+fn the_same_folder_spelled_differently_is_listed_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let nested = dir.path().join("nested");
+    std::fs::create_dir(&nested).unwrap();
+    std::fs::write(dir.path().join("one.jpg"), []).unwrap();
+    std::fs::write(nested.join("two.png"), []).unwrap();
+    let folder = |path: std::path::PathBuf| Folder {
+        path,
+        enabled: true,
+        recursive: true,
+    };
+    // Only Unix adds a link below.
+    #[cfg_attr(not(unix), allow(unused_mut))]
+    let mut folders = vec![
+        folder(dir.path().to_owned()),
+        // Another spelling of the same folder.
+        folder(nested.join("..")),
+    ];
+    // A link to the folder, like a junction on Windows.
+    let _links = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
+    {
+        let link = _links.path().join("link");
+        std::os::unix::fs::symlink(dir.path(), &link).unwrap();
+        folders.push(folder(link));
+    }
+    let config = Config {
+        folders,
+        ..Config::default()
+    };
+    assert_eq!(config.images().unwrap().len(), 2);
+}
+
+#[test]
 fn recursive_collection_includes_nested_images_matching_filter() {
     use mindswall_core::utilities::Orientation;
     let dir = tempfile::tempdir().unwrap();

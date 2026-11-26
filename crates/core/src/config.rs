@@ -412,7 +412,14 @@ impl Config {
     }
     /// Collect the images of the enabled folders in `folders`, applying this
     /// configuration's filter and exclusions.
+    ///
+    /// The same image reached through different folder spellings, nested
+    /// folders, or a link to a folder is listed once. Only each folder is
+    /// resolved on disk, not each image, because opening every file is slow
+    /// on Windows; links to single image files are not detected.
     pub fn images_in(&self, folders: &[Folder]) -> Result<Vec<PathBuf>, Error> {
+        let started = std::time::Instant::now();
+        let mut filter_time = std::time::Duration::ZERO;
         let mut seen = std::collections::HashSet::new();
         let mut images = Vec::new();
         let excluded: std::collections::HashSet<_> = self
@@ -423,20 +430,28 @@ impl Config {
         for folder in folders.iter().filter(|f| f.enabled) {
             let report =
                 scanner::scan_lenient(std::slice::from_ref(&folder.path), folder.recursive);
+            let root = fs::canonicalize(&folder.path).unwrap_or_else(|_| folder.path.clone());
             for error in &report.skipped {
                 tracing::warn!(%error, "skipping unreadable location");
             }
             for image in report.images {
-                let identity = fs::canonicalize(&image).unwrap_or_else(|_| image.clone());
+                let identity = crate::utilities::path_key(
+                    &image
+                        .strip_prefix(&folder.path)
+                        .map_or_else(|_| image.clone(), |relative| root.join(relative)),
+                );
                 if excluded.contains(&crate::utilities::path_key(&image)) {
                     continue;
                 }
                 let filtered = self.filter != Default::default();
-                if filtered
-                    && !crate::utilities::dimensions(&image)
-                        .is_ok_and(|(w, h)| crate::utilities::matches_filter(w, h, &self.filter))
-                {
-                    continue;
+                if filtered {
+                    let checked = std::time::Instant::now();
+                    let keep = crate::utilities::dimensions(&image)
+                        .is_ok_and(|(w, h)| crate::utilities::matches_filter(w, h, &self.filter));
+                    filter_time += checked.elapsed();
+                    if !keep {
+                        continue;
+                    }
                 }
                 if seen.insert(identity) {
                     images.push(image);
@@ -444,6 +459,16 @@ impl Config {
             }
         }
         images.sort();
+        let total_ms = crate::utilities::elapsed_ms(started);
+        let filter_ms = u64::try_from(filter_time.as_millis()).unwrap_or(u64::MAX);
+        tracing::info!(
+            folders = folders.iter().filter(|f| f.enabled).count(),
+            images = images.len(),
+            scan_ms = total_ms.saturating_sub(filter_ms),
+            filter_ms,
+            total_ms,
+            "collection scanned"
+        );
         Ok(images)
     }
     /// Update a collection for paths reported by a folder watcher without

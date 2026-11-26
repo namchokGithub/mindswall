@@ -229,7 +229,12 @@ change takes (`wallpaper change timing`, with `combine_ms` and `total_ms`;
 `wallpaper changed`, with `set_ms` and `history_ms`; and, while images are
 combined, `combined wallpaper prepared`, with `monitor_ms`, `sizes_ms`,
 `plan_ms`, and `render_ms`) and each preview (`preview created` or `preview
-read from cache`).
+read from cache`). Scanning folders logs `collection scanned` (images,
+`scan_ms`, `filter_ms`), and saving settings logs `settings reloaded`
+(`scan_ms`, `apply_ms`). A scan resolves each folder once instead of opening
+every image, so adding a large folder stays quick; the same image reached
+through another spelling of a folder, a nested folder, or a link to a folder is
+still listed once.
 While the window is minimized, the app stops polling the slideshow status.
 
 Folders, images, and backup files are chosen through native dialogs opened by

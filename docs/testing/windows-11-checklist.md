@@ -280,6 +280,12 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [ ] With the slideshow stopped, disabling the last enabled folder applies
       the Windows default image
 - [x] Removing a folder updates the config file
+- [ ] Add a folder with a few thousand images that was not opened recently:
+      the app responds within a few seconds; copy the `collection scanned` and
+      `settings reloaded` log lines (images, `scan_ms`, `filter_ms`,
+      `apply_ms`) and compare adding with removing
+- [ ] Add the same folder twice with different spellings (for example through
+      a mapped drive or a junction): the total counts each image once
 - [x] Non-ASCII folder paths display and work
 - [ ] Folder paths on **Folders** and **Monitors** show only the last folder
       (`D:\coding\mindswall\example.wallpaper` shows

@@ -541,6 +541,7 @@ pub fn run_slideshow_with(
                             .unwrap_or_default()
                     )),
                     Control::Reload => (|| -> Result<String, String> {
+                        let started = Instant::now();
                         let new_config =
                             Config::load(&Config::default_path().map_err(|e| e.to_string())?)
                                 .map_err(|e| e.to_string())?;
@@ -559,10 +560,17 @@ pub fn run_slideshow_with(
                         )?;
                         // Monitors may have moved between the main slideshow
                         // and their own folders, so show each one's image again.
+                        let scan_ms = elapsed_ms(started);
                         if tracking || new_target != target {
                             reapply_shared(&playback, &new_target, &collages);
                             monitors.reapply(&monitors.active(), &monitor_again);
                         }
+                        tracing::info!(
+                            scan_ms,
+                            apply_ms = elapsed_ms(started) - scan_ms,
+                            total_ms = elapsed_ms(started),
+                            "settings reloaded"
+                        );
                         reloaded = Some(new_config);
                         Ok(if playback.show.is_none() {
                             "No enabled folders; using Windows default wallpaper"

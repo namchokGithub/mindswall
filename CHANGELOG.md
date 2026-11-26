@@ -51,6 +51,8 @@ All notable changes to MindsWall are recorded here. The format follows
   long each wallpaper change and preview takes.
 - Image details of a combined wallpaper move through each of its images with
   arrows or the Left and Right keys.
+- Adding a folder no longer opens every image to find duplicates, and the
+  log records how long folder scans and settings reloads take.
 - Optional combined wallpapers: an image that leaves much of a monitor empty
   (portrait, square, or landscape on a portrait monitor) is shown with other
   images in up to three rows, like a mosaic, over a blurred background, with
