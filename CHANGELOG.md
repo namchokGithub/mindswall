@@ -55,6 +55,8 @@ All notable changes to MindsWall are recorded here. The format follows
 - Adding a folder no longer opens every image to find duplicates, and the
   log records how long folder scans and settings reloads take.
 - New profile names are limited to 50 characters.
+- An About page shows the version and opens the source code, releases,
+  issues, and license on GitHub.
 - Optional combined wallpapers: an image that leaves much of a monitor empty
   (portrait, square, or landscape on a portrait monitor) is shown with other
   images in up to three rows, like a mosaic, over a blurred background, with

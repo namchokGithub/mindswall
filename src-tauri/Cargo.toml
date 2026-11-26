@@ -3,7 +3,7 @@ name = "mindswall-desktop"
 version = "0.1.0"
 description = "MindsWall desktop wallpaper manager"
 license = "MIT"
-repository = ""
+repository = "https://github.com/namchokGithub/mindswall"
 edition = "2024"
 rust-version = "1.90"
 

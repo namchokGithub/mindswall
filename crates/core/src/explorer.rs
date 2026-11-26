@@ -1,10 +1,30 @@
-//! Opening folders in File Explorer.
+//! Opening folders in File Explorer and web pages in the default browser.
 
 use std::path::Path;
 
 /// Open `path` in File Explorer. Fails when it is not an existing folder.
 #[cfg(windows)]
 pub fn open_folder(path: &Path) -> Result<(), String> {
+    if !path.is_dir() {
+        return Err("This folder is not available".into());
+    }
+    shell_open(path.as_os_str()).map_err(|code| format!("Could not open the folder (error {code})"))
+}
+
+/// Open an `https://` address in the default browser.
+#[cfg(windows)]
+pub fn open_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err("Only https:// links can be opened".into());
+    }
+    shell_open(std::ffi::OsStr::new(url))
+        .map_err(|code| format!("Could not open the link (error {code})"))
+}
+
+/// Ask Windows to open `target` with its default handler. Returns the
+/// ShellExecuteW result code on failure.
+#[cfg(windows)]
+fn shell_open(target: &std::ffi::OsStr) -> Result<(), isize> {
     use std::os::windows::ffi::OsStrExt;
     use windows::{
         Win32::{
@@ -15,10 +35,7 @@ pub fn open_folder(path: &Path) -> Result<(), String> {
         },
         core::{PCWSTR, w},
     };
-    if !path.is_dir() {
-        return Err("This folder is not available".into());
-    }
-    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let wide: Vec<u16> = target.encode_wide().chain(Some(0)).collect();
     // SAFETY: `wide` is NUL-terminated and outlives the call. COM is
     // initialized first, as the ShellExecuteW documentation recommends, and
     // uninitialized only when this call initialized it.
@@ -38,13 +55,15 @@ pub fn open_folder(path: &Path) -> Result<(), String> {
         result.0 as isize
     };
     // Values above 32 mean success.
-    if code <= 32 {
-        return Err(format!("Could not open the folder (error {code})"));
-    }
-    Ok(())
+    if code <= 32 { Err(code) } else { Ok(()) }
 }
 
 #[cfg(not(windows))]
 pub fn open_folder(_: &Path) -> Result<(), String> {
     Err("Opening folders is supported only on Windows".into())
+}
+
+#[cfg(not(windows))]
+pub fn open_url(_: &str) -> Result<(), String> {
+    Err("Opening links is supported only on Windows".into())
 }

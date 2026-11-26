@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowLeft, ArrowRight, ChevronRight, FolderOpen, History, Image, LayoutGrid, Layers, Monitor, Paintbrush, Pause, Play, Plus, RefreshCw, Settings, Trash2, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, FolderOpen, History, Image, LayoutGrid, Layers, Monitor, Paintbrush, Pause, Play, Plus, RefreshCw, Settings, Trash2, ExternalLink, Info } from "lucide-react";
 import { TitleBar } from "./TitleBar";
 import { Select } from "./Select";
 import { applyTheme, type ThemeSetting } from "./theme";
@@ -10,6 +10,7 @@ import { Gallery, HistoryPage, type UtilityConfig } from "./Utilities";
 import { GalleryPreview } from "./GalleryPreview";
 import { MonitorsPage, type MonitorPlayback } from "./Monitors";
 import { ScreenCards } from "./Overview";
+import { AboutPage } from "./About";
 import { Editor, HotkeySettings, Profiles } from "./Extended";
 import { maskFolderPath, maskUserName } from "./maskPath";
 import { ConfirmDialog, type Confirmation } from "./ConfirmDialog";
@@ -23,7 +24,7 @@ import "./style.css";
 type Folder = { path: string; enabled: boolean; recursive: boolean };
 type ProfileStatus = { active: string | null; changed: boolean };
 type Config = { theme: ThemeSetting; collage: { enabled: boolean; gap: number; layout: "row" | "mosaic" } } & { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
-type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings";
+type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings" | "about";
 type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null; combined: string[]; display: string | null; monitors?: MonitorPlayback[] };
 
 /** The notice shown when the folder watcher adds or removes images. */
@@ -156,7 +157,7 @@ function App() {
   const running = status === "running";
   const filtersActive = config && (config.excluded.length > 0 || config.filter.min_width > 0 || config.filter.min_height > 0 || config.filter.orientation !== "any" || config.filter.aspect_ratio !== "any");
   const nav: { id: Page; label: string; icon: typeof LayoutGrid }[] = [
-    { id: "overview", label: "Overview", icon: LayoutGrid }, { id: "folders", label: "Folders", icon: FolderOpen }, { id: "gallery", label: "Gallery", icon: Image }, { id: "monitors", label: "Monitors", icon: Monitor }, { id: "history", label: "History", icon: History }, { id: "profiles", label: "Profiles", icon: Layers }, { id: "editor", label: "Editor", icon: Paintbrush }, { id: "settings", label: "Settings", icon: Settings },
+    { id: "overview", label: "Overview", icon: LayoutGrid }, { id: "folders", label: "Folders", icon: FolderOpen }, { id: "gallery", label: "Gallery", icon: Image }, { id: "monitors", label: "Monitors", icon: Monitor }, { id: "history", label: "History", icon: History }, { id: "profiles", label: "Profiles", icon: Layers }, { id: "editor", label: "Editor", icon: Paintbrush }, { id: "settings", label: "Settings", icon: Settings }, { id: "about", label: "About", icon: Info },
   ];
   return <div className="app-frame"><TitleBar/><div className="app-shell">
     <aside className="sidebar">
@@ -164,7 +165,7 @@ function App() {
       <div className="sidebar-bottom"><span className="local-dot"/> LOCAL MODE <small>Made for your space.</small></div>
     </aside>
     <main><header className="topline"><span>YOUR PERSONAL WALLPAPER MANAGER</span>{config && config.profiles.length > 0 && <button className={`profile-pill${profileStatus.changed ? " changed" : ""}`} onClick={() => navigatePage("profiles")} title={profileStatus.changed ? "Settings differ from the saved profile. Open Profiles to update it." : "Open Profiles"}><Layers size={13}/>{profileStatus.active ? <>Profile: <strong>{profileStatus.active}</strong>{profileStatus.changed && <em>· changed</em>}</> : "No profile"}</button>}<span className="topline-right"><span className="local-dot"/> Offline by design</span></header>
-      <div className="content"><div className="heading"><div><div className="eyebrow">{page === "overview" ? "YOUR SPACE" : page === "settings" ? "PREFERENCES" : "YOUR COLLECTION"}</div><h1>{page === "overview" ? "A little change of scenery." : page === "folders" ? "Your folders." : page === "gallery" ? "A collection of moments." : page === "history" ? "Take another look." : page === "monitors" ? "Your screens." : "Make it yours."}</h1><p>{page === "overview" ? "A fresh perspective, right on your desktop." : page === "folders" ? "Choose the places where your wallpapers live." : page === "gallery" ? "Find a favorite for your desktop." : page === "history" ? "Revisit wallpapers you have enjoyed." : page === "monitors" ? "Give each display its own view." : "Set the rhythm that feels right for you."}</p></div><span className={`status ${status}`}><span/> {status === "running" ? "Playing" : status === "paused" ? "Paused" : "Stopped"}</span></div>
+      <div className="content"><div className="heading"><div><div className="eyebrow">{page === "overview" ? "YOUR SPACE" : page === "settings" ? "PREFERENCES" : page === "about" ? "ABOUT" : "YOUR COLLECTION"}</div><h1>{page === "overview" ? "A little change of scenery." : page === "folders" ? "Your folders." : page === "gallery" ? "A collection of moments." : page === "history" ? "Take another look." : page === "monitors" ? "Your screens." : page === "about" ? "A little space of your own." : "Make it yours."}</h1><p>{page === "overview" ? "A fresh perspective, right on your desktop." : page === "folders" ? "Choose the places where your wallpapers live." : page === "gallery" ? "Find a favorite for your desktop." : page === "history" ? "Revisit wallpapers you have enjoyed." : page === "monitors" ? "Give each display its own view." : page === "about" ? "Local, open, and made for your desktop." : "Set the rhythm that feels right for you."}</p></div><span className={`status ${status}`}><span/> {status === "running" ? "Playing" : status === "paused" ? "Paused" : "Stopped"}</span></div>
         {!config ? <div className="panel empty"><LoadingBlock label="Loading your workspace"/></div> : <>
         {page === "overview" && <><div className="section-title"><div><span className="eyebrow">CURRENT WALLPAPER</span><h2>Your desktop, right now</h2></div><span className="subtle">A moment for yourself</span></div>
           {details && <GalleryPreview key={details.path} path={details.path} combined={details.combined} close={() => setDetails(null)}/>}
@@ -182,6 +183,7 @@ function App() {
         {page === "profiles" && <Profiles config={config} status={profileStatus} refresh={async () => { setConfig(await invoke<Config>("get_config")); await refreshStatus(); }}/>}
         <div hidden={page !== "editor"}><Editor active={page === "editor"}/></div>
         {page === "settings" && <><div className="section-title"><div><span className="eyebrow">SLIDESHOW</span><h2>Find your rhythm</h2></div></div><div className="panel settings-panel"><div className="setting-row"><div><strong>Change picture every</strong><small>How long each wallpaper stays on your desktop.</small></div><IntervalSelect value={config.interval_seconds} disabled={busy} onChange={interval_seconds => save({ ...config, interval_seconds })}/></div><div className="setting-row"><div><strong>Shuffle wallpapers</strong><small>Enjoy your collection in a different order each time. Images do not repeat within a cycle.</small></div><label className="switch"><input type="checkbox" aria-label="Shuffle wallpapers" checked={config.shuffle} disabled={busy} onChange={e => save({ ...config, shuffle: e.target.checked })}/><span/></label></div><div className="setting-row"><div><strong>Start with Windows</strong><small>Open MindsWall when you sign in to this account.</small></div><label className="switch"><input type="checkbox" aria-label="Start with Windows" checked={autostart} disabled={busy} onChange={async e => { const enabled = e.target.checked; setBusy(true); try { await invoke("set_autostart", { enabled }); setAutostart(enabled); setMessage("Startup preference saved."); } catch (err) { setError(String(err)); } finally { setBusy(false); } }}/><span/></label></div></div><div className="footnote"><span className="local-dot"/> Your settings and images stay on this device.</div></>}
+        {page === "about" && <AboutPage/>}
         {page === "settings" && <UtilitySettings config={config} busy={busy} save={save}/>}
         {page === "settings" && <HotkeySettings hotkeys={config.hotkeys} refresh={async () => { setConfig(await invoke<Config>("get_config")); }}/>}
         </>}

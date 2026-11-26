@@ -248,7 +248,10 @@ slideshow changes. A slideshow run from a CLI build without hand-over support
 is checked every 30 seconds while the window is open. Multi-monitor behavior and the gallery with a
 large collection still need interactive Windows verification.
 
-**Profiles** saves named collections and can import or export settings and
+**About** shows the app version, how it treats your data, and buttons that open
+the source code, releases, issue tracker, and license on GitHub in your
+browser; only these fixed project addresses can be opened, and nothing is sent
+from the app. **Profiles** saves named collections and can import or export settings and
 profiles as JSON. Profile names have 1–50 characters (names up to 80
 characters saved by earlier versions still load). A profile stores folders, interval, shuffle, filters,
 exclusions, and fit mode. The active profile is shown at the top of every page

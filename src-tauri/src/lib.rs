@@ -799,6 +799,42 @@ async fn set_monitor_image(
     .await
 }
 
+/// The project's home page, from `repository` in Cargo.toml.
+const PROJECT_URL: &str = env!("CARGO_PKG_REPOSITORY");
+
+#[derive(serde::Serialize)]
+struct AppInfo {
+    name: String,
+    version: String,
+    source: &'static str,
+    license: &'static str,
+}
+
+#[tauri::command]
+fn app_info(app: tauri::AppHandle) -> AppInfo {
+    let package = app.package_info();
+    AppInfo {
+        name: package.name.clone(),
+        version: package.version.to_string(),
+        source: PROJECT_URL,
+        license: env!("CARGO_PKG_LICENSE"),
+    }
+}
+
+/// Open a page of the project in the default browser. Only these fixed
+/// addresses can be opened, never one sent by the page.
+#[tauri::command]
+async fn open_project_link(link: String) -> Result<(), String> {
+    let url = match link.as_str() {
+        "source" => PROJECT_URL.to_owned(),
+        "issues" => format!("{PROJECT_URL}/issues"),
+        "releases" => format!("{PROJECT_URL}/releases"),
+        "license" => format!("{PROJECT_URL}/blob/main/LICENSE"),
+        _ => return Err("Unknown link".into()),
+    };
+    blocking(move || mindswall_core::explorer::open_url(&url)).await
+}
+
 /// Open a folder from the settings in File Explorer. Other paths are refused.
 #[tauri::command]
 async fn open_folder(path: PathBuf) -> Result<(), String> {
@@ -1270,6 +1306,8 @@ pub fn run() {
             control,
             monitor_control,
             open_folder,
+            app_info,
+            open_project_link,
             start_service,
             service_error,
             current_preview,

@@ -553,6 +553,13 @@ some landscape images.
 
 ## 5. Extended features (Phase 6)
 
+### About
+
+- [ ] **About** in the sidebar shows **MindsWall** and the installed version
+- [ ] **Source code**, **Releases**, **Report an issue**, and **MIT license**
+      each open the matching GitHub page in the default browser
+- [ ] With no network, the app still works; only the opened browser page fails
+
 ### Profiles
 
 - [ ] Save the current folders and settings as a named profile
