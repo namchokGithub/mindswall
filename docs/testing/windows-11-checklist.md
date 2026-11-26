@@ -194,9 +194,10 @@ example from the log.
       user A: user A's CLI reports
       `the slideshow control pipe is owned by another user` instead of
       controlling user B's slideshow
-- [ ] Hide the window to the tray for 10 minutes: Task Manager shows no
-      periodic CPU activity from the WebView process
-- [ ] Reopen the window from the tray: status and preview refresh immediately
+- [ ] Close the window to the tray: within a few seconds no `msedgewebview2.exe`
+      process belonging to MindsWall remains in Task Manager (Details tab,
+      check the command line or parent process)
+- [ ] Reopen the window from the tray: status and preview load immediately
 - [ ] Create more than 20 Editor previews: only the 20 newest stay in
       `%LOCALAPPDATA%\MindsWall\cache\edits`, plus any edited copy in History
 - [ ] Write invalid JSON to `history.json`: History shows an empty list, the
@@ -268,8 +269,14 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 
 ### Tray
 
-- [x] Closing the window hides it to the tray; the slideshow keeps running
-- [x] Tray **Open MindsWall** shows and focuses the window
+- [ ] Closing the window closes it while the app stays in the tray; the
+      slideshow keeps running (the earlier pass hid the window instead)
+- [ ] Tray **Open MindsWall** opens a new window and focuses it; choosing it
+      twice quickly opens only one window
+- [ ] Minimize the window, then choose tray **Open MindsWall**: the window is
+      restored
+- [ ] Open a page, close the window, and reopen it: the app starts on
+      Overview and no error is shown
 - [x] Tray **Previous**, **Next**, **Pause**, and **Resume** work while the
       window is hidden
 - [x] Tray **Quit** exits the process (check Task Manager) and stops the
@@ -279,11 +286,18 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 
 - [x] Launching the app a second time focuses the existing window; no second
       process remains
+- [ ] With the window closed, launching the app again opens a window
 - [x] While the app runs, CLI `status`, `next`, `previous`, `pause`, `resume`
       control the app's slideshow
 - [x] While the app runs, CLI `run` refuses to start
-- [x] Start CLI `run` first, then the app: record behavior (handoff is not yet
-      implemented)
+- [x] Start CLI `run` first, then the app: record behavior (recorded before
+      the handoff was implemented)
+- [ ] Start CLI `run` first, then the app: the CLI prints
+      `Slideshow handed over to the MindsWall app.` and exits, the wallpaper
+      does not change at the handover, and Overview shows the same image
+- [ ] Pause CLI `run`, then start the app: the app's slideshow stays paused
+- [ ] After the handover, CLI `status`, `next`, and `pause` control the app,
+      and Overview updates without waiting for the 30-second poll
 
 ### Start with Windows
 
@@ -295,12 +309,18 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [x] Sign out and sign in: the app starts (record whether it starts hidden or
       shown, and whether the slideshow resumes)
 - [x] Disabling it removes the entry; the app no longer starts at sign-in
+- [ ] Turn **Start with Windows** off and on, then check the `Run` entry ends
+      with `--hidden`
+- [ ] Sign out and sign in: the app starts in the tray without opening a
+      window, and the slideshow runs
 
 ### Resources (observation only)
 
 - [x] Record RAM of all MindsWall and WebView2 processes with the window open
       and hidden (target < 30 MB is expected to fail until WebView suspension
       exists): 9-10MB
+- [ ] Run `scripts/measure-performance.ps1` with the window open and again
+      with it closed to the tray; record the totals in `docs/performance.md`
 
 ## 4. Wallpaper utilities (Phase 4)
 
@@ -356,7 +376,24 @@ matches the Windows **Personalize > Background** setting of the same name.
 - [x] A running slideshow later replaces the per-monitor image (known behavior)
 - [x] Disconnect a monitor while the app runs: no crash; record the list and
       wallpaper behavior
-- [x] Reconnect it: record behavior (automatic handling is not yet implemented)
+- [x] Reconnect it: record behavior (recorded before automatic handling was
+      implemented)
+- [ ] **Add folder** on one monitor: within one interval that monitor shows
+      images from its folders while the others keep the main slideshow
+- [ ] **Next**, **Previous**, and **Pause** affect every monitor
+- [ ] Disconnect a monitor that has its own folders: within about 10 seconds
+      the log records `connected monitors changed`; no crash
+- [ ] Reconnect it: within about 10 seconds it shows its own image again and
+      continues its cycle
+- [ ] Disconnect a monitor that shows the main slideshow, then reconnect it:
+      it shows the main slideshow's current image
+- [ ] A disconnected monitor appears under **Saved monitor folders**;
+      **Forget** removes it from `monitor_folders`
+- [ ] Remove the last folder of a monitor: it returns to the main slideshow
+- [ ] Add, delete, and rename images in a monitor's folder: that monitor's
+      collection follows the change, as for the main folders
+- [ ] With only one monitor and no per-monitor folders, the log shows no
+      monitor checks and wallpapers still change for the whole desktop
 - [x] Mixed scaling (for example 100% and 150%): wallpapers render correctly
 
 ## 5. Extended features (Phase 6)
@@ -405,6 +442,16 @@ Hotkeys are empty by default; configure them in **Settings**.
 - [x] An invalid shortcut string is rejected
 - [x] A shortcut already used by another app reports `Could not register shortcuts` or a clear conflict message
 - [x] Hotkeys still work after an app restart
+
+### Release workflow
+
+- [ ] Push a tag such as `v0.1.0-test1` on a fork or test repository: the
+      version check fails because the tag differs from the manifest versions,
+      and no draft release is made
+- [ ] Push a matching `v<version>` tag: the workflow passes, and the draft
+      release has the NSIS installer, the portable ZIP, and `SHA256SUMS.txt`
+- [ ] The portable ZIP runs from a user folder as a standard user and uses the
+      same settings as the installed build
 
 ## 6. Local-first checks
 

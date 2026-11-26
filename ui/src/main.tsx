@@ -47,18 +47,18 @@ function App() {
   }, [refreshStatus]);
 
   // The app's own slideshow sends "slideshow-changed" events, so polling is
-  // only a slow fallback for a slideshow run from the CLI. Nothing is polled
-  // or refreshed while the window is hidden.
+  // only a slow fallback for a slideshow run from an older CLI that cannot
+  // hand over. Closing the window destroys this page, and nothing is polled
+  // or refreshed while it is minimized.
   useEffect(() => {
-    let timer: number | undefined; let windowVisible = true; let active = true; const disposers: Array<() => void> = [];
-    const visible = () => windowVisible && !document.hidden;
+    let timer: number | undefined; let active = true; const disposers: Array<() => void> = [];
+    const visible = () => !document.hidden;
     const update = () => {
       if (visible() && timer === undefined) { refreshStatus(); timer = window.setInterval(refreshStatus, 30000); }
       else if (!visible() && timer !== undefined) { window.clearInterval(timer); timer = undefined; }
     };
     const keep = (dispose: () => void) => { if (active) disposers.push(dispose); else dispose(); };
     document.addEventListener("visibilitychange", update);
-    listen<boolean>("window-visible", event => { windowVisible = event.payload; update(); }).then(keep).catch(() => {});
     listen("slideshow-changed", () => { if (visible()) refreshStatus(); }).then(keep).catch(() => {});
     update();
     return () => { active = false; disposers.forEach(dispose => dispose()); document.removeEventListener("visibilitychange", update); if (timer !== undefined) window.clearInterval(timer); };
@@ -137,7 +137,7 @@ function App() {
           <div className="footnote"><Image size={16}/> JPG, JPEG, PNG and BMP images are supported.</div></>}
         {page === "gallery" && <Gallery config={config} busy={busy} openSettings={() => navigatePage("settings")} exclude={async path => { await save({ ...config, excluded: [...config.excluded, path] }, true); }} restore={async path => { await save({ ...config, excluded: config.excluded.filter(item => item !== path) }, true); }}/>}
         {page === "history" && <HistoryPage/>}
-        {page === "monitors" && <MonitorsPage/>}
+        {page === "monitors" && <MonitorsPage config={config} busy={busy} saveMonitorFolders={monitor_folders => save({ ...config, monitor_folders })}/>}
         {page === "profiles" && <Profiles config={config} refresh={async () => { setConfig(await invoke<Config>("get_config")); await refreshStatus(); }}/>}
         <div hidden={page !== "editor"}><Editor active={page === "editor"}/></div>
         {page === "settings" && <><div className="section-title"><div><span className="eyebrow">SLIDESHOW</span><h2>Find your rhythm</h2></div></div><div className="panel settings-panel"><div className="setting-row"><div><strong>Change picture every</strong><small>How long each wallpaper stays on your desktop.</small></div><IntervalSelect value={config.interval_seconds} disabled={busy} onChange={interval_seconds => save({ ...config, interval_seconds })}/></div><div className="setting-row"><div><strong>Shuffle wallpapers</strong><small>Enjoy your collection in a different order each time. Images do not repeat within a cycle.</small></div><label className="switch"><input type="checkbox" aria-label="Shuffle wallpapers" checked={config.shuffle} disabled={busy} onChange={e => save({ ...config, shuffle: e.target.checked })}/><span/></label></div><div className="setting-row"><div><strong>Start with Windows</strong><small>Open MindsWall when you sign in to this account.</small></div><label className="switch"><input type="checkbox" aria-label="Start with Windows" checked={autostart} disabled={busy} onChange={async e => { const enabled = e.target.checked; setBusy(true); try { await invoke("set_autostart", { enabled }); setAutostart(enabled); setMessage("Startup preference saved."); } catch (err) { setError(String(err)); } finally { setBusy(false); } }}/><span/></label></div></div><div className="footnote"><span className="local-dot"/> Your settings and images stay on this device.</div></>}

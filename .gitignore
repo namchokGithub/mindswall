@@ -31,3 +31,6 @@ example.wallpaper
 ui/node_modules/
 ui/dist/
 src-tauri/gen/
+
+# Raw performance measurements (summarize results in docs/performance.md)
+docs/performance/raw/

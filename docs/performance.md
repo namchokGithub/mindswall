@@ -54,6 +54,7 @@ Each run writes a CSV to `docs/performance/raw/<timestamp>-<label>.csv` with
 the columns `timestamp`, `process_name`, `pid`, `role`, `cpu_percent`,
 `working_set_mb`, and `private_mb`, then prints the average and maximum CPU and
 memory per role and in total. Processes that exit during a run are skipped.
+Raw CSV files are ignored by Git; record the summary in the results table below.
 
 Run from the repository root:
 

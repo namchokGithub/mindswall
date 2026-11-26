@@ -20,7 +20,7 @@ Completed items move from the phase checklists to the
 - The [Windows 11 manual checklist](testing/windows-11-checklist.md) records
   passing checks for core CLI, slideshow, desktop, utilities, and hotkeys at
   commit `2bf16d4`. Some checks remain incomplete or need clarification;
-  CI does not exist yet.
+  CI and release workflows exist but have not run yet.
 - Commits `ca0a272`, `f8d2046`, and `f4f7d30` fixed slideshow recovery, IPC,
   cache, and file-access issues found in a code review. Their automated tests
   pass, but the matching checklist sections have not been run on Windows yet;
@@ -43,16 +43,15 @@ Completed items move from the phase checklists to the
 - **Logging**: the slideshow service now logs successful wallpaper changes as
   well as failures. Re-check the log file on Windows, because the earlier
   checklist pass was recorded before successful changes were logged.
-- **Not implemented**:
-  - WebView is not released or suspended when the window is hidden (RAM).
-    Status polling now stops while the window is hidden.
-  - No named pipe handoff from a running CLI instance to the app. When the CLI
-    owns the slideshow, Overview falls back to polling every 30 seconds.
-  - No per-monitor slideshow folders.
-  - No automatic handling of monitors being connected or disconnected.
+- **Implemented, not verified on Windows** (2026-11-26, not committed yet):
+  closing the window releases the WebView and autostart opens only the tray;
+  the app takes over a slideshow started from the CLI; per-monitor slideshow
+  folders with monitor connect and disconnect handling; the tag-triggered
+  release workflow. See Recent changes awaiting verification.
 - **Phase 5 partly started**: error recovery is implemented in code but not
-  verified on Windows. Benchmarks, CI, installer and portable ZIP, and the
-  release workflow have not started.
+  verified on Windows. CI and the release workflow exist but have not run;
+  benchmarks have a method and no results; the installer and portable ZIP have
+  not been produced.
 
 ### Recent changes awaiting verification
 
@@ -84,6 +83,24 @@ Completed Log.
   collection without a full rescan; the app's slideshow sends a
   `slideshow-changed` event to the UI, and fallback polling is every 30
   seconds.
+- **Window lifecycle** (2026-11-26, not committed yet): closing the window
+  destroys it and its WebView; the tray, slideshow, and shortcuts keep running,
+  and **Open MindsWall** creates a new window. "Start with Windows" registers
+  `--hidden`, so the app starts in the tray without a window.
+- **CLI handoff** (2026-11-26, not committed yet): a new `handoff` pipe command
+  asks a slideshow started with `mindswall run` to stop. The app then takes the
+  pipe (retrying for up to 5 seconds) and continues from the same image and
+  paused state. The app refuses `handoff` for its own slideshow.
+- **Per-monitor slideshows** (2026-11-26, not committed yet):
+  `monitor_folders` in the config gives a monitor its own folders and
+  slideshow; other monitors share the main slideshow, applied per monitor while
+  any monitor has its own. While configured, monitors are listed every 10
+  seconds; a reconnected monitor gets its image again and keeps its cycle. The
+  Monitors page adds and removes folders per monitor.
+- **Release workflow** (2026-11-26, not committed yet): pushing a `v*.*.*` tag
+  runs the CI checks, verifies the manifest versions and `CHANGELOG.md`, builds
+  the NSIS installer and a portable ZIP with checksums, and creates a draft
+  GitHub Release. The process is in [releasing.md](releasing.md).
 - **File access** (`f4f7d30`): file and folder dialogs open from Rust, and
   commands accept only paths chosen in this session or already managed by the
   app.
@@ -94,11 +111,14 @@ Completed Log.
    [manual test checklist](testing/windows-11-checklist.md), starting with the
    sections for the recent changes.
 2. Push the branch so the new Windows CI runs, and fix anything it reports.
+   Push a test tag on a fork or test repository to try the release workflow.
 3. Finish the remaining Phase 3 work.
-4. Verify the folder watcher and slideshow events on Windows.
+4. Verify the folder watcher, slideshow events, window lifecycle, CLI
+   handoff, and per-monitor slideshows on Windows (per-monitor checks need two
+   or more displays).
 5. Measure performance with `scripts/measure-performance.ps1`, then optimize.
-6. Packaging and release when the user decides to proceed with release work;
-   the bundle already targets the per-user NSIS installer from D4.
+6. Produce the first installer and portable ZIP through the release workflow
+   when the user decides to release.
 
 Phase 6 development began before release at the user's request. Continue to
 track its untested features alongside the remaining P1 and P2 work.
@@ -188,8 +208,10 @@ and Windows startup.
   the app takes over the named pipe server so CLI control commands work
   while it runs
 
-- [ ] **Resource check**: destroy or suspend the WebView when hidden so the
-      background process can approach the RAM target
+- [~] **Resource check**: destroy or suspend the WebView when hidden so the
+      background process can approach the RAM target. Implemented on
+      2026-11-26 by destroying the window on close and starting hidden from
+      autostart; RAM not measured yet
 
 Done when: the app runs from the tray on Windows 11, all P1 controls work from
 both the UI and the tray, settings persist, and startup registration works for
@@ -198,8 +220,9 @@ a standard user.
 The checklist records passing desktop, tray, CLI control, and startup checks,
 including the checked standard-user startup scenario. Clarify the account used
 because the environment summary lists administrator. The UI uses custom controls
-rather than shadcn/ui; resource suspension when hidden, event-driven updates,
-and handoff from a running CLI instance remain open.
+rather than shadcn/ui. Releasing the WebView on close, event-driven updates,
+and the handoff from a running CLI instance are implemented and await Windows
+verification.
 The checked folder-management and overview actions passed; a dedicated rescan
 control and the remaining settings and overview requirements still need review.
 
@@ -209,7 +232,10 @@ Goal: complete the P2 feature set.
 
 - [~] **Multi-monitor**: enumerate monitors via `IDesktopWallpaper`; same image
   on all monitors or a separate image (and optionally separate folders) per
-  monitor; handle monitors being connected or disconnected; Monitors page
+  monitor; handle monitors being connected or disconnected; Monitors page.
+  Per-monitor folders and connect/disconnect handling (10-second polling
+  while configured) were implemented on 2026-11-26; need verification on a
+  real multi-monitor setup
 - [~] **Image gallery**: grid of discovered images with cached, downscaled
   thumbnails (`image` crate, stored in the local cache directory); lazy
   loading or virtualized list for large libraries; set-as-wallpaper and
@@ -234,8 +260,8 @@ real multi-monitor setup), and gallery browsing stays responsive with a large
 folder (for example 5,000+ images).
 
 The GUI now includes paged thumbnails, manual per-monitor images, filters, fit
-modes, and local history. Automatic folder watching, per-monitor slideshow
-folders, automatic display-change handling, and watcher tests remain open.
+modes, local history, the folder watcher, per-monitor slideshow folders, and
+display-change handling; the last three await Windows verification.
 The fixed aspect ratio tolerance is 5%. Gallery scale remains untested. The
 checklist marks multi-monitor, mixed-scaling, and Span checks as passed; clarify
 the setup used because the environment summary lists one monitor.
@@ -268,8 +294,11 @@ Goal: measured performance, robust error recovery, and repeatable releases.
       2026-11-26 and also builds the NSIS installer; it has not run yet, and
       the frontend tests in `ui/tests` are not run because `ui/package.json`
       has no test script
-- [ ] **Release workflow**: tag-triggered build that produces release
-      artifacts; changelog; version bump process
+- [~] **Release workflow**: tag-triggered build that produces release
+      artifacts; changelog; version bump process.
+      `.github/workflows/release.yml`, `CHANGELOG.md`, and
+      [releasing.md](releasing.md) were added on 2026-11-26; the workflow
+      has not run
 - [ ] **Docs**: README with installation, usage, and screenshots
 
 Done when: performance targets are measured and met (or the gap is documented),
@@ -348,6 +377,9 @@ mindswall/
   then the tray app from Phase 3 on. Both enforce a single instance.
 - The running instance listens on a Windows named pipe scoped to the current
   user. No TCP sockets, so network usage stays at zero.
+- When the app starts its slideshow while `mindswall run` owns the pipe, it
+  sends `handoff`; the CLI replies with its status and exits, and the app
+  continues from that status. The app never hands over its own slideshow.
 - CLI control commands (`next`, `previous`, `pause`, `resume`, `status`) send
   a request over the pipe. With no running instance they report that clearly;
   one-shot commands (`scan`, `set`, `random`) run standalone.
@@ -385,8 +417,11 @@ only the image; forcing Fill there would require writing the per-user
 
 ## Risks
 
-- WebView memory use may exceed the 30 MB background target unless the window
-  is destroyed when hidden.
+- WebView memory use may exceed the 30 MB background target while the window
+  is open; the window is now destroyed when closed, but this is not measured.
+- Display changes are detected by polling every 10 seconds, and only while a
+  monitor has its own folders. Monitor device paths may change when a display
+  moves to another port, which leaves its saved folders unused.
 - `IDesktopWallpaper` behavior differs across monitor layouts and Windows
   builds; requires testing on real hardware.
 - Very large libraries can make scanning, thumbnailing, and dimension reads

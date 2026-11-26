@@ -2,7 +2,15 @@ name: CI
 
 on:
   push:
+    # Tags run the same checks through the release workflow.
+    branches: ["**"]
   pull_request:
+  workflow_call:
+    inputs:
+      skip_installer:
+        description: Skip the installer job when the caller builds its own.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -52,6 +60,7 @@ jobs:
   installer:
     name: Build NSIS installer
     needs: check
+    if: ${{ !inputs.skip_installer }}
     runs-on: windows-latest
     steps:
       - name: Check out repository

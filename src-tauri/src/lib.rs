@@ -264,7 +264,8 @@ async fn pick_image(app: tauri::AppHandle) -> Result<Option<PathBuf>, String> {
     .await
 }
 
-/// Every folder path in the configuration, including those in profiles.
+/// Every folder path in the configuration, including those in profiles and
+/// per-monitor folders.
 fn folder_paths(config: &Config) -> std::collections::HashSet<PathBuf> {
     config
         .folders
@@ -274,6 +275,12 @@ fn folder_paths(config: &Config) -> std::collections::HashSet<PathBuf> {
                 .profiles
                 .iter()
                 .flat_map(|profile| &profile.settings.folders),
+        )
+        .chain(
+            config
+                .monitor_folders
+                .iter()
+                .flat_map(|entry| &entry.folders),
         )
         .map(|folder| folder.path.clone())
         .collect()
@@ -845,8 +852,17 @@ fn start_service_inner(
     starting: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
 ) -> Result<(), String> {
+    let mut resume = None;
     if let Ok(response) = ipc::send(Command::Status) {
-        if response
+        // A slideshow this app did not start runs in the CLI. Ask it to hand
+        // over so the app owns the pipe and can push changes to the UI. An
+        // older CLI does not know the request; then keep using it.
+        if !starting.load(Ordering::SeqCst)
+            && let Ok(handoff) = ipc::send(Command::Handoff)
+            && handoff.ok
+        {
+            resume = handoff.status;
+        } else if response
             .status
             .as_ref()
             .is_some_and(|status| status.state == "stopped")
@@ -857,8 +873,9 @@ fn start_service_inner(
             } else {
                 Err(result.message)
             };
+        } else {
+            return Ok(());
         }
-        return Ok(());
     }
     if starting.swap(true, Ordering::SeqCst) {
         return Ok(());
@@ -870,7 +887,16 @@ fn start_service_inner(
         let notify = |status: &ipc::PlaybackStatus| {
             let _ = app.emit("slideshow-changed", status);
         };
-        if let Err(e) = mindswall_core::service::run_slideshow_with(notify)
+        let options = mindswall_core::service::ServiceOptions {
+            listen_retry: if resume.is_some() {
+                std::time::Duration::from_secs(5)
+            } else {
+                std::time::Duration::ZERO
+            },
+            resume,
+            ..Default::default()
+        };
+        if let Err(e) = mindswall_core::service::run_slideshow_with(options, notify)
             && let Ok(mut slot) = error.lock()
         {
             *slot = Some(e.to_string());
@@ -921,20 +947,58 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// Show and focus the main window, and tell the UI it is visible again.
+/// Launched by "Start with Windows": stay in the tray without a window.
+const HIDDEN_ARG: &str = "--hidden";
+
+/// Show and focus the main window, creating it when it was closed. Closing
+/// the window destroys its WebView so the background process uses less
+/// memory; the slideshow, tray, and shortcuts keep running.
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
-        let _ = app.emit("window-visible", true);
+        return;
+    }
+    // Creating a window from an event handler can deadlock on Windows, so
+    // build it from another thread.
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Err(error) = create_main_window(&app) {
+            eprintln!("Could not open the window: {error}");
+        }
+    });
+}
+
+fn create_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let Some(config) = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .cloned()
+    else {
+        return Ok(());
+    };
+    match tauri::WebviewWindowBuilder::from_config(app, &config)?.build() {
+        Ok(window) => {
+            let _ = window.set_focus();
+            Ok(())
+        }
+        // Another request created the window first.
+        Err(_) if app.get_webview_window("main").is_some() => Ok(()),
+        Err(error) => Err(error),
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            show_main_window(app);
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if !args.iter().any(|arg| arg == HIDDEN_ARG) {
+                show_main_window(app);
+            }
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(
@@ -971,6 +1035,7 @@ pub fn run() {
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("MindsWall")
+                .arg(HIDDEN_ARG)
                 .build(),
         )
         .manage(ServiceState::default())
@@ -1056,6 +1121,9 @@ pub fn run() {
                 tray = tray.icon(icon.clone());
             }
             tray.build(app)?;
+            if !std::env::args().any(|arg| arg == HIDDEN_ARG) {
+                create_main_window(app.handle())?;
+            }
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 if let Ok(config) = get_config()
@@ -1092,13 +1160,16 @@ pub fn run() {
             }
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
-                let _ = window.emit("window-visible", false);
+        .build(tauri::generate_context!())
+        .expect("error while building MindsWall")
+        .run(|_, event| {
+            // Closing the last window must not quit: the app keeps running
+            // in the tray. Quit from the tray passes an exit code.
+            if let tauri::RunEvent::ExitRequested {
+                api, code: None, ..
+            } = event
+            {
+                api.prevent_exit();
             }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running MindsWall");
+        });
 }

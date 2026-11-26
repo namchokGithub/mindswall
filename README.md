@@ -71,7 +71,9 @@ cargo run -p mindswall-cli -- resume
 cargo run -p mindswall-cli -- config show
 ```
 
-Press Ctrl+C in the slideshow terminal to stop it. Logs are stored under
+Press Ctrl+C in the slideshow terminal to stop it. When the desktop app starts
+its slideshow while `run` is active, the CLI hands over: it prints a message
+and exits, and the app continues with the same image and paused state. Logs are stored under
 `%APPDATA%\MindsWall\data\mindswall.log`. The slideshow and Windows wallpaper
 integration still need end-to-end testing in an interactive Windows session.
 
@@ -86,9 +88,12 @@ npm.cmd --prefix ui run tauri dev
 ```
 
 Use **Folders** to select image directories, then start the slideshow from
-**Overview**. Closing the window hides it to the system tray; use the tray
-menu to open or quit the app. **Settings** includes the per-user Windows
-startup option. The app and the CLI use the same local configuration and control
+**Overview**. Closing the window releases its WebView to save memory while the
+app keeps running in the system tray; use the tray menu to open the window
+again or quit the app. **Settings** includes the per-user Windows startup
+option; when started with Windows, the app starts in the tray without opening a
+window (`--hidden`). Turn the startup option off and on once to update a
+startup entry made by an earlier build. The app and the CLI use the same local configuration and control
 pipe. Desktop interactions and startup behavior still require interactive
 Windows verification.
 
@@ -124,6 +129,17 @@ also contains fit, resolution, orientation, and aspect-ratio filters. **History*
 shows thumbnails for the most recent 10 applied images locally, and **Monitors** lists
 connected displays and can apply an image to one display. A running slideshow
 can replace a per-monitor selection at its next change.
+
+In **Monitors**, a display can also get its own folders. It then runs its own
+slideshow at the same interval, with the same shuffle, filter, exclusion, and
+fit settings, while other displays share the main slideshow. Next, Previous,
+and Pause apply to every display. The slideshow still needs at least one
+enabled folder in **Folders**. While any display has its own folders, the
+slideshow lists monitors every 10 seconds: a reconnected display gets its image
+again and continues its own cycle, and a disconnected display is skipped.
+Folders of disconnected displays stay saved until you choose **Forget**. The
+configuration stores them in `monitor_folders`, keyed by the Windows monitor
+device path. Profiles do not include per-monitor folders.
 Windows may retain unavailable display records; Monitors skips records whose
 dimensions cannot be read while showing the displays that are available.
 If the history file is invalid, it is renamed to
@@ -133,17 +149,16 @@ paths without regard to letter case or `/` and `\` separators.
 Local caches are limited: at startup the app keeps at most 20,000 thumbnails
 (512 MB), and the Editor keeps the 20 most recent edited copies (1 GB) plus any
 copy listed in History. Caches are stored under `%LOCALAPPDATA%\MindsWall\cache`.
-While the window is hidden in the tray, the app stops polling the slideshow
-status.
+While the window is minimized, the app stops polling the slideshow status.
 
 Folders, images, and backup files are chosen through native dialogs opened by
 the app. The desktop app only reads or writes paths chosen this way during the
 current session, or paths that are already part of the collection, history,
 or configuration.
 
-These utilities remain in development. Per-monitor slideshow sources are not
-yet implemented. Overview updates when the app's slideshow changes; a slideshow
-run from the CLI is checked every 30 seconds while the window is open. Multi-monitor behavior and the gallery with a
+These utilities remain in development. Overview updates when the app's
+slideshow changes. A slideshow run from a CLI build without hand-over support
+is checked every 30 seconds while the window is open. Multi-monitor behavior and the gallery with a
 large collection still need interactive Windows verification.
 
 **Profiles** saves named collections and can import or export settings and
@@ -160,7 +175,11 @@ running slideshow may replace an edited wallpaper at its next change.
 The GitHub Actions workflow in `.github/workflows/ci.yml` runs on Windows for
 pushes and pull requests. It builds the frontend, then runs `cargo fmt --check`,
 Clippy with warnings denied, and the Rust tests, and builds the NSIS installer
-as a downloadable workflow artifact. It does not publish releases. See
+as a downloadable workflow artifact. Pushing a `v*.*.*` tag runs
+`.github/workflows/release.yml`, which builds the installer and a portable ZIP
+and attaches them to a draft GitHub Release; see
+[docs/releasing.md](docs/releasing.md) for the version bump and changelog
+steps. See
 [docs/performance.md](docs/performance.md) for how to measure CPU and memory
 use with `scripts/measure-performance.ps1`; no results have been recorded yet.
 

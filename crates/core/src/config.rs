@@ -51,6 +51,13 @@ pub struct Folder {
     pub enabled: bool,
     pub recursive: bool,
 }
+/// Folders that feed a separate slideshow on one monitor. The monitor is
+/// identified by its Windows device path, as listed by `list_monitors`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MonitorFolders {
+    pub monitor: String,
+    pub folders: Vec<Folder>,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProfileSettings {
     pub folders: Vec<Folder>,
@@ -90,6 +97,10 @@ pub struct Config {
     pub active_profile: Option<String>,
     #[serde(default)]
     pub hotkeys: Hotkeys,
+    /// Monitors with their own folders. Other monitors show the main
+    /// slideshow.
+    #[serde(default)]
+    pub monitor_folders: Vec<MonitorFolders>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -104,6 +115,7 @@ impl Default for Config {
             profiles: Vec::new(),
             active_profile: None,
             hotkeys: Hotkeys::default(),
+            monitor_folders: Vec::new(),
         }
     }
 }
@@ -129,11 +141,25 @@ impl Config {
             || self.profiles.len() > 100
             || self.folders.len() > 1000
             || self.excluded.len() > 100000
+            || self.monitor_folders.len() > 64
         {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Invalid configuration version, interval, or collection size",
             ));
+        }
+        let mut monitors = std::collections::HashSet::new();
+        for entry in &self.monitor_folders {
+            if entry.monitor.trim().is_empty()
+                || entry.monitor.len() > 512
+                || entry.folders.len() > 1000
+                || !monitors.insert(entry.monitor.to_lowercase())
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid or duplicate monitor folders",
+                ));
+            }
         }
         let mut names = std::collections::HashSet::new();
         for profile in &self.profiles {
@@ -282,6 +308,11 @@ impl Config {
     /// cannot be read are logged and skipped so one unavailable location does
     /// not hide the rest of the collection.
     pub fn images(&self) -> Result<Vec<PathBuf>, Error> {
+        self.images_in(&self.folders)
+    }
+    /// Collect the images of the enabled folders in `folders`, applying this
+    /// configuration's filter and exclusions.
+    pub fn images_in(&self, folders: &[Folder]) -> Result<Vec<PathBuf>, Error> {
         let mut seen = std::collections::HashSet::new();
         let mut images = Vec::new();
         let excluded: std::collections::HashSet<_> = self
@@ -289,7 +320,7 @@ impl Config {
             .iter()
             .map(|path| crate::utilities::path_key(path))
             .collect();
-        for folder in self.folders.iter().filter(|f| f.enabled) {
+        for folder in folders.iter().filter(|f| f.enabled) {
             let report =
                 scanner::scan_lenient(std::slice::from_ref(&folder.path), folder.recursive);
             for error in &report.skipped {
@@ -325,6 +356,15 @@ impl Config {
         current: &[PathBuf],
         changed: &std::collections::HashSet<PathBuf>,
     ) -> Vec<PathBuf> {
+        self.apply_changes_in(&self.folders, current, changed)
+    }
+    /// Like [`Config::apply_changes`] for a collection built from `folders`.
+    pub fn apply_changes_in(
+        &self,
+        folders: &[Folder],
+        current: &[PathBuf],
+        changed: &std::collections::HashSet<PathBuf>,
+    ) -> Vec<PathBuf> {
         let excluded: std::collections::HashSet<_> = self
             .excluded
             .iter()
@@ -334,7 +374,7 @@ impl Config {
         let accept = |image: &Path| {
             scanner::is_image(image)
                 && image.is_file()
-                && self.folders.iter().any(|folder| {
+                && folders.iter().any(|folder| {
                     folder.enabled
                         && image.starts_with(&folder.path)
                         && (folder.recursive || image.parent() == Some(folder.path.as_path()))

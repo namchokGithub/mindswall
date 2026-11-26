@@ -10,6 +10,9 @@ pub enum Command {
     Status,
     Reload,
     Set(std::path::PathBuf),
+    /// Ask a slideshow started from the CLI to stop so the desktop app can
+    /// take over. The response carries the status to continue from.
+    Handoff,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Response {

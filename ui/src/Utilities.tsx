@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Grid2X2, Grid3X3, Image, List, RefreshCw } from "lucide-react";
+import { FolderOpen, Grid2X2, Grid3X3, Image, List, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
 import { GalleryPreview } from "./GalleryPreview";
 
 export type Filter = { min_width: number; min_height: number; orientation: "any" | "landscape" | "portrait" | "square"; aspect_ratio: "any" | "wide" | "wide_ten" | "standard" | "square" };
-export type UtilityConfig = { excluded: string[]; filter: Filter; fit_mode: string };
+export type MonitorFolders = { monitor: string; folders: { path: string; enabled: boolean; recursive: boolean }[] };
+export type UtilityConfig = { excluded: string[]; filter: Filter; fit_mode: string; monitor_folders: MonitorFolders[] };
 type Page = { paths: string[]; total: number };
 type Entry = { path: string; timestamp: number; monitor: string | null };
 type GalleryLayout = "large" | "compact" | "list";
@@ -74,7 +75,7 @@ export function HistoryPage() {
 }
 
 type Monitor = { id: string; width: number; height: number };
-export function MonitorsPage() {
+export function MonitorsPage({ config, busy, saveMonitorFolders }: { config: UtilityConfig; busy: boolean; saveMonitorFolders: (value: MonitorFolders[]) => Promise<void> }) {
   const [monitors, setMonitors] = useState<Monitor[]>([]); const { setError, setNotice } = useSnackbar("monitors"); const [loading, setLoading] = useState(true); const [loadFailed, setLoadFailed] = useState(false);
   const refresh = useCallback(async () => { setLoading(true); setLoadFailed(false); try { setMonitors(await invoke<Monitor[]>("monitors")); setError(""); } catch (e) { setLoadFailed(true); setError(String(e)); } finally { setLoading(false); } }, [setError]);
   useEffect(() => { refresh(); }, [refresh]);
@@ -82,8 +83,22 @@ export function MonitorsPage() {
     try { const path = await invoke<string | null>("pick_image"); if (path) { await invoke("set_monitor_image", { monitor: monitor.id, path }); setNotice("Wallpaper changed for this monitor."); } }
     catch (e) { setError(String(e)); }
   }
+  const foldersOf = (id: string) => config.monitor_folders.find(entry => entry.monitor === id)?.folders ?? [];
+  // Entries without folders are dropped so a monitor returns to the main slideshow.
+  const withFolders = (id: string, folders: MonitorFolders["folders"]) => [...config.monitor_folders.filter(entry => entry.monitor !== id), ...(folders.length > 0 ? [{ monitor: id, folders }] : [])];
+  async function addFolder(id: string) {
+    try {
+      const path = await invoke<string | null>("pick_folder");
+      if (!path || foldersOf(id).some(folder => folder.path.toLowerCase() === path.toLowerCase())) return;
+      await saveMonitorFolders(withFolders(id, [...foldersOf(id), { path, enabled: true, recursive: true }]));
+    } catch (e) { setError(String(e)); }
+  }
+  const removeFolder = (id: string, path: string) => saveMonitorFolders(withFolders(id, foldersOf(id).filter(folder => folder.path !== path)));
+  const folderList = (id: string) => foldersOf(id).length === 0 ? <small>Shows the main slideshow.</small> : foldersOf(id).map(folder => <div className="monitor-folder" key={folder.path}><FolderOpen size={15}/><small title={folder.path}>{folder.path}</small><button className="icon-button danger" aria-label={`Remove ${folder.path}`} disabled={busy} onClick={() => removeFolder(id, folder.path)}><Trash2 size={14}/></button></div>);
+  const disconnected = config.monitor_folders.filter(entry => !monitors.some(monitor => monitor.id === entry.monitor));
   return <><div className="section-title"><div><span className="eyebrow">YOUR SCREENS</span><h2>Connected monitors</h2></div><button className="icon-button" aria-label="Refresh monitors" disabled={loading} onClick={refresh}><RefreshCw size={16}/></button></div>
-    {loading ? <p role="status">Finding monitors…</p> : loadFailed ? <div className="panel empty"><h3>Could not load monitors.</h3><p>Try refreshing the list.</p><button className="secondary" onClick={refresh}>Try again</button></div> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <div className="panel">{monitors.map((monitor, index) => <div className="history-row" key={monitor.id}><div><strong>Monitor {index + 1}</strong><small>{monitor.width} × {monitor.height}</small><small title={monitor.id}>{monitor.id}</small></div><button className="secondary" onClick={() => choose(monitor)}>Choose image</button></div>)}</div>}
-    <p className="footnote">A running slideshow can replace per-monitor images on its next change.</p>
+    {loading ? <p role="status">Finding monitors…</p> : loadFailed ? <div className="panel empty"><h3>Could not load monitors.</h3><p>Try refreshing the list.</p><button className="secondary" onClick={refresh}>Try again</button></div> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <div className="panel">{monitors.map((monitor, index) => <div className="history-row" key={monitor.id}><div><strong>Monitor {index + 1}</strong><small>{monitor.width} × {monitor.height}</small><small title={monitor.id}>{monitor.id}</small>{folderList(monitor.id)}</div><div className="monitor-actions"><button className="secondary" disabled={busy} onClick={() => addFolder(monitor.id)}><Plus size={15}/> Add folder</button><button className="secondary" onClick={() => choose(monitor)}>Choose image</button></div></div>)}</div>}
+    {!loading && !loadFailed && disconnected.length > 0 && <><div className="section-title"><div><span className="eyebrow">NOT CONNECTED</span><h2>Saved monitor folders</h2></div></div><div className="panel">{disconnected.map(entry => <div className="history-row" key={entry.monitor}><div><small title={entry.monitor}>{entry.monitor}</small>{folderList(entry.monitor)}</div><button className="secondary" disabled={busy} onClick={() => saveMonitorFolders(withFolders(entry.monitor, []))}>Forget</button></div>)}</div></>}
+    <p className="footnote">A monitor with its own folders runs its own slideshow at the same interval; other monitors share the main slideshow. Connected and disconnected monitors are noticed within about 10 seconds. A single image chosen here lasts until the next change.</p>
   </>;
 }

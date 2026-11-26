@@ -1,0 +1,110 @@
+name: Release
+
+# Runs when a version tag such as v0.2.0 is pushed. It builds the per-user
+# NSIS installer and the portable ZIP, and attaches them to a draft GitHub
+# Release. Publishing the draft stays a manual step.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/ci.yml
+    with:
+      skip_installer: true
+
+  build:
+    name: Build release artifacts
+    needs: checks
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check that the tag matches every version
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          $found = @{
+            'src-tauri/tauri.conf.json' = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+            'ui/package.json'           = (Get-Content ui/package.json -Raw | ConvertFrom-Json).version
+          }
+          foreach ($manifest in 'crates/core/Cargo.toml', 'crates/cli/Cargo.toml', 'src-tauri/Cargo.toml') {
+            $line = Select-String -Path $manifest -Pattern '^version = "(.+)"' | Select-Object -First 1
+            $found[$manifest] = $line.Matches[0].Groups[1].Value
+          }
+          $wrong = $found.GetEnumerator() | Where-Object { $_.Value -ne $version }
+          if ($wrong) {
+            $wrong | ForEach-Object { Write-Error "$($_.Key) has version $($_.Value), expected $version" }
+            exit 1
+          }
+          if (-not (Select-String -Path CHANGELOG.md -Pattern "^## \[$([regex]::Escape($version))\]" -Quiet)) {
+            Write-Error "CHANGELOG.md has no section for $version"
+            exit 1
+          }
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix ui
+
+      - name: Build installer and desktop app
+        run: npm --prefix ui run tauri build
+
+      - name: Build CLI
+        run: cargo build --release --locked -p mindswall-cli
+
+      - name: Package portable ZIP and checksums
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          New-Item -ItemType Directory -Force dist/portable, dist/release | Out-Null
+          Copy-Item target/release/mindswall-desktop.exe dist/portable/MindsWall.exe
+          Copy-Item target/release/mindswall.exe dist/portable/mindswall.exe
+          Copy-Item LICENSE, README.md dist/portable/
+          Compress-Archive -Path dist/portable/* -DestinationPath "dist/release/MindsWall_${version}_x64_portable.zip"
+          Copy-Item target/release/bundle/nsis/*.exe dist/release/
+          Get-ChildItem dist/release -File | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content dist/release/SHA256SUMS.txt -Encoding ascii
+
+      - name: Extract release notes
+        shell: pwsh
+        run: |
+          $version = [regex]::Escape('${{ github.ref_name }}'.TrimStart('v'))
+          $notes = (Get-Content CHANGELOG.md -Raw) -split "(?m)^## " |
+            Where-Object { $_ -match "^\[$version\]" } |
+            Select-Object -First 1
+          ($notes -replace "^\[$version\][^\r\n]*\r?\n", '').Trim() | Set-Content dist/notes.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mindswall-${{ github.ref_name }}
+          path: dist/release/*
+          if-no-files-found: error
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/release/* --draft --verify-tag --title "MindsWall ${{ github.ref_name }}" --notes-file dist/notes.md

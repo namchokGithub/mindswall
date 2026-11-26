@@ -1,6 +1,7 @@
 use crate::{
     config::Config,
     ipc::{self, Command as Control, PlaybackStatus, Response},
+    monitors::{MonitorShows, SharedTarget},
     playback::Playback,
     wallpaper::{SystemWallpaper, WallpaperSetter, default_wallpaper_path},
 };
@@ -15,6 +16,23 @@ use std::{
 /// Quiet period after the last file event before changes are applied, so
 /// files that are still being copied can settle.
 const FILE_SETTLE: Duration = Duration::from_secs(2);
+
+/// How often connected monitors are listed while any monitor has its own
+/// folders, so connected and disconnected monitors are noticed.
+const MONITOR_CHECK: Duration = Duration::from_secs(10);
+
+/// How the slideshow service starts and whether it may hand over control.
+#[derive(Debug, Clone, Default)]
+pub struct ServiceOptions {
+    /// Stop when the desktop app asks to take over. Set for the CLI.
+    pub allow_handoff: bool,
+    /// Continue from a slideshow handed over by the CLI: keep its current
+    /// image and paused state instead of changing the wallpaper at start.
+    pub resume: Option<PlaybackStatus>,
+    /// How long to keep retrying the control pipe while a previous owner
+    /// exits.
+    pub listen_retry: Duration,
+}
 
 enum Event {
     Control(ipc::Request),
@@ -58,7 +76,17 @@ fn watch(config: &Config, events: mpsc::Sender<Event>) -> Option<notify::Recomme
             return None;
         }
     };
-    for folder in config.folders.iter().filter(|folder| folder.enabled) {
+    let mut watched = HashSet::new();
+    let folders = config.folders.iter().chain(
+        config
+            .monitor_folders
+            .iter()
+            .flat_map(|entry| &entry.folders),
+    );
+    for folder in folders.filter(|folder| folder.enabled) {
+        if !watched.insert((folder.path.clone(), folder.recursive)) {
+            continue;
+        }
         let mode = if folder.recursive {
             RecursiveMode::Recursive
         } else {
@@ -71,10 +99,11 @@ fn watch(config: &Config, events: mpsc::Sender<Event>) -> Option<notify::Recomme
     Some(watcher)
 }
 
-fn apply(path: &Path) -> Result<(), crate::Error> {
+/// Apply an image to the whole desktop.
+fn apply(path: &Path) -> Result<(), String> {
     if let Err(error) = SystemWallpaper.set_wallpaper(path) {
         tracing::warn!(%error, "could not apply wallpaper");
-        return Err(error);
+        return Err(error.to_string());
     }
     tracing::info!(path = ?path, "wallpaper changed");
     if let Err(error) = crate::history::History::record(path, None) {
@@ -83,13 +112,101 @@ fn apply(path: &Path) -> Result<(), crate::Error> {
     Ok(())
 }
 
+/// Apply an image to one monitor.
+fn apply_monitor(monitor: &str, path: &Path) -> Result<(), String> {
+    crate::wallpaper::set_monitor_wallpaper(monitor, path).inspect_err(|error| {
+        tracing::warn!(%monitor, %error, "could not apply monitor wallpaper");
+    })?;
+    tracing::info!(%monitor, path = ?path, "monitor wallpaper changed");
+    if let Err(error) = crate::history::History::record(path, Some(monitor.to_owned())) {
+        tracing::warn!(%error, "could not record wallpaper history");
+    }
+    Ok(())
+}
+
+/// Apply an image from the main slideshow. When some monitors run their own
+/// slideshow, only the other monitors are changed; it succeeds when at least
+/// one of them accepts the image.
+fn apply_shared(target: &SharedTarget, path: &Path) -> Result<(), String> {
+    let SharedTarget::Monitors(monitors) = target else {
+        return apply(path);
+    };
+    if monitors.is_empty() {
+        return Ok(());
+    }
+    let mut failure = None;
+    let mut applied = false;
+    for monitor in monitors {
+        match crate::wallpaper::set_monitor_wallpaper(monitor, path) {
+            Ok(()) => applied = true,
+            Err(error) => {
+                tracing::warn!(%monitor, %error, "could not apply monitor wallpaper");
+                failure = Some(error);
+            }
+        }
+    }
+    if !applied {
+        return Err(failure.unwrap_or_default());
+    }
+    tracing::info!(path = ?path, monitors = monitors.len(), "wallpaper changed");
+    if let Err(error) = crate::history::History::record(path, None) {
+        tracing::warn!(%error, "could not record wallpaper history");
+    }
+    Ok(())
+}
+
+/// Show the main slideshow's current image again, for example after the
+/// monitors that share it changed.
+fn reapply_shared(playback: &Playback, target: &SharedTarget) {
+    let current = playback
+        .show
+        .as_ref()
+        .and_then(|show| show.current().map(Path::to_path_buf))
+        .or_else(|| playback.default_image.clone());
+    if let Some(path) = current
+        && let Err(error) = apply_shared(target, &path)
+    {
+        tracing::warn!(%error, "could not apply wallpaper to the shared monitors");
+    }
+}
+
+/// List connected monitors. Returns whether the set changed and which
+/// monitors were added.
+fn check_monitors(monitors: &mut MonitorShows) -> (bool, Vec<String>) {
+    match crate::wallpaper::list_monitors() {
+        Ok(list) => {
+            let ids: Vec<String> = list.into_iter().map(|monitor| monitor.id).collect();
+            let before = monitors.connected().to_vec();
+            let added = monitors.set_connected(ids);
+            (before != monitors.connected(), added)
+        }
+        Err(error) => {
+            tracing::warn!(%error, "could not list monitors");
+            (false, Vec::new())
+        }
+    }
+}
+
+fn earliest(waits: [Option<Duration>; 3]) -> Option<Duration> {
+    waits.into_iter().flatten().min()
+}
+
+/// Run the slideshow from the CLI. It stops when the desktop app takes over.
 pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
-    run_slideshow_with(|_| {})
+    run_slideshow_with(
+        ServiceOptions {
+            allow_handoff: true,
+            ..ServiceOptions::default()
+        },
+        |_| {},
+    )
 }
 
 /// Run the slideshow and call `on_change` after every state change, such as a
-/// new wallpaper, pause, resume, or a reloaded collection.
+/// new wallpaper, pause, resume, or a reloaded collection. Returns `Ok` when
+/// the slideshow was handed over to the desktop app.
 pub fn run_slideshow_with(
+    options: ServiceOptions,
     on_change: impl Fn(&PlaybackStatus),
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dirs = directories::ProjectDirs::from("", "", "MindsWall")
@@ -106,9 +223,25 @@ pub fn run_slideshow_with(
     let mut config = Config::load(&path)?;
     let mut playback = Playback::new(&config, Instant::now())?;
     let (control_tx, control_rx) = mpsc::channel();
-    ipc::listen(control_tx).map_err(|e| {
-        format!("cannot start slideshow control listener (another instance may be running): {e}")
-    })?;
+    let listen_until = Instant::now() + options.listen_retry;
+    loop {
+        match ipc::listen(control_tx.clone()) {
+            Ok(()) => break,
+            Err(error)
+                if error.kind() != std::io::ErrorKind::PermissionDenied
+                    && Instant::now() < listen_until =>
+            {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Err(error) => {
+                return Err(format!(
+                    "cannot start slideshow control listener (another instance may be running): {error}"
+                )
+                .into());
+            }
+        }
+    }
+    drop(control_tx);
     let (event_tx, event_rx) = mpsc::channel();
     let forward = event_tx.clone();
     std::thread::spawn(move || {
@@ -119,24 +252,46 @@ pub fn run_slideshow_with(
         }
     });
     let mut watcher = watch(&config, event_tx.clone());
-    playback
-        .show
-        .as_mut()
-        .expect("initial slideshow exists")
-        .next_available(apply)?;
+
+    let mut monitors = MonitorShows::default();
+    monitors.configure(&config);
+    let mut tracking = MonitorShows::is_configured(&config);
+    if tracking {
+        check_monitors(&mut monitors);
+    }
+    let mut monitors_due = tracking.then(|| Instant::now() + MONITOR_CHECK);
+
+    let show = playback.show.as_mut().expect("initial slideshow exists");
+    let resumed = options
+        .resume
+        .as_ref()
+        .and_then(|status| status.current.clone())
+        .filter(|path| show.contains(path))
+        .is_some_and(|path| show.select(path).is_ok());
+    if !resumed {
+        let target = monitors.shared_target();
+        show.next_available(|path| apply_shared(&target, path))?;
+    }
+    if options
+        .resume
+        .as_ref()
+        .is_some_and(|status| status.state == "paused")
+    {
+        playback.timer.pause(Instant::now());
+    }
+    monitors.reapply(&monitors.active(), &apply_monitor);
     on_change(&snapshot(&playback));
     println!("Slideshow running. Press Ctrl+C to stop.");
+
     let mut changed_files = HashSet::new();
     let mut files_due: Option<Instant> = None;
     loop {
         let now = Instant::now();
-        let wait = match (
+        let wait = earliest([
             playback.timer.wait(now),
             files_due.map(|due| due.saturating_duration_since(now)),
-        ) {
-            (Some(timer), Some(files)) => Some(timer.min(files)),
-            (timer, files) => timer.or(files),
-        };
+            monitors_due.map(|due| due.saturating_duration_since(now)),
+        ]);
         let event = match wait {
             Some(wait) => event_rx.recv_timeout(wait),
             None => event_rx
@@ -150,6 +305,24 @@ pub fn run_slideshow_with(
             }
             Ok(Event::Control((command, reply))) => {
                 let now = Instant::now();
+                if matches!(command, Control::Handoff) {
+                    if options.allow_handoff {
+                        let _ = reply.send(Response {
+                            ok: true,
+                            message: "handed over".into(),
+                            status: Some(snapshot(&playback)),
+                        });
+                        tracing::info!("slideshow handed over to the desktop app");
+                        println!("Slideshow handed over to the MindsWall app.");
+                        return Ok(());
+                    }
+                    let _ = reply.send(Response {
+                        ok: false,
+                        message: "the desktop app owns the slideshow".into(),
+                        status: None,
+                    });
+                    continue;
+                }
                 let notify_change = !matches!(command, Control::Status);
                 let mut reloaded = None;
                 let status = if matches!(command, Control::Status) {
@@ -157,6 +330,8 @@ pub fn run_slideshow_with(
                 } else {
                     None
                 };
+                let target = monitors.shared_target();
+                let shared = |path: &Path| apply_shared(&target, path);
                 let result: Result<String, String> = match command {
                     Control::Pause => {
                         if playback.show.is_none() {
@@ -186,16 +361,28 @@ pub fn run_slideshow_with(
                             .unwrap_or_default()
                     )),
                     Control::Reload => (|| -> Result<String, String> {
-                        let config =
+                        let new_config =
                             Config::load(&Config::default_path().map_err(|e| e.to_string())?)
                                 .map_err(|e| e.to_string())?;
+                        monitors.configure(&new_config);
+                        tracking = MonitorShows::is_configured(&new_config);
+                        if tracking {
+                            check_monitors(&mut monitors);
+                        }
+                        let new_target = monitors.shared_target();
                         playback.reload(
-                            &config,
+                            &new_config,
                             now,
-                            &|path| apply(path).map_err(|e| e.to_string()),
+                            &|path| apply_shared(&new_target, path),
                             &default_wallpaper_path,
                         )?;
-                        reloaded = Some(config);
+                        // Monitors may have moved between the main slideshow
+                        // and their own folders, so show each one's image again.
+                        if tracking || new_target != target {
+                            reapply_shared(&playback, &new_target);
+                            monitors.reapply(&monitors.active(), &apply_monitor);
+                        }
+                        reloaded = Some(new_config);
                         Ok(if playback.show.is_none() {
                             "No enabled folders; using Windows default wallpaper"
                         } else {
@@ -205,13 +392,17 @@ pub fn run_slideshow_with(
                     })(),
                     Control::Set(path) => {
                         if let Some(mut candidate) = playback.show.clone() {
-                            match candidate.select(path.clone()).and_then(|()| apply(&path)) {
+                            match candidate
+                                .select(path.clone())
+                                .map_err(|e| e.to_string())
+                                .and_then(|()| shared(&path))
+                            {
                                 Ok(()) => {
                                     playback.show = Some(candidate);
                                     playback.timer.reset(now);
                                     Ok(path.display().to_string())
                                 }
-                                Err(error) => Err(error.to_string()),
+                                Err(error) => Err(error),
                             }
                         } else {
                             Err("No enabled folders".into())
@@ -220,26 +411,26 @@ pub fn run_slideshow_with(
                     Control::Next => match playback.show.as_mut() {
                         Some(show) => {
                             let result = show
-                                .next_available(apply)
-                                .map(|path| path.display().to_string())
-                                .map_err(|e| e.to_string());
+                                .next_available(shared)
+                                .map(|path| path.display().to_string());
+                            monitors.advance(&apply_monitor);
                             playback.timer.reset(now);
                             result
                         }
                         None => Err("No enabled folders".into()),
                     },
                     Control::Previous => match playback.show.as_mut() {
-                        Some(show) => match show.previous_available(apply) {
+                        Some(show) => match show.previous_available(shared) {
                             Some(result) => {
+                                monitors.previous(&apply_monitor);
                                 playback.timer.reset(now);
-                                result
-                                    .map(|path| path.display().to_string())
-                                    .map_err(|e| e.to_string())
+                                result.map(|path| path.display().to_string())
                             }
                             None => Err("no previous wallpaper".into()),
                         },
                         None => Err("No enabled folders".into()),
                     },
+                    Control::Handoff => unreachable!("handled above"),
                 };
                 let response = match result {
                     Ok(message) => Response {
@@ -261,6 +452,7 @@ pub fn run_slideshow_with(
                     config = new_config;
                     changed_files.clear();
                     files_due = None;
+                    monitors_due = tracking.then(|| Instant::now() + MONITOR_CHECK);
                     // Drop the old watcher first so folders are not watched twice.
                     drop(watcher.take());
                     watcher = watch(&config, event_tx.clone());
@@ -271,30 +463,53 @@ pub fn run_slideshow_with(
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let now = Instant::now();
+                let mut changed = false;
+                if monitors_due.is_some_and(|due| now >= due) {
+                    monitors_due = Some(now + MONITOR_CHECK);
+                    let (layout_changed, added) = check_monitors(&mut monitors);
+                    if layout_changed {
+                        tracing::info!(
+                            monitors = monitors.connected().len(),
+                            "connected monitors changed"
+                        );
+                        reapply_shared(&playback, &monitors.shared_target());
+                        monitors.reapply(&added, &apply_monitor);
+                        changed = true;
+                    }
+                }
                 if files_due.is_some_and(|due| now >= due) {
                     files_due = None;
-                    let changed = std::mem::take(&mut changed_files);
-                    match playback.apply_file_changes(&config, &changed, now, &|path| {
-                        apply(path).map_err(|e| e.to_string())
+                    let paths = std::mem::take(&mut changed_files);
+                    let target = monitors.shared_target();
+                    match playback.apply_file_changes(&config, &paths, now, &|path| {
+                        apply_shared(&target, path)
                     }) {
                         Ok(true) => {
                             tracing::info!(
-                                paths = changed.len(),
+                                paths = paths.len(),
                                 "collection updated from folder changes"
                             );
-                            on_change(&snapshot(&playback));
+                            changed = true;
                         }
                         Ok(false) => {}
                         Err(error) => tracing::warn!(%error, "could not apply folder changes"),
+                    }
+                    if monitors.apply_file_changes(&config, &paths, &apply_monitor) {
+                        tracing::info!("monitor collections updated from folder changes");
                     }
                 }
                 if playback.timer.is_due(now)
                     && let Some(show) = playback.show.as_mut()
                 {
-                    if let Err(error) = show.next_available(apply) {
+                    let target = monitors.shared_target();
+                    if let Err(error) = show.next_available(|path| apply_shared(&target, path)) {
                         tracing::warn!(%error, "wallpaper update failed");
                     }
+                    monitors.advance(&apply_monitor);
                     playback.timer.reset(Instant::now());
+                    changed = true;
+                }
+                if changed {
                     on_change(&snapshot(&playback));
                 }
             }
