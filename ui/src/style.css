@@ -109,3 +109,5 @@ body{background:var(--c-11121a);user-select:none;-webkit-user-select:none}
 .gallery-dialog-image{position:relative}.gallery-dialog-header .profile-create{flex:none;flex-wrap:nowrap}
 .gallery-dialog-nav{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-a5a5b4)}.gallery-dialog-nav span{min-width:38px;text-align:center}
 .combined-item{display:block;width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.combined-item:hover{color:var(--c-bcb9f5)}.combined-item.current{color:var(--c-bcb9fa);font-weight:700}
+.editor-image.scaled{display:flex;align-items:center;justify-content:center;height:auto;margin:0 auto;background:transparent}.editor-image.scaled img{max-width:none;max-height:none;object-fit:fill;border-radius:4px;box-shadow:0 0 0 1px var(--c-3b3c4b)}
+.editor-warning{margin:4px 0 12px;font-size:11px;color:var(--c-e4bd78)}.editor-controls .inline-check+.inline-check{margin-top:8px}

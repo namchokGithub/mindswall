@@ -433,6 +433,8 @@ fn import_backup_inner(app: tauri::AppHandle, path: PathBuf) -> Result<String, S
 #[derive(serde::Serialize)]
 struct EditedImage {
     path: PathBuf,
+    width: u32,
+    height: u32,
 }
 
 /// Encode a downscaled PNG preview of an image.
@@ -514,7 +516,12 @@ fn edit_image_inner(
     if let Err(error) = prune_edits(&output.file_name().into_iter().collect::<Vec<_>>()) {
         eprintln!("Could not clean the edited image cache: {error}");
     }
-    Ok(EditedImage { path: output })
+    let (width, height) = image::image_dimensions(&output).map_err(|e| e.to_string())?;
+    Ok(EditedImage {
+        path: output,
+        width,
+        height,
+    })
 }
 
 /// A downscaled preview of the image chosen for editing, sent as raw PNG bytes.

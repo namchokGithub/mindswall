@@ -45,7 +45,8 @@ All notable changes to MindsWall are recorded here. The format follows
 - Monitor thumbnails and Overview cards keep the previous image while the new
   one loads, instead of flashing a placeholder.
 - The Editor previews the chosen image with its size, compares it with the
-  edited copy, and has a **Clear** button.
+  edited copy at the same scale, keeps the aspect ratio when resizing (or
+  warns about stretching), and has a **Clear** button.
 - Settings can open the log folder and show the last 100 log lines.
 - Overview cards load cached, downscaled previews, and the log records how
   long each wallpaper change and preview takes.

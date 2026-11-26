@@ -3,12 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { FolderOpen, Download, Upload, X } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { useLoadedImage } from "./useLoadedImage";
+import { aspectLabel, isStretched, linkedSide, sharedScale, type Size } from "./editorSize";
 import { displayShortcut, shortcutFromKey } from "./shortcutCapture";
 
 type Profile = { name: string };
 type ExtendedConfig = { profiles: Profile[]; active_profile: string | null };
 type Hotkeys = { next: string; previous: string; pause: string };
-type EditResult = { path: string };
+type EditResult = { path: string; width: number; height: number };
 type Props = { config: ExtendedConfig; status: { active: string | null; changed: boolean }; refresh: () => Promise<void> };
 
 export function Profiles({ config, status, refresh }: Props) {
@@ -57,10 +58,23 @@ export function Editor({ active }: { active: boolean }) {
     invoke<[number, number]>("source_size", { path: source }).then(value => { if (active) setSize(value); }).catch(() => {});
     return () => { active = false; };
   }, [source]);
-  async function choose() { try { const path = await invoke<string | null>("pick_image"); if (path) { setSource(path); setEdited(""); setPreview(""); setError(""); } } catch (e) { setError(String(e)); } }
+  const [editedSize, setEditedSize] = useState<Size | null>(null);
+  // Resizing keeps the shape of the image, or of the crop, unless turned off.
+  const [keepRatio, setKeepRatio] = useState(true);
+  const whole = (v: string) => /^\d+$/.test(v) && Number(v) > 0 ? Number(v) : null;
+  const cropSize: Size | null = crop && whole(cropWidth) && whole(cropHeight) ? [whole(cropWidth)!, whole(cropHeight)!] : null;
+  const base: Size | null = cropSize ?? size;
+  const target: Size | null = whole(width) && whole(height) ? [whole(width)!, whole(height)!] : null;
+  const stretched = !!base && !!target && isStretched(base, target);
+  function changeWidth(value: string) { setWidth(value); if (keepRatio && base) setHeight(linkedSide(value, base, "width")); }
+  function changeHeight(value: string) { setHeight(value); if (keepRatio && base) setWidth(linkedSide(value, base, "height")); }
+  // Follow a new crop size or the lock being turned on.
+  const baseKey = base ? base.join("x") : "";
+  useEffect(() => { if (keepRatio && base && width) setHeight(linkedSide(width, base, "width")); }, [baseKey, keepRatio]);
+  async function choose() { try { const path = await invoke<string | null>("pick_image"); if (path) { setSource(path); setEdited(""); setPreview(""); setEditedSize(null); setError(""); } } catch (e) { setError(String(e)); } }
   /** Start over: forget the chosen image, the edited preview, and every setting. */
   function clear() {
-    setSource(""); setEdited(""); setPreview(""); setWidth(""); setHeight(""); setCrop(false);
+    setSource(""); setEdited(""); setPreview(""); setEditedSize(null); setKeepRatio(true); setWidth(""); setHeight(""); setCrop(false);
     setX("0"); setY("0"); setCropWidth(""); setCropHeight(""); setBlur(0); setDim(0); setError(""); setNotice("");
   }
   async function generate() {
@@ -74,18 +88,27 @@ export function Editor({ active }: { active: boolean }) {
       const result = await invoke<EditResult>("edit_image", { path: source, options: { width: w, height: h, crop: crop ? { x: cropValues[0], y: cropValues[1], width: cropValues[2], height: cropValues[3] } : null, blur, dim } });
       const bytes = await invoke<ArrayBuffer>("edited_preview", { path: result.path });
       if (!mounted.current) return;
-      setEdited(result.path); setPreview(URL.createObjectURL(new Blob([bytes], { type: "image/png" }))); setCompletion({ notice: "Preview created. Your original image is unchanged." });
+      setEdited(result.path); setEditedSize([result.width, result.height]); setPreview(URL.createObjectURL(new Blob([bytes], { type: "image/png" }))); setCompletion({ notice: "Preview created. Your original image is unchanged." });
     } catch (e) { if (mounted.current) setCompletion({ error: String(e) }); } finally { if (mounted.current) setBusy(false); }
   }
   return <><div className="section-title"><div><span className="eyebrow">MAKE IT YOURS</span><h2>Image editor</h2></div><div className="profile-create">{source && <button className="secondary" disabled={busy} onClick={clear}><X size={14}/> Clear</button>}<button className="primary" disabled={busy} onClick={choose}><FolderOpen size={16}/> {source ? "Choose another" : "Choose image"}</button></div></div>
     {!source ? <div className="panel empty"><h3>Start with an image.</h3><p>Crop, resize, blur or dim a copy for your desktop.</p><button className="primary" disabled={busy} onClick={choose}>Choose image</button></div> : <><div className="panel editor-panel" onChange={() => setEdited("")}><strong className="selectable">{source.split(/[\\/]/).pop()}</strong><small>{size ? `${size[0]} × ${size[1]} px` : "\u00a0"}</small>
-      <div className={`editor-previews${preview ? " compare" : ""}`}>
-        <figure><div className="editor-image">{original.src ? <img key={original.src} className="loaded-image" src={original.src} alt="Preview of the chosen image"/> : <div className="thumbnail-placeholder">{original.failed ? "No preview" : "Loading…"}</div>}{original.loading && original.src && <span className="image-loading" aria-hidden="true"/>}</div>{preview && <figcaption>Original</figcaption>}</figure>
-        {preview && <figure><div className="editor-image"><img className="loaded-image" src={preview} alt="Preview of the edited image"/></div><figcaption>Edited</figcaption></figure>}
-      </div>
+      {(() => {
+        // Both previews use one scale, so a smaller edit looks smaller.
+        const compare = !!preview && !!editedSize;
+        const scale = size ? sharedScale(compare ? [size, editedSize!] : [size]) : null;
+        const boxHeight = compare ? 220 : 300;
+        const box = scale ? { aspectRatio: `${scale.aspect}`, width: `min(100%, ${Math.round(boxHeight * scale.aspect)}px)` } : undefined;
+        return <div className={`editor-previews${compare ? " compare" : ""}`}>
+          <figure><div className={`editor-image${scale ? " scaled" : ""}`} style={box}>{original.src ? <img key={original.src} className="loaded-image" src={original.src} style={scale?.images[0]} alt="Preview of the chosen image"/> : <div className="thumbnail-placeholder">{original.failed ? "No preview" : "Loading…"}</div>}{original.loading && original.src && <span className="image-loading" aria-hidden="true"/>}</div><figcaption>Original{size && ` · ${size[0]} × ${size[1]}`}</figcaption></figure>
+          {compare && <figure><div className="editor-image scaled" style={box}><img className="loaded-image" src={preview} style={scale?.images[1]} alt="Preview of the edited image"/></div><figcaption>Edited · {editedSize![0]} × {editedSize![1]}</figcaption></figure>}
+        </div>;
+      })()}
       {busy && <div className="editor-loading" role="status"><span className="editor-spinner" aria-hidden="true"/><div><strong>Creating preview…</strong><p>This may take a moment for large images.</p></div></div>}
       <fieldset className="editor-controls" disabled={busy} aria-busy={busy}>
-      <div className="editor-fields"><label>Width (px)<input type="number" min="1" max="8192" value={width} onChange={e => setWidth(e.target.value)} placeholder="Original"/></label><label>Height (px)<input type="number" min="1" max="8192" value={height} onChange={e => setHeight(e.target.value)} placeholder="Original"/></label><label>Blur ({blur})<input type="range" min="0" max="20" step="1" value={blur} onChange={e => setBlur(Number(e.target.value))}/></label><label>Dim ({dim}%)<input type="range" min="0" max="90" step="5" value={dim} onChange={e => setDim(Number(e.target.value))}/></label></div>
+      <div className="editor-fields"><label>Width (px)<input type="number" min="1" max="8192" value={width} onChange={e => changeWidth(e.target.value)} placeholder="Original"/></label><label>Height (px)<input type="number" min="1" max="8192" value={height} onChange={e => changeHeight(e.target.value)} placeholder="Original"/></label><label>Blur ({blur})<input type="range" min="0" max="20" step="1" value={blur} onChange={e => setBlur(Number(e.target.value))}/></label><label>Dim ({dim}%)<input type="range" min="0" max="90" step="5" value={dim} onChange={e => setDim(Number(e.target.value))}/></label></div>
+      <label className="inline-check"><input type="checkbox" checked={keepRatio} onChange={e => setKeepRatio(e.target.checked)}/> Keep aspect ratio{base && ` (${aspectLabel(base)})`}</label>
+      {stretched && <p className="editor-warning" role="status">Stretched: the shape changes from {aspectLabel(base!)} to {aspectLabel(target!)}.</p>}
       <label className="inline-check"><input type="checkbox" checked={crop} onChange={e => setCrop(e.target.checked)}/> Crop image before resizing</label>{crop && <div className="editor-fields">{[["Left (px)", x, setX], ["Top (px)", y, setY], ["Crop width", cropWidth, setCropWidth], ["Crop height", cropHeight, setCropHeight]].map(([label, value, setter]) => <label key={label as string}>{label as string}<input type="number" min="0" value={value as string} onChange={e => (setter as (s: string) => void)(e.target.value)}/></label>)}</div>}
       </fieldset>
       <div className="profile-create"><button className="primary" disabled={busy} onClick={generate}>{busy ? "Creating preview…" : "Create preview"}</button><button className="secondary" disabled={busy || !edited} onClick={async () => { try { await invoke("apply_edited", { path: edited }); setNotice("Edited image applied to your desktop."); } catch (e) { setError(String(e)); } }}>Set as wallpaper</button></div>

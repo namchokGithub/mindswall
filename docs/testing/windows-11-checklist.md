@@ -573,6 +573,13 @@ some landscape images.
 - [ ] After **Choose image**, the image and its size (for example
       **1920 × 1080 px**) appear right away; **Create preview** shows
       **Original** and **Edited** side by side
+- [ ] With **Keep aspect ratio** on, typing a width fills in the height (and
+      the other way round), also from the crop size when cropping; with it
+      off, a size with another shape shows **Stretched: the shape changes from
+      4:3 to 16:9** (for example)
+- [ ] After resizing to a smaller size, **Edited** is drawn smaller than
+      **Original** at the same scale, and both captions show the real sizes
+      (for example **Original · 4000 × 3000**, **Edited · 1920 × 1440**)
 - [ ] **Clear** returns to the empty Editor and resets width, height, crop,
       blur, and dim; **Choose another** replaces the image and removes the old
       edited preview
