@@ -485,7 +485,16 @@ Use a folder with several portrait images (for example 948×2048 and
       stopped slideshow, no card shows them
 - [ ] History names the monitor of each entry, and the filter shows only the
       main slideshow or one monitor
-- [ ] Remove the last folder of a monitor: it returns to the main slideshow
+- [ ] Remove the last folder of a monitor: a confirmation in the app's theme
+      appears first (Cancel and Escape keep the folder); after **Remove**, the
+      monitor returns to the main slideshow
+- [ ] **Forget** on a saved monitor asks for confirmation first
+- [ ] Next to a monitor folder, **Copy path** copies the full path and **Open
+      folder** opens it in File Explorer; a folder that no longer exists shows
+      an error
+- [ ] When wallpapers change, the Monitors thumbnails and the Overview cards
+      keep the previous image with a small spinner until the new one is ready,
+      without flashing **Loading…**
 - [ ] Add, delete, and rename images in a monitor's folder: that monitor's
       collection follows the change, as for the main folders
 - [ ] With only one monitor and no per-monitor folders, the log shows no

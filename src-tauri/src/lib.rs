@@ -770,6 +770,29 @@ async fn set_monitor_image(
     .await
 }
 
+/// Open a folder from the settings in File Explorer. Other paths are refused.
+#[tauri::command]
+async fn open_folder(path: PathBuf) -> Result<(), String> {
+    blocking(move || {
+        let config = get_config()?;
+        let known = config
+            .folders
+            .iter()
+            .chain(
+                config
+                    .monitor_folders
+                    .iter()
+                    .flat_map(|entry| &entry.folders),
+            )
+            .any(|folder| folder.path == path);
+        if !known {
+            return Err("This folder is not in your settings".into());
+        }
+        mindswall_core::explorer::open_folder(&path)
+    })
+    .await
+}
+
 #[tauri::command]
 fn get_config() -> Result<Config, String> {
     Config::load(&Config::default_path().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
@@ -1174,6 +1197,7 @@ pub fn run() {
             folder_count,
             control,
             monitor_control,
+            open_folder,
             start_service,
             service_error,
             current_preview,

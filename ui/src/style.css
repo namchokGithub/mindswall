@@ -92,3 +92,10 @@ body{background:var(--c-11121a);user-select:none;-webkit-user-select:none}
 .screen-cards-note{justify-content:center;text-align:center;margin-top:10px}
 @media(max-width:760px){.screen-cards.columns-3{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:500px){.screen-cards.columns-2,.screen-cards.columns-3{grid-template-columns:minmax(0,1fr)}}
 .path-copy{display:flex;align-items:center;gap:6px;max-width:100%;min-width:0;margin-top:4px;padding:2px 0;border:0;background:none;color:var(--c-858698);font-size:11px;text-align:left}.path-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.path-copy svg{flex:none;opacity:0;transition:opacity .15s}.path-copy:hover{color:var(--c-bcb9f5)}.path-copy:hover svg,.path-copy:focus-visible svg{opacity:1}.monitor-folder .path-copy{flex:1;margin-top:0}
+.loaded-image{animation:image-in .2s ease-out}@keyframes image-in{from{opacity:.35}to{opacity:1}}
+.image-loading{position:absolute;top:8px;left:8px;z-index:1;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;pointer-events:none}@keyframes spin{to{transform:rotate(360deg)}}
+.history-thumbnail{position:relative}
+.confirm-dialog{width:min(420px,calc(100vw - 32px));padding:22px 24px;border:1px solid var(--c-454058);border-radius:12px;background:var(--c-1b1c26);color:var(--c-eaeaf3);box-shadow:0 22px 80px var(--c-00000099)}.confirm-dialog::backdrop{background:var(--c-090a12c9)}
+.confirm-dialog h2{font-size:16px;font-weight:650}.confirm-dialog p{margin-top:10px;overflow-wrap:anywhere}.confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+.danger-button{min-height:35px;padding:0 14px;border:1px solid var(--c-ffb9b9);border-radius:7px;background:var(--c-ffb9b9);color:var(--c-222238);font-size:11px;font-weight:700}.danger-button:hover{background:var(--c-ffb5bd)}
+@media(prefers-reduced-motion:reduce){.loaded-image{animation:none}.image-loading{animation-duration:2.4s}}

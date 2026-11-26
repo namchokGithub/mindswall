@@ -95,7 +95,9 @@ npm.cmd --prefix ui run tauri dev
 Use **Folders** to select image directories, then start the slideshow from
 **Overview**. Folder paths on **Folders** and **Monitors** show only the last
 folder (for example `******\wallpapers`) so the rest stays out of screenshots;
-select a path to copy the full path. Closing the window releases its WebView to save memory while the
+select a path to copy the full path. On **Monitors**, each folder also has
+**Copy path** and **Open folder** (File Explorer) buttons; only folders in the
+settings can be opened. Closing the window releases its WebView to save memory while the
 app keeps running in the system tray; use the tray menu to open the window
 again or quit the app. **Settings** includes the per-user Windows startup
 option; when started with Windows, the app starts in the tray without opening a
@@ -179,7 +181,8 @@ enabled folder in **Folders**. While any display has its own folders, the
 slideshow lists monitors every 10 seconds: a reconnected display gets its image
 again and continues its own cycle, and a disconnected display is skipped.
 Folders and names of disconnected displays stay saved under **Saved monitor
-settings** until you choose **Forget**, or **Move** them to a connected display
+settings** until you choose **Forget** (after a confirmation, as for removing a
+folder), or **Move** them to a connected display
 that has no folders of its own, for example when a monitor was moved to another
 port and got a new device path. The configuration keys them by the Windows
 monitor device path. Profiles do not include per-monitor folders or names.

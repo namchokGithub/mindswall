@@ -1,6 +1,7 @@
 pub mod collage;
 pub mod config;
 pub mod editor;
+pub mod explorer;
 pub mod history;
 pub mod ipc;
 pub mod monitors;
