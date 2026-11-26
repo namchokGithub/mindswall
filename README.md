@@ -151,7 +151,12 @@ You can set or exclude an image, then use
 all exclusions. Restored images still need to match enabled folders and filters. Settings
 also contains fit, resolution, orientation, and aspect-ratio filters.
 
-**Combine images to fill the screen** (Settings, off by default) helps when an
+**Combine images to fill the screen** (Settings, off by default) has two
+layouts, chosen under **Combine layout** (`collage.layout`). **Side by side
+(v1)** (`row`) shows a portrait image on a landscape monitor with the next
+portrait images of the cycle, side by side at full height; other images are
+skipped and stay in the cycle, and the search stops at the first portrait image
+that no longer fits. **Mosaic (v2)** (`mosaic`, the default) helps when an
 image, fitted alone, would cover less than 80% of a monitor, such as a portrait
 or square image on a landscape monitor. The image is shown with other images
 from the current cycle in one to three rows, like a mosaic, over a blurred,

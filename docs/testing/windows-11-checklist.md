@@ -410,6 +410,10 @@ some landscape images.
       mosaic; very long strips are never added
 - [ ] Images that were combined are not shown again before the cycle ends
       (Overview position jumps by the number of combined images)
+- [ ] **Combine layout** > **Side by side (v1)**: only portrait images are
+      combined, side by side at full height as before; square images are shown
+      alone; switching back to **Mosaic (v2)** works at the next change; the
+      dropdown is disabled while combining is off
 - [ ] The result looks right with Fill, Fit, Center, and Span
 - [ ] Overview shows **+N images**, the preview is the combined image, and
       History notes "combined with N more"

@@ -51,3 +51,5 @@ All notable changes to MindsWall are recorded here. The format follows
   (portrait, square, or landscape on a portrait monitor) is shown with other
   images in up to three rows, like a mosaic, over a blurred background, with
   an adjustable gap; small images are never enlarged more than twice.
+  **Combine layout** chooses between this mosaic and the original side-by-side
+  portrait row.

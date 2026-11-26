@@ -466,6 +466,10 @@ only the image; forcing Fill there would require writing the per-user
   cover at least 0.15 more than the image alone.
 - Limits: no image is enlarged more than 2×; companions more than 4:1 in
   either direction are skipped. Unchosen images stay in the cycle.
+- The original single portrait row stays available as `collage.layout: "row"`
+  (**Side by side (v1)**); `mosaic` (**Mosaic (v2)**) is the default, also
+  for settings saved before the choice existed. Changing the layout drops
+  remembered combinations.
 - Companions count as played. The combination is remembered for Previous and
   reapplying (the last 10); the cache keeps the 10 most recent files.
 - Size: the monitor's resolution; the primary monitor for the shared

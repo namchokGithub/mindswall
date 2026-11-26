@@ -1,7 +1,7 @@
 //! Combined wallpapers: an image that leaves much of a monitor empty is shown
 //! with other images in rows, like a mosaic, over a blurred copy of it.
 
-use crate::config::CollageSettings;
+use crate::config::{CollageLayout, CollageSettings};
 use image::{DynamicImage, ImageEncoder, RgbImage, imageops::FilterType};
 use std::{
     cell::{Cell, RefCell},
@@ -206,6 +206,71 @@ pub fn plan(
     })
 }
 
+/// The full-height width of an image on a monitor `target_height` tall, rounded up.
+fn width_at((width, height): (u32, u32), target_height: u32) -> u32 {
+    (u64::from(width) * u64::from(target_height)).div_ceil(u64::from(height.max(1))) as u32
+}
+
+/// The side-by-side layout: only a portrait image on a landscape monitor is
+/// combined. Candidates are taken in order at full monitor height; images
+/// that are not portrait are skipped (they stay in the cycle), and the search
+/// stops at the first portrait image that no longer fits, with at most five
+/// companions. The row is centered. Returns `None` when nothing fits next to
+/// `first`.
+pub fn plan_row(
+    first: (u32, u32),
+    candidates: impl IntoIterator<Item = (PathBuf, (u32, u32))>,
+    target: (u32, u32),
+    gap: u32,
+) -> Option<Plan> {
+    let portrait = |(width, height): (u32, u32)| width > 0 && height > width;
+    let (target_width, target_height) = target;
+    if target_width <= target_height || !portrait(first) {
+        return None;
+    }
+    let mut widths = vec![width_at(first, target_height).min(target_width)];
+    let mut used = widths[0];
+    let mut companions = Vec::new();
+    for (path, size) in candidates.into_iter().take(SCAN_LIMIT) {
+        if !portrait(size) {
+            continue;
+        }
+        let width = width_at(size, target_height);
+        if used + gap + width > target_width {
+            break;
+        }
+        used += gap + width;
+        widths.push(width);
+        companions.push(path);
+        if companions.len() + 1 == MAX_IMAGES {
+            break;
+        }
+    }
+    if companions.is_empty() {
+        return None;
+    }
+    let mut x = (target_width - used) / 2;
+    let tiles = widths
+        .iter()
+        .map(|&width| {
+            let tile = Tile {
+                x,
+                y: 0,
+                width,
+                height: target_height,
+            };
+            x += width + gap;
+            tile
+        })
+        .collect();
+    let covered: u64 = widths.iter().map(|&width| u64::from(width)).sum();
+    Some(Plan {
+        companions,
+        tiles,
+        coverage: covered as f64 / f64::from(target_width),
+    })
+}
+
 /// Draw `images` at their `tiles` over a blurred, darkened copy of the first
 /// image on a `target` sized canvas, and save it as a JPEG in `cache`. The
 /// same inputs reuse the existing file.
@@ -368,7 +433,11 @@ impl Collages {
             .filter(|path| path.as_path() != first)
             .take(SCAN_LIMIT)
             .filter_map(|path| Some((path.clone(), crate::utilities::dimensions(path).ok()?)));
-        let plan = plan(first_size, candidates, size, self.settings.get().gap)?;
+        let settings = self.settings.get();
+        let plan = match settings.layout {
+            CollageLayout::Row => plan_row(first_size, candidates, size, settings.gap),
+            CollageLayout::Mosaic => plan(first_size, candidates, size, settings.gap),
+        }?;
         let combined = plan.companions;
         let images: Vec<PathBuf> = std::iter::once(first.to_owned())
             .chain(combined.iter().cloned())

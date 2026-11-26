@@ -67,19 +67,33 @@ pub enum Theme {
     Light,
     Dark,
 }
-/// Combine portrait images side by side on a landscape monitor.
+/// How combined wallpapers arrange their images.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CollageLayout {
+    /// Portrait images side by side at full height on a landscape monitor.
+    Row,
+    /// Any image that leaves much of the monitor empty, with others in up to
+    /// three rows.
+    #[default]
+    Mosaic,
+}
+
+/// Combine images that leave much of a monitor empty with other images.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CollageSettings {
     pub enabled: bool,
     /// Space between images in pixels, filled by the blurred background.
     pub gap: u32,
+    pub layout: CollageLayout,
 }
 impl Default for CollageSettings {
     fn default() -> Self {
         Self {
             enabled: false,
             gap: 4,
+            layout: CollageLayout::default(),
         }
     }
 }

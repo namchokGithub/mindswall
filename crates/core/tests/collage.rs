@@ -119,6 +119,50 @@ fn small_images_are_not_enlarged_more_than_twice() {
 }
 
 #[test]
+fn side_by_side_keeps_the_original_portrait_row() {
+    let candidates = vec![
+        (p("narrow.jpg"), (948, 2048)),
+        (p("landscape.jpg"), (1920, 1080)),
+        (p("wide-portrait.jpg"), (1170, 1650)),
+        (p("too-many.jpg"), (948, 2048)),
+    ];
+    // 500 + 4 + 500 + 4 + 766 = 1774 fits in 1920; another 500 does not.
+    let plan = collage::plan_row((948, 2048), candidates.clone(), (1920, 1080), 4).unwrap();
+    assert_eq!(
+        plan.companions,
+        vec![p("narrow.jpg"), p("wide-portrait.jpg")]
+    );
+    let sizes = sizes_of((948, 2048), &plan, &candidates);
+    assert_valid_row(&plan, &sizes, (1920, 1080));
+    assert_eq!(plan.tiles[0].x, (1920 - 1774) / 2);
+    assert_eq!(plan.tiles[1].x, plan.tiles[0].x + 500 + 4);
+
+    let one = || vec![(p("b.jpg"), (948, 2048))];
+    // Only portrait images on landscape monitors; a square image stays alone.
+    assert!(collage::plan_row((1920, 1080), one(), (1920, 1080), 4).is_none());
+    assert!(collage::plan_row((1000, 1000), one(), (1920, 1080), 4).is_none());
+    assert!(collage::plan_row((948, 2048), one(), (1080, 1920), 4).is_none());
+    // 511 + 4 + 334 = 849 does not fit in 800.
+    assert!(collage::plan_row((1170, 1650), one(), (800, 720), 4).is_none());
+    // A wider gap can leave no room for a second image: 710 + gap + 710.
+    let wide = || vec![(p("c.jpg"), (1170, 1650))];
+    assert!(collage::plan_row((1170, 1650), wide(), (1430, 1000), 4).is_some());
+    assert!(collage::plan_row((1170, 1650), wide(), (1430, 1000), 32).is_none());
+}
+
+/// Row tiles are full height, side by side, and inside the monitor.
+fn assert_valid_row(plan: &collage::Plan, sizes: &[(u32, u32)], target: (u32, u32)) {
+    assert_eq!(plan.tiles.len(), sizes.len());
+    for pair in plan.tiles.windows(2) {
+        assert!(pair[0].x + pair[0].width <= pair[1].x);
+    }
+    for tile in &plan.tiles {
+        assert_eq!((tile.y, tile.height), (0, target.1));
+        assert!(tile.x + tile.width <= target.0);
+    }
+}
+
+#[test]
 fn very_long_images_are_not_used_as_companions() {
     let candidates = vec![(p("strip.jpg"), (4000, 500)), (p("tower.jpg"), (300, 2000))];
     assert!(collage::plan((1200, 1200), candidates, (1920, 1080), 4).is_none());
@@ -261,6 +305,17 @@ fn collage_gap_is_validated() {
     let mut config = mindswall_core::config::Config::default();
     assert!(!config.collage.enabled);
     assert_eq!(config.collage.gap, 4);
+    assert_eq!(
+        config.collage.layout,
+        mindswall_core::config::CollageLayout::Mosaic
+    );
+    // Settings saved before the layout choice existed use the mosaic.
+    let older: mindswall_core::config::CollageSettings =
+        serde_json::from_str(r#"{"enabled":true,"gap":8}"#).unwrap();
+    assert_eq!(older.layout, mindswall_core::config::CollageLayout::Mosaic);
+    let row: mindswall_core::config::CollageSettings =
+        serde_json::from_str(r#"{"enabled":true,"gap":8,"layout":"row"}"#).unwrap();
+    assert_eq!(row.layout, mindswall_core::config::CollageLayout::Row);
     config.collage.gap = collage::MAX_GAP;
     assert!(config.validate().is_ok());
     config.collage.gap = collage::MAX_GAP + 1;
