@@ -178,7 +178,7 @@ export function MonitorsPage({ config, busy, saveMonitors }: { config: UtilityCo
             : <div className="monitor-title"><strong>{monitorLabel(monitor.id, monitors, config.monitor_names)}</strong><button className="icon-button" aria-label="Rename monitor" title="Rename" disabled={busy} onClick={() => setRenaming({ id: monitor.id, value: nameOf(monitor.id) })}><Pencil size={13}/></button></div>}
           <small title={monitor.id}>{[nameOf(monitor.id) && `Monitor ${index + 1}`, monitor.name ?? "Unknown model", `${monitor.width} × ${monitor.height}`, monitor.primary && "Primary"].filter(Boolean).join(" · ")}</small>
           <span className={`monitor-mode${foldersOf(monitor.id).length > 0 ? " own" : ""}`}>{mode(monitor.id)}</span>
-          <small className="selectable" title={monitor.current ?? undefined}>{!monitor.current ? "No wallpaper image reported" : /[\\/]collages[\\/][^\\/]+$/i.test(monitor.current) ? "Showing combined portrait images" : `Showing ${monitor.current.split(/[\\/]/).pop()}`}</small>
+          <small className="selectable" title={monitor.current ?? undefined}>{!monitor.current ? "No wallpaper image reported" : /[\\/]collages[\\/][^\\/]+$/i.test(monitor.current) ? "Showing combined images" : `Showing ${monitor.current.split(/[\\/]/).pop()}`}</small>
           {folderList(monitor.id)}
         </div>
         <div className="monitor-actions"><button className="secondary" disabled={busy} onClick={() => addFolder(monitor.id)}><Plus size={15}/> Add folder</button><button className="secondary" onClick={() => chooseImage(monitor.id)}>Choose image</button></div>

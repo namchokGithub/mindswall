@@ -1,8 +1,8 @@
-//! Combined wallpapers: portrait images placed side by side on a landscape
-//! monitor, over a blurred copy of the first image.
+//! Combined wallpapers: an image that leaves much of a monitor empty is shown
+//! with other images in rows, like a mosaic, over a blurred copy of it.
 
 use crate::config::CollageSettings;
-use image::{DynamicImage, GenericImageView, ImageEncoder, RgbImage, imageops::FilterType};
+use image::{DynamicImage, ImageEncoder, RgbImage, imageops::FilterType};
 use std::{
     cell::{Cell, RefCell},
     collections::VecDeque,
@@ -14,75 +14,222 @@ use std::{
 
 /// Largest allowed space between images, in pixels.
 pub const MAX_GAP: u32 = 32;
-/// Most images shown next to the first one.
-const MAX_COMPANIONS: usize = 5;
+/// Most images in one combined wallpaper, including the first.
+const MAX_IMAGES: usize = 6;
 /// How many unplayed images are checked for companions.
 const SCAN_LIMIT: usize = 30;
+/// How many usable unplayed images the layout may choose from.
+const POOL: usize = 8;
+/// Images are never enlarged more than this, so small images do not blur.
+const MAX_UPSCALE: f64 = 2.0;
+/// The first image is combined only when, fitted alone, it covers less than
+/// this share of the monitor.
+const COMBINE_BELOW: f64 = 0.8;
+/// A layout must cover at least this much more of the monitor than the first
+/// image alone.
+const MIN_GAIN: f64 = 0.15;
+/// Score taken off for each extra image, so fewer images win a near tie.
+const IMAGE_COST: f64 = 0.02;
+/// Companions wider or taller than this many times their other side are
+/// skipped, because they would become thin strips.
+const MAX_SHAPE: f64 = 4.0;
 /// Combined wallpapers kept on disk and remembered for Previous.
 const KEEP: usize = 10;
 
-fn is_portrait((width, height): (u32, u32)) -> bool {
-    width > 0 && height > width
+/// Where one image is drawn on the combined wallpaper, in pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Tile {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
-/// Width of an image scaled to `height`, rounded up.
-fn width_at((width, height): (u32, u32), target_height: u32) -> u32 {
-    (u64::from(width) * u64::from(target_height)).div_ceil(u64::from(height.max(1))) as u32
+/// The images chosen to show next to the first one, and where every image
+/// goes: `tiles[0]` is the first image, then the companions in order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Plan {
+    pub companions: Vec<PathBuf>,
+    pub tiles: Vec<Tile>,
+    /// The share of the monitor covered by images, from 0 to 1.
+    pub coverage: f64,
 }
 
-/// Choose the images to show next to `first` on a `target` sized monitor.
+fn ratio((width, height): (u32, u32)) -> f64 {
+    f64::from(width) / f64::from(height)
+}
+
+/// The share of `target` that `size` covers when fitted alone.
+fn coverage_alone(size: (u32, u32), target: (u32, u32)) -> f64 {
+    let (image, screen) = (ratio(size), ratio(target));
+    image.min(screen) / image.max(screen)
+}
+
+/// Every way to split `count` images, in order, into one to three rows. Each entry lists the number of images per row.
+fn row_splits(count: usize) -> Vec<Vec<usize>> {
+    let mut splits = vec![vec![count]];
+    for first in 1..count {
+        splits.push(vec![first, count - first]);
+        for second in 1..count - first {
+            splits.push(vec![first, second, count - first - second]);
+        }
+    }
+    splits
+}
+
+/// Arrange `sizes` in rows of `rows` images: every image in a row has the
+/// same height and each row spans the monitor's width. When the rows are
+/// taller than the monitor, everything is scaled down to fit. The result is
+/// centered. Returns the covered share and the tiles, or `None` when an image
+/// would be enlarged more than [`MAX_UPSCALE`] or there is no room.
+fn layout(
+    sizes: &[(u32, u32)],
+    rows: &[usize],
+    (width, height): (u32, u32),
+    gap: u32,
+) -> Option<(f64, Vec<Tile>)> {
+    let (screen_width, screen_height, gap) = (f64::from(width), f64::from(height), f64::from(gap));
+    let mut row_heights = Vec::with_capacity(rows.len());
+    let mut start = 0;
+    for &count in rows {
+        let group = &sizes[start..start + count];
+        let room = screen_width - gap * (count - 1) as f64;
+        if room <= 0.0 {
+            return None;
+        }
+        row_heights.push(room / group.iter().map(|&size| ratio(size)).sum::<f64>());
+        start += count;
+    }
+    let row_gaps = gap * (rows.len() - 1) as f64;
+    if row_gaps >= screen_height {
+        return None;
+    }
+    let total: f64 = row_heights.iter().sum();
+    let scale = if total + row_gaps > screen_height {
+        (screen_height - row_gaps) / total
+    } else {
+        1.0
+    };
+    let mut y = (screen_height - (total * scale + row_gaps)) / 2.0;
+    let mut tiles = Vec::with_capacity(sizes.len());
+    let mut covered = 0.0;
+    let mut start = 0;
+    for (&count, &row_height) in rows.iter().zip(&row_heights) {
+        let row_height = row_height * scale;
+        let group = &sizes[start..start + count];
+        let row_width = group
+            .iter()
+            .map(|&size| ratio(size) * row_height)
+            .sum::<f64>()
+            + gap * (count - 1) as f64;
+        let mut x = (screen_width - row_width) / 2.0;
+        for &size in group {
+            if row_height > MAX_UPSCALE * f64::from(size.1) {
+                return None;
+            }
+            let tile_width = ratio(size) * row_height;
+            // Rounding both edges keeps neighbouring tiles from overlapping.
+            let (left, right) = (x.round(), (x + tile_width).round());
+            let (top, bottom) = (y.round(), (y + row_height).round());
+            if right - left < 1.0 || bottom - top < 1.0 {
+                return None;
+            }
+            tiles.push(Tile {
+                x: left as u32,
+                y: top as u32,
+                width: (right - left) as u32,
+                height: (bottom - top) as u32,
+            });
+            covered += tile_width * row_height;
+            x += tile_width + gap;
+        }
+        y += row_height + gap;
+        start += count;
+    }
+    Some((covered / (screen_width * screen_height), tiles))
+}
+
+/// Choose images to show with `first` on a `target` sized monitor and lay
+/// them out in rows, like a mosaic.
 ///
-/// Only a portrait image on a landscape monitor is combined. Candidates are
-/// taken in order: landscape ones are skipped (they stay in the cycle), and
-/// the search stops at the first portrait image that no longer fits. Returns
-/// an empty list when nothing fits next to `first`.
+/// `first` is combined only when, fitted alone, it leaves much of the
+/// monitor empty. Companions are chosen from the first usable candidates
+/// (no more than four times as wide as tall or the other way round), keeping
+/// their order; images that are not chosen
+/// stay in the cycle. The layout that covers the most of the monitor wins,
+/// with a small cost per extra image. No image is enlarged more than twice.
+/// Returns `None` when no layout covers clearly more than `first` alone.
 pub fn plan(
     first: (u32, u32),
     candidates: impl IntoIterator<Item = (PathBuf, (u32, u32))>,
     target: (u32, u32),
     gap: u32,
-) -> Vec<PathBuf> {
-    let (target_width, target_height) = target;
-    if target_width <= target_height || !is_portrait(first) {
-        return Vec::new();
+) -> Option<Plan> {
+    let valid = |(width, height): (u32, u32)| width > 0 && height > 0;
+    if !valid(first) || !valid(target) {
+        return None;
     }
-    let mut used = width_at(first, target_height);
-    let mut chosen = Vec::new();
-    for (path, size) in candidates.into_iter().take(SCAN_LIMIT) {
-        if !is_portrait(size) {
+    let alone = coverage_alone(first, target);
+    if alone >= COMBINE_BELOW {
+        return None;
+    }
+    let pool: Vec<(PathBuf, (u32, u32))> = candidates
+        .into_iter()
+        .take(SCAN_LIMIT)
+        .filter(|(_, size)| valid(*size) && (1.0 / MAX_SHAPE..=MAX_SHAPE).contains(&ratio(*size)))
+        .take(POOL)
+        .collect();
+    let mut best: Option<(f64, Vec<usize>, f64, Vec<Tile>)> = None;
+    for mask in 1u32..(1 << pool.len()) {
+        let chosen: Vec<usize> = (0..pool.len()).filter(|i| mask & (1 << i) != 0).collect();
+        if chosen.len() + 1 > MAX_IMAGES {
             continue;
         }
-        let width = width_at(size, target_height);
-        if used + gap + width > target_width {
-            break;
-        }
-        used += gap + width;
-        chosen.push(path);
-        if chosen.len() == MAX_COMPANIONS {
-            break;
+        let sizes: Vec<(u32, u32)> = std::iter::once(first)
+            .chain(chosen.iter().map(|&i| pool[i].1))
+            .collect();
+        for rows in row_splits(sizes.len()) {
+            let Some((coverage, tiles)) = layout(&sizes, &rows, target, gap) else {
+                continue;
+            };
+            let score = coverage - IMAGE_COST * chosen.len() as f64;
+            if coverage >= alone + MIN_GAIN && best.as_ref().is_none_or(|best| score > best.0) {
+                best = Some((score, chosen.clone(), coverage, tiles));
+            }
         }
     }
-    chosen
+    let (_, chosen, coverage, tiles) = best?;
+    Some(Plan {
+        companions: chosen.into_iter().map(|i| pool[i].0.clone()).collect(),
+        tiles,
+        coverage,
+    })
 }
 
-/// Draw `images` side by side at full height, centered on a `target` sized
-/// canvas over a blurred, darkened copy of the first image, and save it as a
-/// JPEG in `cache`. The same inputs reuse the existing file.
+/// Draw `images` at their `tiles` over a blurred, darkened copy of the first
+/// image on a `target` sized canvas, and save it as a JPEG in `cache`. The
+/// same inputs reuse the existing file.
 pub fn render(
     images: &[PathBuf],
+    tiles: &[Tile],
     target: (u32, u32),
-    gap: u32,
     cache: &Path,
 ) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
     let (width, height) = target;
+    let invalid = || io::Error::new(io::ErrorKind::InvalidInput, "Invalid combined wallpaper");
     if images.is_empty()
+        || images.len() != tiles.len()
         || width == 0
         || height == 0
         || u64::from(width) * u64::from(height) > 64_000_000
+        || tiles.iter().any(|tile| {
+            tile.width == 0
+                || tile.height == 0
+                || u64::from(tile.x) + u64::from(tile.width) > u64::from(width)
+                || u64::from(tile.y) + u64::from(tile.height) > u64::from(height)
+        })
     {
-        return Err(
-            io::Error::new(io::ErrorKind::InvalidInput, "Invalid combined wallpaper").into(),
-        );
+        return Err(invalid().into());
     }
     let mut hash = DefaultHasher::new();
     for path in images {
@@ -91,7 +238,7 @@ pub fn render(
         meta.len().hash(&mut hash);
         meta.modified()?.hash(&mut hash);
     }
-    (width, height, gap).hash(&mut hash);
+    (width, height, tiles).hash(&mut hash);
     let file = cache.join(format!("{:016x}.jpg", hash.finish()));
     if file.is_file() {
         return Ok(file);
@@ -102,21 +249,11 @@ pub fn render(
         .map(image::open)
         .collect::<Result<Vec<DynamicImage>, _>>()?;
     let mut canvas = background(&decoded[0], target);
-    let scaled: Vec<RgbImage> = decoded
-        .iter()
-        .map(|image| {
-            let size = width_at(image.dimensions(), height).min(width);
-            image
-                .resize_exact(size, height, FilterType::CatmullRom)
-                .to_rgb8()
-        })
-        .collect();
-    let total = scaled.iter().map(RgbImage::width).sum::<u32>()
-        + gap * (scaled.len() as u32).saturating_sub(1);
-    let mut x = i64::from(width.saturating_sub(total) / 2);
-    for image in &scaled {
-        image::imageops::overlay(&mut canvas, image, x, 0);
-        x += i64::from(image.width() + gap);
+    for (image, tile) in decoded.iter().zip(tiles) {
+        let scaled = image
+            .resize_exact(tile.width, tile.height, FilterType::CatmullRom)
+            .to_rgb8();
+        image::imageops::overlay(&mut canvas, &scaled, i64::from(tile.x), i64::from(tile.y));
     }
 
     fs::create_dir_all(cache)?;
@@ -225,25 +362,19 @@ impl Collages {
             return self.remembered(target, first);
         }
         let first_size = crate::utilities::dimensions(first).ok()?;
-        if !is_portrait(first_size) {
-            return None;
-        }
         let size = size()?;
         let candidates = upcoming
             .iter()
             .filter(|path| path.as_path() != first)
             .take(SCAN_LIMIT)
             .filter_map(|path| Some((path.clone(), crate::utilities::dimensions(path).ok()?)));
-        let gap = self.settings.get().gap;
-        let combined = plan(first_size, candidates, size, gap);
-        if combined.is_empty() {
-            return None;
-        }
+        let plan = plan(first_size, candidates, size, self.settings.get().gap)?;
+        let combined = plan.companions;
         let images: Vec<PathBuf> = std::iter::once(first.to_owned())
             .chain(combined.iter().cloned())
             .collect();
         let cache = self.cache.as_ref()?;
-        let file = match render(&images, size, gap, cache) {
+        let file = match render(&images, &plan.tiles, size, cache) {
             Ok(file) => file,
             Err(error) => {
                 tracing::warn!(%error, "could not combine images; showing one image");

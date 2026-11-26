@@ -151,11 +151,18 @@ You can set or exclude an image, then use
 all exclusions. Restored images still need to match enabled folders and filters. Settings
 also contains fit, resolution, orientation, and aspect-ratio filters.
 
-**Combine portrait images** (Settings, off by default) shows a portrait image on
-a landscape monitor together with the next portrait images of the current
-cycle, side by side at full height over a blurred, darkened copy of the first
-image, with an adjustable space between them (0–32 px, default 4). Images that
-are shown together count as shown in the cycle. The combined image is made at
+**Combine images to fill the screen** (Settings, off by default) helps when an
+image, fitted alone, would cover less than 80% of a monitor, such as a portrait
+or square image on a landscape monitor. The image is shown with other images
+from the current cycle in one to three rows, like a mosaic, over a blurred,
+darkened copy of it, with an adjustable space between them (0–32 px, default
+4). Up to five other images are chosen from the next eight usable images of the
+cycle, keeping their order, to cover as much of the monitor as possible; a
+combination must cover clearly more (15 points) than the image alone. No image
+is enlarged more than twice its size, so small images are shown alone, and
+images more than four times as wide as tall (or the other way round) are not
+added. Images that are shown together count as shown in the cycle; images that
+were not chosen stay in it. The combined image is made at
 the monitor's resolution (all monitors together for Span, the primary monitor
 for a shared slideshow, each monitor's own size for monitors with their own
 folders), works with every fit mode, and is cached in

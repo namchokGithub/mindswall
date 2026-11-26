@@ -47,5 +47,7 @@ All notable changes to MindsWall are recorded here. The format follows
 - The Editor previews the chosen image with its size, compares it with the
   edited copy, and has a **Clear** button.
 - Settings can open the log folder and show the last 100 log lines.
-- Optional combined wallpapers: portrait images are shown side by side on a
-  landscape monitor over a blurred background, with an adjustable gap.
+- Optional combined wallpapers: an image that leaves much of a monitor empty
+  (portrait, square, or landscape on a portrait monitor) is shown with other
+  images in up to three rows, like a mosaic, over a blurred background, with
+  an adjustable gap; small images are never enlarged more than twice.

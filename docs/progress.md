@@ -315,7 +315,7 @@ artifacts.
 
 Development started before release at the user's request.
 
-- [~] **Combined portrait wallpapers** (2026-11-26, D8): implemented with
+- [~] **Combined wallpapers (mosaic)** (2026-11-26, D8): implemented with
   tests for planning, rendering, and cycle accounting; awaiting Windows check
 - [~] **UI polish** (2026-11-26): light/dark/system theme (`theme` in the
   config), custom title bar (`decorations: false`), fixed sidebar, hidden scroll
@@ -451,14 +451,21 @@ only the image; forcing Fill there would require writing the per-user
   next interval. Monitors that share the main slideshow, and all monitors in
   the Span fit mode, cannot change alone.
 
-### D8. Combined portrait wallpapers
+### D8. Combined wallpapers (mosaic)
 
 - Off by default (`collage.enabled`); the gap is 0–32 px (`collage.gap`,
   default 4).
-- Applies to every fit mode, only for a portrait image on a landscape monitor.
-  Companions are the next portrait images in the current cycle, in order;
-  landscape images are skipped and stay in the cycle; the search stops at the
-  first portrait image that does not fit, with at most 5 companions.
+- Applies to every fit mode when the first image, fitted alone, covers less
+  than 80% of the monitor (portrait or square images on a landscape monitor,
+  landscape images on a portrait monitor).
+- Layout (2026-11-26, replaces the single portrait row): one to three rows;
+  each row spans the monitor width with equal image heights, and the whole
+  layout is scaled down when taller than the monitor. Companions (at most 5)
+  are any subset, in order, of the next 8 usable images of the cycle; the
+  layout with the highest coverage wins, minus 0.02 per extra image, and must
+  cover at least 0.15 more than the image alone.
+- Limits: no image is enlarged more than 2×; companions more than 4:1 in
+  either direction are skipped. Unchosen images stay in the cycle.
 - Companions count as played. The combination is remembered for Previous and
   reapplying (the last 10); the cache keeps the 10 most recent files.
 - Size: the monitor's resolution; the primary monitor for the shared
