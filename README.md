@@ -110,7 +110,7 @@ You can set or exclude an image, then use
 **Excluded** in Gallery to restore individual images or **Settings** to restore
 all exclusions. Restored images still need to match enabled folders and filters. Settings
 also contains fit, resolution, orientation, and aspect-ratio filters. **History**
-keeps the most recent 100 applied images locally, and **Monitors** lists
+shows thumbnails for the most recent 10 applied images locally, and **Monitors** lists
 connected displays and can apply an image to one display. A running slideshow
 can replace a per-monitor selection at its next change.
 Windows may retain unavailable display records; Monitors skips records whose

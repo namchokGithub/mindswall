@@ -332,13 +332,32 @@ async fn gallery_thumbnail(
         {
             return Err("Image is not in the current collection".into());
         }
-        let cache = directories::ProjectDirs::from("", "", "MindsWall")
-            .ok_or("Cache directory unavailable")?
-            .cache_dir()
-            .join("thumbnails");
-        let thumb =
-            mindswall_core::utilities::thumbnail(&path, &cache).map_err(|e| e.to_string())?;
-        std::fs::read(thumb).map_err(|e| e.to_string())
+        cached_thumbnail(&path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn cached_thumbnail(path: &std::path::Path) -> Result<Vec<u8>, String> {
+    let cache = directories::ProjectDirs::from("", "", "MindsWall")
+        .ok_or("Cache directory unavailable")?
+        .cache_dir()
+        .join("thumbnails");
+    let thumb = mindswall_core::utilities::thumbnail(path, &cache).map_err(|e| e.to_string())?;
+    std::fs::read(thumb).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn history_thumbnail(path: PathBuf) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let history = mindswall_core::history::History::load(
+            &mindswall_core::history::History::default_path().map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        if !history.entries.iter().any(|entry| entry.path == path) {
+            return Err("Image is not in the wallpaper history".into());
+        }
+        cached_thumbnail(&path)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -694,6 +713,7 @@ pub fn run() {
             set_autostart,
             gallery_images,
             gallery_thumbnail,
+            history_thumbnail,
             gallery_details,
             apply_image,
             get_history,

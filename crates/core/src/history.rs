@@ -6,6 +6,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+const HISTORY_LIMIT: usize = 10;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub path: PathBuf,
@@ -26,14 +28,18 @@ impl History {
     }
     pub fn load(path: &Path) -> io::Result<Self> {
         match fs::read(path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).map_err(io::Error::other),
+            Ok(bytes) => {
+                let mut history: Self = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+                history.entries.truncate(HISTORY_LIMIT);
+                Ok(history)
+            }
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Self::default()),
             Err(e) => Err(e),
         }
     }
     pub fn push(&mut self, entry: HistoryEntry) {
         self.entries.insert(0, entry);
-        self.entries.truncate(100);
+        self.entries.truncate(HISTORY_LIMIT);
     }
     pub fn save(&self, path: &Path) -> io::Result<()> {
         let parent = path

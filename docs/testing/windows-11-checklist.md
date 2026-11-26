@@ -270,6 +270,10 @@ matches the Windows **Personalize > Background** setting of the same name.
 - [x] Re-apply sets the image again
 - [x] A deleted image is shown as missing or handled without a crash
 - [x] After more than 100 changes, only the latest 100 are kept
+- [ ] With the new limit, only the latest 10 entries appear and are retained
+      after the next wallpaper change
+- [ ] History thumbnails appear for available images; missing images show a
+      placeholder without affecting other entries
 - [x] History survives an app restart
 
 ### Monitors (needs two or more displays)

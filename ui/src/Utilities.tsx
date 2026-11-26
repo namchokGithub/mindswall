@@ -21,17 +21,17 @@ function initialGalleryLayout(): GalleryLayout {
 
 const loadThumbnail = createThumbnailQueue(4);
 
-function Thumbnail({ path }: { path: string }) {
+function Thumbnail({ path, source = "gallery_thumbnail" }: { path: string; source?: "gallery_thumbnail" | "history_thumbnail" }) {
   const [src, setSrc] = useState("");
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true; let url = "";
-    loadThumbnail(() => invoke<number[]>("gallery_thumbnail", { path }), () => active).then(bytes => {
+    loadThumbnail(() => invoke<number[]>(source, { path }), () => active).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "image/png" })); setSrc(url);
     }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [path]);
+  }, [path, source]);
   return src ? <img src={src} alt="" loading="lazy" /> : <div className="thumbnail-placeholder">{failed ? "Preview unavailable" : "Loading…"}</div>;
 }
 
@@ -70,7 +70,7 @@ export function HistoryPage() {
   const refresh = useCallback(async () => { try { setEntries(await invoke<Entry[]>("get_history")); setError(""); } catch (e) { setError(String(e)); } finally { setLoading(false); } }, [setError]);
   useEffect(() => { refresh(); }, [refresh]);
   return <><div className="section-title"><div><span className="eyebrow">RECENT MOMENTS</span><h2>Wallpaper history</h2></div><button className="icon-button" aria-label="Refresh history" onClick={refresh}><RefreshCw size={16}/></button></div>
-    {loading ? <p role="status">Loading history…</p> : entries.length === 0 ? <div className="panel empty"><h3>Nothing here yet.</h3><p>Wallpapers you apply will appear here.</p></div> : <div className="panel">{entries.map((entry, index) => <div className="history-row" key={`${entry.timestamp}-${index}`}><div><strong title={entry.path}>{entry.path.split(/[\\/]/).pop()}</strong><small title={entry.path}>{entry.path}</small><small>{new Date(entry.timestamp * 1000).toLocaleString()}{entry.monitor ? ` · ${entry.monitor}` : ""}</small></div><button className="secondary" onClick={async () => { try { await invoke("reapply_history", { path: entry.path, monitor: entry.monitor }); await refresh(); setNotice("Wallpaper changed."); } catch (e) { setError(String(e)); } }}>Apply again</button></div>)}</div>}
+    {loading ? <p role="status">Loading history…</p> : entries.length === 0 ? <div className="panel empty"><h3>Nothing here yet.</h3><p>Wallpapers you apply will appear here.</p></div> : <div className="panel">{entries.map((entry, index) => <div className="history-row history-entry" key={`${entry.timestamp}-${index}`}><div className="history-thumbnail"><Thumbnail path={entry.path} source="history_thumbnail"/></div><div className="history-details"><strong title={entry.path}>{entry.path.split(/[\\/]/).pop()}</strong><small title={entry.path}>{entry.path}</small><small>{new Date(entry.timestamp * 1000).toLocaleString()}{entry.monitor ? ` · ${entry.monitor}` : ""}</small></div><button className="secondary" onClick={async () => { try { await invoke("reapply_history", { path: entry.path, monitor: entry.monitor }); await refresh(); setNotice("Wallpaper changed."); } catch (e) { setError(String(e)); } }}>Apply again</button></div>)}</div>}
   </>;
 }
 
