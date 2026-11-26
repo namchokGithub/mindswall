@@ -97,8 +97,8 @@ npm.cmd --prefix ui run tauri dev
 Use **Folders** to select image directories, then start the slideshow from
 **Overview**. Folder paths on **Folders** and **Monitors** show only the last
 folder (for example `******\wallpapers`) so the rest stays out of screenshots;
-select a path to copy the full path. On **Monitors**, each folder also has
-**Copy path** and **Open folder** (File Explorer) buttons; only folders in the
+select a path to copy the full path. On **Monitors**, each folder also has an
+**Open folder** (File Explorer) button; only folders in the
 settings can be opened. Closing the window releases its WebView to save memory while the
 app keeps running in the system tray; use the tray menu to open the window
 again or quit the app. **Settings** includes the per-user Windows startup

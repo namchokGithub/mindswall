@@ -525,7 +525,7 @@ some landscape images.
       appears first (Cancel and Escape keep the folder); after **Remove**, the
       monitor returns to the main slideshow
 - [ ] **Forget** on a saved monitor asks for confirmation first
-- [ ] Next to a monitor folder, **Copy path** copies the full path and **Open
+- [ ] Clicking a monitor folder's path copies the full path, and **Open
       folder** opens it in File Explorer; a folder that no longer exists shows
       an error
 - [ ] When wallpapers change, the Monitors thumbnails and the Overview cards

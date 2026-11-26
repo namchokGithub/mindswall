@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowRightLeft, Copy, ExternalLink, FolderOpen, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowRightLeft, ExternalLink, FolderOpen, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
 import { useLoadedImage } from "./useLoadedImage";
@@ -152,12 +152,10 @@ export function MonitorsPage({ config, busy, saveMonitors }: { config: UtilityCo
     return `Own folders · ${folders.length} ${folders.length === 1 ? "folder" : "folders"}${total === null ? "" : ` · ${total} images`}`;
   };
   const copied = (ok: boolean) => ok ? setNotice("Folder path copied.") : setError("Could not copy the folder path.");
-  const copyPath = (path: string) => navigator.clipboard.writeText(path).then(() => copied(true), () => copied(false));
   const openFolder = (path: string) => run(() => invoke("open_folder", { path }));
   const confirmRemove = (id: string, path: string) => setConfirm({ title: "Remove this folder?", message: `${maskFolderPath(path)} will no longer be used by ${monitorLabel(id, monitors, config.monitor_names)}. The images stay on your disk.`, confirm: "Remove", action: () => removeFolder(id, path) });
   const confirmForget = (id: string) => setConfirm({ title: "Forget this monitor?", message: `The folders and name saved for ${monitorLabel(id, monitors, config.monitor_names)} will be removed. The images stay on your disk.`, confirm: "Forget", action: () => forget(id) });
   const folderList = (id: string) => foldersOf(id).map(folder => <div className="monitor-folder" key={folder.path}><FolderOpen size={15}/><PathCopy path={folder.path} copied={copied}/>
-    <button className="icon-button" aria-label={`Copy full path of ${maskFolderPath(folder.path)}`} title="Copy path" onClick={() => copyPath(folder.path)}><Copy size={14}/></button>
     <button className="icon-button" aria-label={`Open ${maskFolderPath(folder.path)} in File Explorer`} title="Open folder" onClick={() => openFolder(folder.path)}><ExternalLink size={14}/></button>
     <button className="icon-button danger" aria-label={`Remove ${maskFolderPath(folder.path)}`} title="Remove folder" disabled={busy} onClick={() => confirmRemove(id, folder.path)}><Trash2 size={14}/></button></div>);
 
