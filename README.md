@@ -261,7 +261,8 @@ to it at the same scale with both sizes, and **Clear** starts over with default
 settings. **Keep aspect ratio** (on by default) fills in the other side when
 width or height changes, using the crop size when cropping; with it off, a
 warning shows when the new size stretches the image. The Editor shows
-a loading indicator while creating a preview and keeps its work when switching
+a spinner on **Create preview** (and dims the previous edit) while creating a
+preview and keeps its work when switching
 pages during the same app session. Global shortcuts
 can be recorded using the keyboard in **Settings**, and saved profiles are available from the
 system tray. These features still need interactive Windows verification. A

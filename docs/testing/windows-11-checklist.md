@@ -583,8 +583,10 @@ some landscape images.
 - [ ] **Clear** returns to the empty Editor and resets width, height, crop,
       blur, and dim; **Choose another** replaces the image and removes the old
       edited preview
-- [ ] Creating a preview shows a loading state and prevents changing edit
-      settings until the preview succeeds or fails
+- [ ] Creating a preview shows a spinner and **Creating preview…** on the
+      button only (no separate loading box), dims an existing **Edited**
+      image with a small spinner, and prevents changing edit settings until
+      the preview succeeds or fails
 - [ ] Switch to another page while a preview is processing, then return before
       and after it finishes: the edit settings and preview remain available
 - [ ] A preview failure while on another page is reported after returning to
