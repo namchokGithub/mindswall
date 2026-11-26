@@ -58,6 +58,15 @@ pub struct MonitorFolders {
     pub monitor: String,
     pub folders: Vec<Folder>,
 }
+/// The desktop app's color theme. `System` follows the Windows app mode.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Theme {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
 /// A name the user gave a monitor, shown instead of its device path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MonitorName {
@@ -111,6 +120,8 @@ pub struct Config {
     /// the name Windows reports for it.
     #[serde(default)]
     pub monitor_names: Vec<MonitorName>,
+    #[serde(default)]
+    pub theme: Theme,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -127,6 +138,7 @@ impl Default for Config {
             hotkeys: Hotkeys::default(),
             monitor_folders: Vec::new(),
             monitor_names: Vec::new(),
+            theme: Theme::System,
         }
     }
 }

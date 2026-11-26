@@ -99,6 +99,13 @@ startup entry made by an earlier build. The app and the CLI use the same local c
 pipe. Desktop interactions and startup behavior still require interactive
 Windows verification.
 
+The window uses its own minimal title bar in the app's colors, with minimize,
+maximize, and close buttons; drag it to move the window and double-click it to
+maximize. **Settings** > **Theme** chooses Light, Dark, or System (follows the
+Windows app mode; stored as `theme` in the config). The sidebar stays in place
+while the page scrolls, scroll bars are hidden, dropdowns use the app's own
+style, and only file names and paths can be selected and copied.
+
 Disabling or removing the last enabled folder stops the slideshow and applies
 the Windows image at `%SystemRoot%\Web\Wallpaper\Windows\img0.jpg`. If the
 slideshow was running, enabling a folder again resumes it; if it was paused,

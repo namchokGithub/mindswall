@@ -29,3 +29,6 @@ All notable changes to MindsWall are recorded here. The format follows
 - Every page shows the active profile and whether its settings changed;
   profiles can be updated with the current settings or reverted, and the tray
   checks the active profile.
+- Light, dark, and system themes, a custom title bar, a fixed sidebar, hidden
+  scroll bars, custom dropdowns, and text selection limited to file names and
+  paths.

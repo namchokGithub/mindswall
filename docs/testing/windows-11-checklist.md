@@ -244,6 +244,25 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [x] The app opens and every page loads: Overview, Folders, Gallery, Monitors,
       History, Profiles, Editor, Settings
 - [x] Logo and tray icon display correctly
+- [ ] The custom title bar shows the logo and name once (not repeated in the
+      sidebar), matches the app background, and follows Light/Dark
+- [ ] Dragging the title bar moves the window; double-click maximizes and
+      restores; Windows+Arrow snapping works
+- [ ] Minimize, Maximize/Restore, and Close work; Close keeps the app in the
+      tray; the edges resize the window and the window has a shadow
+- [ ] **Settings** > **Theme**: Light, Dark, and System each apply immediately;
+      with System, changing the Windows app mode switches the app while it is
+      open; the choice persists after restart
+- [ ] In Light, every page is readable (text, buttons, badges, snackbars, the
+      Overview preview text over the image, and Monitors tiles)
+- [ ] The sidebar stays fixed while a long page (Gallery) scrolls; no scroll
+      bars are visible, but mouse wheel, touchpad, and keyboard scrolling work
+- [ ] Text cannot be selected except file names and paths (Folders, Overview,
+      Gallery, History, Monitors, image details); inputs still allow selection
+- [ ] Every dropdown (interval, fit mode, orientation, aspect ratio, theme,
+      History filter, Monitors **Move to…**) opens the app's own menu, works
+      with mouse and keyboard (arrows, Enter, Escape), and opens upward near the
+      bottom of the window
 
 ### Folders
 

@@ -109,3 +109,28 @@ fn restoring_one_excluded_image_keeps_other_exclusions() {
     assert_eq!(config.images().unwrap(), vec![first]);
     assert_eq!(config.excluded, vec![second]);
 }
+
+#[test]
+fn theme_defaults_to_system_and_round_trips() {
+    use mindswall_core::config::Theme;
+    let config: Config =
+        serde_json::from_str(r#"{"version":1,"folders":[],"interval_seconds":600,"shuffle":true}"#)
+            .unwrap();
+    assert_eq!(config.theme, Theme::System);
+    let dark = Config {
+        theme: Theme::Dark,
+        ..Config::default()
+    };
+    let json = serde_json::to_string(&dark).unwrap();
+    assert!(json.contains(r#""theme":"dark""#));
+    assert_eq!(
+        serde_json::from_str::<Config>(&json).unwrap().theme,
+        Theme::Dark
+    );
+    assert!(
+        serde_json::from_str::<Config>(
+            r#"{"version":1,"folders":[],"interval_seconds":600,"shuffle":true,"theme":"blue"}"#
+        )
+        .is_err()
+    );
+}

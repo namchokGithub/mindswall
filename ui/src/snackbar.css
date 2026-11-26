@@ -12,11 +12,11 @@
   align-items: flex-start;
   gap: 12px;
   padding: 15px 14px 15px 17px;
-  background: #272835;
-  color: #f0effa;
-  border: 1px solid #4a4b60;
+  background: var(--c-272835);
+  color: var(--c-f0effa);
+  border: 1px solid var(--c-4a4b60);
   border-radius: 10px;
-  box-shadow: 0 14px 36px #08091080;
+  box-shadow: 0 14px 36px var(--c-08091080);
   font-size: 13px;
   line-height: 1.45;
   pointer-events: auto;
@@ -24,20 +24,20 @@
 }
 
 .snackbar > svg { flex: none; }
-.snackbar--success > svg { color: #a2ddbb; }
-.snackbar--error > svg { color: #ffb5bd; }
+.snackbar--success > svg { color: var(--c-a2ddbb); }
+.snackbar--error > svg { color: var(--c-ffb5bd); }
 .snackbar > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .snackbar > button {
   display: grid;
   place-items: center;
   flex: none;
   padding: 2px;
-  color: #b5b5c7;
+  color: var(--c-b5b5c7);
   background: transparent;
   border: 0;
   border-radius: 4px;
 }
-.snackbar > button:hover { color: #fff; }
+.snackbar > button:hover { color: var(--c-ffffff); }
 
 @keyframes snackbar-in {
   from { opacity: 0; transform: translateY(8px); }

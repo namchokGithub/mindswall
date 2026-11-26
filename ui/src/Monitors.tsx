@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ArrowRightLeft, FolderOpen, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
+import { Select } from "./Select";
 import type { MonitorFolders, UtilityConfig } from "./Utilities";
 
 export type Monitor = { id: string; name: string | null; x: number; y: number; width: number; height: number; primary: boolean; current: string | null };
@@ -182,13 +183,13 @@ export function MonitorsPage({ config, busy, saveMonitors }: { config: UtilityCo
             : <div className="monitor-title"><strong>{monitorLabel(monitor.id, monitors, config.monitor_names)}</strong><button className="icon-button" aria-label="Rename monitor" title="Rename" disabled={busy} onClick={() => setRenaming({ id: monitor.id, value: nameOf(monitor.id) })}><Pencil size={13}/></button></div>}
           <small title={monitor.id}>{[nameOf(monitor.id) && `Monitor ${index + 1}`, monitor.name ?? "Unknown model", `${monitor.width} × ${monitor.height}`, monitor.primary && "Primary"].filter(Boolean).join(" · ")}</small>
           <span className={`monitor-mode${foldersOf(monitor.id).length > 0 ? " own" : ""}`}>{mode(monitor.id)}</span>
-          <small title={monitor.current ?? undefined}>{monitor.current ? `Showing ${monitor.current.split(/[\\/]/).pop()}` : "No wallpaper image reported"}</small>
+          <small className="selectable" title={monitor.current ?? undefined}>{monitor.current ? `Showing ${monitor.current.split(/[\\/]/).pop()}` : "No wallpaper image reported"}</small>
           {folderList(monitor.id)}
         </div>
         <div className="monitor-actions"><button className="secondary" disabled={busy} onClick={() => addFolder(monitor.id)}><Plus size={15}/> Add folder</button><button className="secondary" onClick={() => chooseImage(monitor.id)}>Choose image</button></div>
       </div>)}</div></>}
     {savedIds.length > 0 && <><div className="section-title"><div><span className="eyebrow">NOT CONNECTED</span><h2>Saved monitor settings</h2></div></div><div className="panel">{savedIds.map(id => <div className="history-row" key={id}><div className="monitor-info"><strong title={id}>{monitorLabel(id, monitors, config.monitor_names)}</strong><small title={id}>{nameOf(id) ? shortMonitorId(id) : "Not connected"}</small>{foldersOf(id).length === 0 ? <small>No folders saved.</small> : folderList(id)}</div>
-      <div className="monitor-actions">{moveTargets.length > 0 && <div className="monitor-move"><select aria-label="Move settings to monitor" value={moveTarget[id] ?? ""} disabled={busy} onChange={event => setMoveTarget(targets => ({ ...targets, [id]: event.target.value }))}><option value="">Move to…</option>{moveTargets.map(monitor => <option key={monitor.id} value={monitor.id}>{monitorLabel(monitor.id, monitors, config.monitor_names)}</option>)}</select><button className="secondary" aria-label="Move settings" disabled={busy || !moveTarget[id]} onClick={() => move(id)}><ArrowRightLeft size={14}/> Move</button></div>}<button className="secondary" disabled={busy} onClick={() => forget(id)}>Forget</button></div></div>)}</div>
+      <div className="monitor-actions">{moveTargets.length > 0 && <div className="monitor-move"><Select label="Move settings to monitor" placeholder="Move to…" value={moveTarget[id] ?? null} disabled={busy} onChange={target => setMoveTarget(targets => ({ ...targets, [id]: target }))} options={moveTargets.map(monitor => ({ value: monitor.id, label: monitorLabel(monitor.id, monitors, config.monitor_names) }))}/><button className="secondary" aria-label="Move settings" disabled={busy || !moveTarget[id]} onClick={() => move(id)}><ArrowRightLeft size={14}/> Move</button></div>}<button className="secondary" disabled={busy} onClick={() => forget(id)}>Forget</button></div></div>)}</div>
       <p className="footnote">A monitor can get a new device path when it is moved to another port. Move its settings to the monitor's new entry.</p></>}
     <p className="footnote">A monitor with its own folders runs its own slideshow; other monitors share the main slideshow. Interval, shuffle, filters, and exclusions are shared by every monitor, and Windows uses one fit mode for the whole desktop. Connected and disconnected monitors are noticed within about 10 seconds. A single image chosen here lasts until the next change.</p>
   </>;

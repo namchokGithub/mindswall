@@ -1,3 +1,5 @@
+import { Select } from "./Select";
+
 const INTERVALS = [60, 300, 600, 900, 1800, 3600, 21600, 43200, 86400];
 const FIT_MODES = ["fill", "fit", "stretch", "center", "tile", "span"];
 
@@ -14,14 +16,10 @@ function formatInterval(seconds: number): string {
 }
 
 export function IntervalSelect({ value, disabled, onChange }: { value: number; disabled: boolean; onChange: (value: number) => void }) {
-  return <select aria-label="Change picture every" value={value} disabled={disabled} onChange={event => onChange(Number(event.target.value))}>
-    {!INTERVALS.includes(value) && <option value={value}>{formatInterval(value)}</option>}
-    {INTERVALS.map(seconds => <option key={seconds} value={seconds}>{formatInterval(seconds)}</option>)}
-  </select>;
+  const values = INTERVALS.includes(value) ? INTERVALS : [value, ...INTERVALS];
+  return <Select label="Change picture every" value={value} disabled={disabled} onChange={onChange} options={values.map(seconds => ({ value: seconds, label: formatInterval(seconds) }))}/>;
 }
 
 export function FitModeSelect({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (value: string) => void }) {
-  return <select aria-label="Wallpaper fit mode" value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>
-    {FIT_MODES.map(mode => <option key={mode} value={mode}>{mode[0].toUpperCase() + mode.slice(1)}</option>)}
-  </select>;
+  return <Select label="Wallpaper fit mode" value={value} disabled={disabled} onChange={onChange} options={FIT_MODES.map(mode => ({ value: mode, label: mode[0].toUpperCase() + mode.slice(1) }))}/>;
 }

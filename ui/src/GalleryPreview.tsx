@@ -36,10 +36,10 @@ export function GalleryPreview({ path, close }: { path: string; close: () => voi
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
   }, [path]);
   return <dialog ref={dialog} className="gallery-dialog" aria-labelledby="gallery-preview-title" onCancel={event => { event.preventDefault(); close(); }}>
-    <header className="gallery-dialog-header"><div><span className="eyebrow">IMAGE DETAILS</span><h2 id="gallery-preview-title">{name}</h2></div><button autoFocus className="icon-button" aria-label="Close preview" onClick={close}><X size={18}/></button></header>
+    <header className="gallery-dialog-header"><div><span className="eyebrow">IMAGE DETAILS</span><h2 className="selectable" id="gallery-preview-title">{name}</h2></div><button autoFocus className="icon-button" aria-label="Close preview" onClick={close}><X size={18}/></button></header>
     {error ? <div className="gallery-dialog-error" role="alert"><h3>Could not open this image.</h3><p>{error}</p></div> : !details ? <p className="gallery-dialog-wait" role="status">Loading image details…</p> : <div className="gallery-dialog-content"><div className="gallery-dialog-image"><img src={preview} alt={`Preview of ${name}`}/></div><div className="gallery-properties">
       <section><h3>Image</h3><dl><dt>Dimensions</dt><dd>{details.width} × {details.height}</dd><dt>Width</dt><dd>{details.width} pixels</dd><dt>Height</dt><dd>{details.height} pixels</dd><dt>Bit depth</dt><dd>{details.bit_depth} bits</dd><dt>Resolution (DPI)</dt><dd>Unavailable</dd></dl></section>
-      <section><h3>File</h3><dl><dt>Name</dt><dd>{name}</dd><dt>Item type</dt><dd>{extension ? `${extension} file` : "Unknown"}</dd><dt>File location</dt><dd>{location || "Unavailable"}</dd><dt>Date created</dt><dd>{date(details.created)}</dd><dt>Date modified</dt><dd>{date(details.modified)}</dd><dt>Size</dt><dd>{size(details.size)}</dd></dl></section>
+      <section><h3>File</h3><dl><dt>Name</dt><dd className="selectable">{name}</dd><dt>Item type</dt><dd>{extension ? `${extension} file` : "Unknown"}</dd><dt>File location</dt><dd className={location ? "selectable" : undefined}>{location || "Unavailable"}</dd><dt>Date created</dt><dd>{date(details.created)}</dd><dt>Date modified</dt><dd>{date(details.modified)}</dd><dt>Size</dt><dd>{size(details.size)}</dd></dl></section>
     </div></div>}
   </dialog>;
 }

@@ -315,6 +315,10 @@ artifacts.
 
 Development started before release at the user's request.
 
+- [~] **UI polish** (2026-11-26): light/dark/system theme (`theme` in the
+  config), custom title bar (`decorations: false`), fixed sidebar, hidden scroll
+  bars, custom dropdowns, and selection limited to file names and paths;
+  awaiting Windows check
 - [~] **Wallpaper profiles**: named sets of folders and settings with quick
   switching from the UI and tray
   (2026-11-26: the active profile is shown on every page and checked in the
