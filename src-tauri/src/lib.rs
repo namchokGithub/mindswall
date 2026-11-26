@@ -860,6 +860,10 @@ struct OverviewStatus {
     current: Option<PathBuf>,
     position: Option<usize>,
     total: Option<usize>,
+    /// Images shown next to `current` in a combined wallpaper.
+    combined: Vec<PathBuf>,
+    /// The combined wallpaper file, used for the preview.
+    display: Option<PathBuf>,
 }
 
 #[tauri::command]
@@ -878,6 +882,8 @@ fn overview_status_inner() -> Result<OverviewStatus, String> {
             current: status.current,
             position: status.position,
             total: Some(status.total),
+            combined: status.combined,
+            display: status.display,
         })
     } else {
         let (state, path) = response
@@ -889,6 +895,8 @@ fn overview_status_inner() -> Result<OverviewStatus, String> {
             current: (!path.is_empty()).then(|| PathBuf::from(path)),
             position: None,
             total: None,
+            combined: Vec::new(),
+            display: None,
         })
     }
 }
@@ -980,7 +988,7 @@ async fn current_preview(path: PathBuf) -> Result<tauri::ipc::Response, String> 
 
 fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
     let status = overview_status_inner()?;
-    if status.current.as_ref() != Some(&path) {
+    if status.current.as_ref() != Some(&path) && status.display.as_ref() != Some(&path) {
         return Err("Wallpaper has changed".into());
     }
     let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;

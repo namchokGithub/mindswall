@@ -67,6 +67,22 @@ pub enum Theme {
     Light,
     Dark,
 }
+/// Combine portrait images side by side on a landscape monitor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CollageSettings {
+    pub enabled: bool,
+    /// Space between images in pixels, filled by the blurred background.
+    pub gap: u32,
+}
+impl Default for CollageSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            gap: 4,
+        }
+    }
+}
 /// A name the user gave a monitor, shown instead of its device path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MonitorName {
@@ -122,6 +138,8 @@ pub struct Config {
     pub monitor_names: Vec<MonitorName>,
     #[serde(default)]
     pub theme: Theme,
+    #[serde(default)]
+    pub collage: CollageSettings,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -139,6 +157,7 @@ impl Default for Config {
             monitor_folders: Vec::new(),
             monitor_names: Vec::new(),
             theme: Theme::System,
+            collage: CollageSettings::default(),
         }
     }
 }
@@ -166,6 +185,7 @@ impl Config {
             || self.excluded.len() > 100000
             || self.monitor_folders.len() > 64
             || self.monitor_names.len() > 64
+            || self.collage.gap > crate::collage::MAX_GAP
         {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,

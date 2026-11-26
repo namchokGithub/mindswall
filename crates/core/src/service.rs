@@ -1,4 +1,5 @@
 use crate::{
+    collage::{Collages, Combined},
     config::Config,
     ipc::{self, Command as Control, PlaybackStatus, Response},
     monitors::{MonitorShows, SharedTarget},
@@ -50,7 +51,12 @@ enum Event {
     Files(Vec<PathBuf>),
 }
 
-fn snapshot(playback: &Playback) -> PlaybackStatus {
+fn snapshot(playback: &Playback, collages: &Collages) -> PlaybackStatus {
+    let shown = playback
+        .show
+        .as_ref()
+        .and_then(|show| show.current())
+        .and_then(|current| collages.remembered(MAIN, current));
     PlaybackStatus {
         state: if playback.show.is_none() {
             "stopped"
@@ -67,6 +73,11 @@ fn snapshot(playback: &Playback) -> PlaybackStatus {
             .or_else(|| playback.default_image.clone()),
         position: playback.show.as_ref().and_then(|show| show.position()),
         total: playback.show.as_ref().map_or(0, |show| show.total()),
+        combined: shown
+            .as_ref()
+            .map(|shown| shown.combined.clone())
+            .unwrap_or_default(),
+        display: shown.map(|shown| shown.file),
     }
 }
 
@@ -110,45 +121,57 @@ fn watch(config: &Config, events: mpsc::Sender<Event>) -> Option<notify::Recomme
     Some(watcher)
 }
 
-/// Apply an image to the whole desktop.
-fn apply(path: &Path) -> Result<(), String> {
-    if let Err(error) = SystemWallpaper.set_wallpaper(path) {
+/// Key of the main slideshow's combined wallpapers.
+const MAIN: &str = "main";
+
+fn record(path: &Path, monitor: Option<String>, shown: Option<Combined>) {
+    let combined = shown.map(|shown| shown.combined).unwrap_or_default();
+    if let Err(error) = crate::history::History::record_combined(path, monitor, combined) {
+        tracing::warn!(%error, "could not record wallpaper history");
+    }
+}
+
+/// Apply an image, or the combined wallpaper made from it, to the whole
+/// desktop.
+fn apply(path: &Path, shown: Option<Combined>) -> Result<(), String> {
+    let file = shown.as_ref().map_or(path, |shown| shown.file.as_path());
+    if let Err(error) = SystemWallpaper.set_wallpaper(file) {
         tracing::warn!(%error, "could not apply wallpaper");
         return Err(error.to_string());
     }
-    tracing::info!(path = ?path, "wallpaper changed");
-    if let Err(error) = crate::history::History::record(path, None) {
-        tracing::warn!(%error, "could not record wallpaper history");
-    }
+    let combined = shown.as_ref().map_or(0, |shown| shown.combined.len());
+    tracing::info!(path = ?path, combined, "wallpaper changed");
+    record(path, None, shown);
     Ok(())
 }
 
-/// Apply an image to one monitor.
-fn apply_monitor(monitor: &str, path: &Path) -> Result<(), String> {
-    crate::wallpaper::set_monitor_wallpaper(monitor, path).inspect_err(|error| {
+/// Apply an image, or the combined wallpaper made from it, to one monitor.
+fn apply_monitor(monitor: &str, path: &Path, shown: Option<Combined>) -> Result<(), String> {
+    let file = shown.as_ref().map_or(path, |shown| shown.file.as_path());
+    crate::wallpaper::set_monitor_wallpaper(monitor, file).inspect_err(|error| {
         tracing::warn!(%monitor, %error, "could not apply monitor wallpaper");
     })?;
-    tracing::info!(%monitor, path = ?path, "monitor wallpaper changed");
-    if let Err(error) = crate::history::History::record(path, Some(monitor.to_owned())) {
-        tracing::warn!(%error, "could not record wallpaper history");
-    }
+    let combined = shown.as_ref().map_or(0, |shown| shown.combined.len());
+    tracing::info!(%monitor, path = ?path, combined, "monitor wallpaper changed");
+    record(path, Some(monitor.to_owned()), shown);
     Ok(())
 }
 
 /// Apply an image from the main slideshow. When some monitors run their own
 /// slideshow, only the other monitors are changed; it succeeds when at least
 /// one of them accepts the image.
-fn apply_shared(target: &SharedTarget, path: &Path) -> Result<(), String> {
+fn apply_shared(target: &SharedTarget, path: &Path, shown: Option<Combined>) -> Result<(), String> {
     let SharedTarget::Monitors(monitors) = target else {
-        return apply(path);
+        return apply(path, shown);
     };
     if monitors.is_empty() {
         return Ok(());
     }
+    let file = shown.as_ref().map_or(path, |shown| shown.file.as_path());
     let mut failure = None;
     let mut applied = false;
     for monitor in monitors {
-        match crate::wallpaper::set_monitor_wallpaper(monitor, path) {
+        match crate::wallpaper::set_monitor_wallpaper(monitor, file) {
             Ok(()) => applied = true,
             Err(error) => {
                 tracing::warn!(%monitor, %error, "could not apply monitor wallpaper");
@@ -159,23 +182,100 @@ fn apply_shared(target: &SharedTarget, path: &Path) -> Result<(), String> {
     if !applied {
         return Err(failure.unwrap_or_default());
     }
-    tracing::info!(path = ?path, monitors = monitors.len(), "wallpaper changed");
-    if let Err(error) = crate::history::History::record(path, None) {
-        tracing::warn!(%error, "could not record wallpaper history");
-    }
+    let combined = shown.as_ref().map_or(0, |shown| shown.combined.len());
+    tracing::info!(path = ?path, monitors = monitors.len(), combined, "wallpaper changed");
+    record(path, None, shown);
     Ok(())
+}
+
+/// The size of the image the main slideshow needs: the primary monitor, all
+/// monitors together for the Span fit mode, or the first monitor it covers.
+fn shared_size(target: &SharedTarget, span: bool) -> Option<(u32, u32)> {
+    let monitors = crate::wallpaper::list_monitors().ok()?;
+    let size = |monitor: &crate::wallpaper::MonitorInfo| {
+        Some((
+            u32::try_from(monitor.width).ok()?,
+            u32::try_from(monitor.height).ok()?,
+        ))
+    };
+    match target {
+        SharedTarget::Desktop if span => {
+            let left = monitors.iter().map(|m| m.x).min()?;
+            let top = monitors.iter().map(|m| m.y).min()?;
+            let right = monitors.iter().map(|m| m.x + m.width).max()?;
+            let bottom = monitors.iter().map(|m| m.y + m.height).max()?;
+            Some((
+                u32::try_from(right - left).ok()?,
+                u32::try_from(bottom - top).ok()?,
+            ))
+        }
+        SharedTarget::Desktop => monitors
+            .iter()
+            .find(|monitor| monitor.primary)
+            .or_else(|| monitors.first())
+            .and_then(size),
+        SharedTarget::Monitors(ids) => ids
+            .iter()
+            .find_map(|id| monitors.iter().find(|monitor| &monitor.id == id))
+            .and_then(size),
+    }
+}
+
+fn monitor_size(id: &str) -> Option<(u32, u32)> {
+    let monitors = crate::wallpaper::list_monitors().ok()?;
+    let monitor = monitors.into_iter().find(|monitor| monitor.id == id)?;
+    Some((
+        u32::try_from(monitor.width).ok()?,
+        u32::try_from(monitor.height).ok()?,
+    ))
+}
+
+/// Show an image of the main slideshow, combined with some of the `upcoming`
+/// images when portrait images are combined. Without `upcoming`, the last
+/// combination shown for the image is reused. Returns the combined images.
+fn show_shared(
+    collages: &Collages,
+    target: &SharedTarget,
+    path: &Path,
+    upcoming: &[PathBuf],
+) -> Result<Vec<PathBuf>, String> {
+    let shown = collages.combine(MAIN, path, upcoming, || {
+        shared_size(target, collages.span())
+    });
+    let used = shown
+        .as_ref()
+        .map(|shown| shown.combined.clone())
+        .unwrap_or_default();
+    apply_shared(target, path, shown)?;
+    Ok(used)
+}
+
+/// Show an image of a monitor's own slideshow; see [`show_shared`].
+fn show_monitor(
+    collages: &Collages,
+    monitor: &str,
+    path: &Path,
+    upcoming: &[PathBuf],
+) -> Result<Vec<PathBuf>, String> {
+    let shown = collages.combine(monitor, path, upcoming, || monitor_size(monitor));
+    let used = shown
+        .as_ref()
+        .map(|shown| shown.combined.clone())
+        .unwrap_or_default();
+    apply_monitor(monitor, path, shown)?;
+    Ok(used)
 }
 
 /// Show the main slideshow's current image again, for example after the
 /// monitors that share it changed.
-fn reapply_shared(playback: &Playback, target: &SharedTarget) {
+fn reapply_shared(playback: &Playback, target: &SharedTarget, collages: &Collages) {
     let current = playback
         .show
         .as_ref()
         .and_then(|show| show.current().map(Path::to_path_buf))
         .or_else(|| playback.default_image.clone());
     if let Some(path) = current
-        && let Err(error) = apply_shared(target, &path)
+        && let Err(error) = show_shared(collages, target, &path, &[])
     {
         tracing::warn!(%error, "could not apply wallpaper to the shared monitors");
     }
@@ -242,6 +342,14 @@ pub fn run_slideshow_with(
     let path = Config::default_path()?;
     let mut config = Config::load(&path)?;
     let mut playback = Playback::new(&config, Instant::now())?;
+    let collages = Collages::new(&config);
+    // Monitor slideshows: `monitor_next` may combine upcoming images, and
+    // `monitor_again` shows an image again with its last combination.
+    let monitor_next = |monitor: &str, path: &Path, upcoming: &[PathBuf]| {
+        show_monitor(&collages, monitor, path, upcoming)
+    };
+    let monitor_again =
+        |monitor: &str, path: &Path| show_monitor(&collages, monitor, path, &[]).map(|_| ());
     let (control_tx, control_rx) = mpsc::channel();
     let listen_until = Instant::now() + options.listen_retry;
     loop {
@@ -290,7 +398,7 @@ pub fn run_slideshow_with(
         .is_some_and(|path| show.select(path).is_ok());
     if !resumed {
         let target = monitors.shared_target();
-        show.next_available(|path| apply_shared(&target, path))?;
+        show.next_available_with(|path, upcoming| show_shared(&collages, &target, path, upcoming))?;
     }
     if options
         .resume
@@ -299,8 +407,8 @@ pub fn run_slideshow_with(
     {
         playback.timer.pause(Instant::now());
     }
-    monitors.reapply(&monitors.active(), &apply_monitor);
-    on_change(&snapshot(&playback), Change::Playback);
+    monitors.reapply(&monitors.active(), &monitor_again);
+    on_change(&snapshot(&playback, &collages), Change::Playback);
     println!("Slideshow running. Press Ctrl+C to stop.");
 
     let mut changed_files = HashSet::new();
@@ -330,7 +438,7 @@ pub fn run_slideshow_with(
                         let _ = reply.send(Response {
                             ok: true,
                             message: "handed over".into(),
-                            status: Some(snapshot(&playback)),
+                            status: Some(snapshot(&playback, &collages)),
                         });
                         tracing::info!("slideshow handed over to the desktop app");
                         println!("Slideshow handed over to the MindsWall app.");
@@ -346,12 +454,12 @@ pub fn run_slideshow_with(
                 let notify_change = !matches!(command, Control::Status);
                 let mut reloaded = None;
                 let status = if matches!(command, Control::Status) {
-                    Some(snapshot(&playback))
+                    Some(snapshot(&playback, &collages))
                 } else {
                     None
                 };
                 let target = monitors.shared_target();
-                let shared = |path: &Path| apply_shared(&target, path);
+                let shared = |path: &Path| show_shared(&collages, &target, path, &[]).map(|_| ());
                 let result: Result<String, String> = match command {
                     Control::Pause => {
                         if playback.show.is_none() {
@@ -384,6 +492,7 @@ pub fn run_slideshow_with(
                         let new_config =
                             Config::load(&Config::default_path().map_err(|e| e.to_string())?)
                                 .map_err(|e| e.to_string())?;
+                        collages.configure(&new_config);
                         monitors.configure(&new_config);
                         tracking = MonitorShows::is_configured(&new_config);
                         if tracking {
@@ -393,14 +502,14 @@ pub fn run_slideshow_with(
                         playback.reload(
                             &new_config,
                             now,
-                            &|path| apply_shared(&new_target, path),
+                            &|path| show_shared(&collages, &new_target, path, &[]).map(|_| ()),
                             &default_wallpaper_path,
                         )?;
                         // Monitors may have moved between the main slideshow
                         // and their own folders, so show each one's image again.
                         if tracking || new_target != target {
-                            reapply_shared(&playback, &new_target);
-                            monitors.reapply(&monitors.active(), &apply_monitor);
+                            reapply_shared(&playback, &new_target, &collages);
+                            monitors.reapply(&monitors.active(), &monitor_again);
                         }
                         reloaded = Some(new_config);
                         Ok(if playback.show.is_none() {
@@ -431,9 +540,11 @@ pub fn run_slideshow_with(
                     Control::Next => match playback.show.as_mut() {
                         Some(show) => {
                             let result = show
-                                .next_available(shared)
+                                .next_available_with(|path, upcoming| {
+                                    show_shared(&collages, &target, path, upcoming)
+                                })
                                 .map(|path| path.display().to_string());
-                            monitors.advance(&apply_monitor);
+                            monitors.advance_with(&monitor_next);
                             playback.timer.reset(now);
                             result
                         }
@@ -442,7 +553,7 @@ pub fn run_slideshow_with(
                     Control::Previous => match playback.show.as_mut() {
                         Some(show) => match show.previous_available(shared) {
                             Some(result) => {
-                                monitors.previous(&apply_monitor);
+                                monitors.previous(&monitor_again);
                                 playback.timer.reset(now);
                                 result.map(|path| path.display().to_string())
                             }
@@ -478,7 +589,7 @@ pub fn run_slideshow_with(
                     watcher = watch(&config, event_tx.clone());
                 }
                 if notify_change {
-                    on_change(&snapshot(&playback), Change::Playback);
+                    on_change(&snapshot(&playback, &collages), Change::Playback);
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
@@ -493,8 +604,8 @@ pub fn run_slideshow_with(
                             monitors = monitors.connected().len(),
                             "connected monitors changed"
                         );
-                        reapply_shared(&playback, &monitors.shared_target());
-                        monitors.reapply(&added, &apply_monitor);
+                        reapply_shared(&playback, &monitors.shared_target(), &collages);
+                        monitors.reapply(&added, &monitor_again);
                         changed = true;
                     }
                 }
@@ -503,7 +614,7 @@ pub fn run_slideshow_with(
                     let paths = std::mem::take(&mut changed_files);
                     let target = monitors.shared_target();
                     match playback.apply_file_changes(&config, &paths, now, &|path| {
-                        apply_shared(&target, path)
+                        show_shared(&collages, &target, path, &[]).map(|_| ())
                     }) {
                         Ok(true) => {
                             tracing::info!(
@@ -515,7 +626,7 @@ pub fn run_slideshow_with(
                         Ok(false) => {}
                         Err(error) => tracing::warn!(%error, "could not apply folder changes"),
                     }
-                    if monitors.apply_file_changes(&config, &paths, &apply_monitor) {
+                    if monitors.apply_file_changes(&config, &paths, &monitor_again) {
                         tracing::info!("monitor collections updated from folder changes");
                         collection_changed = true;
                     }
@@ -524,17 +635,19 @@ pub fn run_slideshow_with(
                     && let Some(show) = playback.show.as_mut()
                 {
                     let target = monitors.shared_target();
-                    if let Err(error) = show.next_available(|path| apply_shared(&target, path)) {
+                    if let Err(error) = show.next_available_with(|path, upcoming| {
+                        show_shared(&collages, &target, path, upcoming)
+                    }) {
                         tracing::warn!(%error, "wallpaper update failed");
                     }
-                    monitors.advance(&apply_monitor);
+                    monitors.advance_with(&monitor_next);
                     playback.timer.reset(Instant::now());
                     changed = true;
                 }
                 if collection_changed {
-                    on_change(&snapshot(&playback), Change::Collection);
+                    on_change(&snapshot(&playback, &collages), Change::Collection);
                 } else if changed {
-                    on_change(&snapshot(&playback), Change::Playback);
+                    on_change(&snapshot(&playback, &collages), Change::Playback);
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {

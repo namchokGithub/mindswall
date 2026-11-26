@@ -136,7 +136,20 @@ grid, compact grid, or list; the selected layout is remembered on this device.
 You can set or exclude an image, then use
 **Excluded** in Gallery to restore individual images or **Settings** to restore
 all exclusions. Restored images still need to match enabled folders and filters. Settings
-also contains fit, resolution, orientation, and aspect-ratio filters. **History**
+also contains fit, resolution, orientation, and aspect-ratio filters.
+
+**Combine portrait images** (Settings, off by default) shows a portrait image on
+a landscape monitor together with the next portrait images of the current
+cycle, side by side at full height over a blurred, darkened copy of the first
+image, with an adjustable space between them (0–32 px, default 4). Images that
+are shown together count as shown in the cycle. The combined image is made at
+the monitor's resolution (all monitors together for Span, the primary monitor
+for a shared slideshow, each monitor's own size for monitors with their own
+folders), works with every fit mode, and is cached in
+`%LOCALAPPDATA%\MindsWall\cache\collages` (the 10 most recent files).
+Previous shows the same combination again. Overview shows a "+N images" badge,
+and History notes how many images were combined. The original files are never
+changed. This setting is not part of profiles. **History**
 shows thumbnails for the most recent 10 applied images locally. With more than
 one display, each entry names its display or the main slideshow, and a filter
 shows one display; the limit of 10 covers all displays together.

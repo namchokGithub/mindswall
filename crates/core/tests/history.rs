@@ -10,6 +10,7 @@ fn history_limits_entries_and_persists() {
             path: format!("{n}.jpg").into(),
             timestamp: n,
             monitor: None,
+            combined: Vec::new(),
         });
     }
     assert_eq!(history.entries.len(), 10);
@@ -29,6 +30,7 @@ fn legacy_history_loads_only_the_ten_most_recent_and_saves_that_limit() {
             path: format!("{timestamp}.jpg").into(),
             timestamp,
             monitor: None,
+            combined: Vec::new(),
         })
         .collect();
     std::fs::write(&path, serde_json::to_vec(&History { entries }).unwrap()).unwrap();

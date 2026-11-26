@@ -78,3 +78,4 @@ body{background:var(--c-11121a);user-select:none;-webkit-user-select:none}
 .select-menu li[aria-selected="true"]{color:var(--c-d8d6ff);font-weight:600}
 .select-menu li svg{color:var(--c-bcb9fa)}
 .history-tools .select{min-width:160px}.monitor-move .select{min-width:150px}
+.combined-badge{display:inline-block;margin-left:10px;padding:3px 8px;border-radius:20px;background:var(--c-302f47);color:var(--c-d8d6ff);font-size:11px;font-weight:600;letter-spacing:0;vertical-align:middle}

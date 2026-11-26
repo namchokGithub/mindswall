@@ -13,6 +13,8 @@ fn legacy_and_structured_status_are_compatible() {
             current: Some("nested/image.jpg".into()),
             position: Some(2),
             total: 50,
+            combined: Vec::new(),
+            display: None,
         }),
     };
     let json = serde_json::to_string(&response).unwrap();

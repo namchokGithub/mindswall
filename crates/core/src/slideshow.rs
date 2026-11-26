@@ -94,11 +94,31 @@ impl Slideshow {
         &mut self,
         mut apply: impl FnMut(&Path) -> Result<(), E>,
     ) -> Result<PathBuf, E> {
+        self.next_available_with(|path, _| apply(path).map(|()| Vec::new()))
+    }
+
+    /// Like [`Slideshow::next_available`], but `apply` also receives the
+    /// unplayed images of the current cycle in order (empty when moving
+    /// forward through history after Previous). Images it returns were shown
+    /// together with the new image and count as played in this cycle.
+    pub fn next_available_with<E>(
+        &mut self,
+        mut apply: impl FnMut(&Path, &[PathBuf]) -> Result<Vec<PathBuf>, E>,
+    ) -> Result<PathBuf, E> {
         let mut candidate = self.clone();
         loop {
+            let replay = candidate
+                .cursor
+                .is_some_and(|cursor| cursor + 1 < candidate.history.len());
             let path = candidate.next().to_owned();
-            match apply(path.as_path()) {
-                Ok(()) => {
+            let upcoming: &[PathBuf] = if replay {
+                &[]
+            } else {
+                &candidate.queue[candidate.index.min(candidate.queue.len())..]
+            };
+            match apply(path.as_path(), upcoming) {
+                Ok(used) => {
+                    candidate.mark_played(&used);
                     *self = candidate;
                     return Ok(path);
                 }
@@ -139,6 +159,21 @@ impl Slideshow {
                     // The cursor now points at the closest surviving earlier entry.
                     path = candidate.current()?.to_owned();
                 }
+            }
+        }
+    }
+
+    /// Count unplayed images of the current cycle as played, so they are not
+    /// shown again before the cycle ends. Other images are ignored.
+    fn mark_played(&mut self, paths: &[PathBuf]) {
+        for path in paths {
+            let start = self.index.min(self.queue.len());
+            if let Some(offset) = self.queue[start..].iter().position(|image| image == path) {
+                let image = self.queue.remove(start + offset);
+                self.queue.insert(start, image);
+                self.index = start + 1;
+                let position = self.cycle_positions.len() + 1;
+                self.cycle_positions.insert(path.clone(), position);
             }
         }
     }

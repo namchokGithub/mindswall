@@ -32,3 +32,5 @@ All notable changes to MindsWall are recorded here. The format follows
 - Light, dark, and system themes, a custom title bar, a fixed sidebar, hidden
   scroll bars, custom dropdowns, and text selection limited to file names and
   paths.
+- Optional combined wallpapers: portrait images are shown side by side on a
+  landscape monitor over a blurred background, with an adjustable gap.

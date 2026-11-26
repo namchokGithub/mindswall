@@ -127,6 +127,23 @@ impl MonitorShows {
         }
     }
 
+    /// Like [`MonitorShows::advance`], but `apply` also receives each
+    /// monitor's unplayed images and returns those it showed together with
+    /// the new image (see [`Slideshow::next_available_with`]).
+    pub fn advance_with(
+        &mut self,
+        apply: &impl Fn(&str, &Path, &[PathBuf]) -> Result<Vec<PathBuf>, String>,
+    ) {
+        for monitor in self.active() {
+            if let Some(show) = self.shows.get_mut(&monitor)
+                && let Err(error) =
+                    show.next_available_with(|path, upcoming| apply(&monitor, path, upcoming))
+            {
+                tracing::warn!(%monitor, %error, "monitor wallpaper update failed");
+            }
+        }
+    }
+
     /// Go back on every connected monitor that has an earlier image.
     pub fn previous(&mut self, apply: &impl Fn(&str, &Path) -> Result<(), String>) {
         for monitor in self.active() {

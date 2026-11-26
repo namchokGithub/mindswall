@@ -23,6 +23,7 @@ fn invalid_history_is_moved_aside_and_recording_works_again() {
         path: "a.jpg".into(),
         timestamp: 1,
         monitor: None,
+        combined: Vec::new(),
     });
     history.save(&path).unwrap();
     assert_eq!(History::load(&path).unwrap().entries.len(), 1);

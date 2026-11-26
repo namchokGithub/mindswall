@@ -370,6 +370,30 @@ matches the Windows **Personalize > Background** setting of the same name.
 - [x] A filter that matches no images shows a clear message instead of failing
       silently
 
+### Combined portrait images
+
+Use a folder with several portrait images (for example 948×2048 and
+1170×1650) and some landscape images.
+
+- [ ] With **Combine portrait images** off (default), portrait images are shown
+      alone as before
+- [ ] Turn it on: the next portrait image is shown with the following portrait
+      images side by side at full height, centered, over a blurred background;
+      the space matches **Space between images** (try None and 16 px)
+- [ ] Landscape images are still shown alone, and images that were combined
+      are not shown again before the cycle ends (Overview position jumps by the
+      number of combined images)
+- [ ] The result looks right with Fill, Fit, Center, and Span
+- [ ] Overview shows **+N images**, the preview is the combined image, and
+      History notes "combined with N more"
+- [ ] **Previous** shows the same combination again
+- [ ] With per-monitor folders, each monitor's combination uses its own
+      resolution; Monitors shows "Showing combined portrait images"
+- [ ] `%LOCALAPPDATA%\MindsWall\cache\collages` keeps at most 10 files; the
+      original images are unchanged
+- [ ] Record how long a change takes with 3–4 large portrait images (log
+      timestamps) and whether CPU stays low between changes
+
 ### Gallery
 
 - [x] Thumbnails load in pages; the cache folder fills with `.png` thumbnails

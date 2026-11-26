@@ -315,6 +315,8 @@ artifacts.
 
 Development started before release at the user's request.
 
+- [~] **Combined portrait wallpapers** (2026-11-26, D8): implemented with
+  tests for planning, rendering, and cycle accounting; awaiting Windows check
 - [~] **UI polish** (2026-11-26): light/dark/system theme (`theme` in the
   config), custom title bar (`decorations: false`), fixed sidebar, hidden scroll
   bars, custom dropdowns, and selection limited to file names and paths;
@@ -443,6 +445,20 @@ only the image; forcing Fill there would require writing the per-user
   (`IDesktopWallpaper::SetPosition`), so fit mode cannot differ per monitor.
 - History keeps the latest 10 changes across all monitors and filters them by
   monitor in the UI.
+
+### D8. Combined portrait wallpapers
+
+- Off by default (`collage.enabled`); the gap is 0–32 px (`collage.gap`,
+  default 4).
+- Applies to every fit mode, only for a portrait image on a landscape monitor.
+  Companions are the next portrait images in the current cycle, in order;
+  landscape images are skipped and stay in the cycle; the search stops at the
+  first portrait image that does not fit, with at most 5 companions.
+- Companions count as played. The combination is remembered for Previous and
+  reapplying (the last 10); the cache keeps the 10 most recent files.
+- Size: the monitor's resolution; the primary monitor for the shared
+  slideshow; the whole desktop for Span; each monitor's own size for monitors
+  with their own folders. History records the first image and the companions.
 
 ## Risks
 

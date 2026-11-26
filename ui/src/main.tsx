@@ -16,9 +16,9 @@ import "./style.css";
 
 type Folder = { path: string; enabled: boolean; recursive: boolean };
 type ProfileStatus = { active: string | null; changed: boolean };
-type Config = { theme: ThemeSetting } & { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
+type Config = { theme: ThemeSetting; collage: { enabled: boolean; gap: number } } & { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
 type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings";
-type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null };
+type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null; combined: string[]; display: string | null };
 
 function App() {
   const [page, setPage] = useState<Page>("overview");
@@ -34,6 +34,9 @@ function App() {
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>({ active: null, changed: false });
   const [preview, setPreview] = useState("");
   const [imagePath, setImagePath] = useState("");
+  // A combined wallpaper: the images shown next to `imagePath` and the file shown.
+  const [combined, setCombined] = useState<string[]>([]);
+  const [displayPath, setDisplayPath] = useState("");
   const [imagePosition, setImagePosition] = useState<number | null>(null);
   const [imageTotal, setImageTotal] = useState<number | null>(null);
   const statusRequest = useRef(0);
@@ -45,9 +48,11 @@ function App() {
       if (request !== statusRequest.current) return;
       setStatus(value.state);
       setImagePath(value.current ?? "");
+      setCombined(value.combined ?? []);
+      setDisplayPath(value.display ?? "");
       setImagePosition(value.position);
       setImageTotal(value.total);
-    } catch { if (request === statusRequest.current) { setStatus("stopped"); setImagePath(""); setImagePosition(null); setImageTotal(null); } }
+    } catch { if (request === statusRequest.current) { setStatus("stopped"); setImagePath(""); setCombined([]); setDisplayPath(""); setImagePosition(null); setImageTotal(null); } }
   }, []);
 
   useEffect(() => {
@@ -81,15 +86,16 @@ function App() {
   }, [refreshStatus, setError]);
 
   useEffect(() => {
-    if (!imagePath) { setPreview(""); return; }
+    const shown = displayPath || imagePath;
+    if (!shown) { setPreview(""); return; }
     let active = true; let url = "";
     setPreview("");
-    invoke<ArrayBuffer>("current_preview", { path: imagePath }).then(bytes => {
+    invoke<ArrayBuffer>("current_preview", { path: shown }).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([new Uint8Array(bytes)])); setPreview(url);
     }).catch(() => { if (active) setPreview(""); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [imagePath]);
+  }, [imagePath, displayPath]);
 
   const scanFolders = useCallback(async (folders: Folder[]) => {
     const entries = await Promise.all(folders.map(async f => {
@@ -141,7 +147,7 @@ function App() {
       <div className="content"><div className="heading"><div><div className="eyebrow">{page === "overview" ? "YOUR SPACE" : page === "settings" ? "PREFERENCES" : "YOUR COLLECTION"}</div><h1>{page === "overview" ? "A little change of scenery." : page === "folders" ? "Your folders." : page === "gallery" ? "A collection of moments." : page === "history" ? "Take another look." : page === "monitors" ? "Your screens." : "Make it yours."}</h1><p>{page === "overview" ? "A fresh perspective, right on your desktop." : page === "folders" ? "Choose the places where your wallpapers live." : page === "gallery" ? "Find a favorite for your desktop." : page === "history" ? "Revisit wallpapers you have enjoyed." : page === "monitors" ? "Give each display its own view." : "Set the rhythm that feels right for you."}</p></div><span className={`status ${status}`}><span/> {status === "running" ? "Playing" : status === "paused" ? "Paused" : "Stopped"}</span></div>
         {!config ? <div className="panel empty">Loading your workspace…</div> : <>
         {page === "overview" && <><div className="section-title"><div><span className="eyebrow">CURRENT WALLPAPER</span><h2>Your desktop, right now</h2></div><span className="subtle">A moment for yourself</span></div>
-          <div className="preview" style={preview ? { backgroundImage: `linear-gradient(0deg, rgba(12,13,25,.85), transparent 58%), url("${preview}")` } : undefined}><div className="preview-content"><div className="preview-tag"><span className="local-dot"/> {!imagePath ? "YOUR NEXT FAVORITE" : ownMonitors ? "MAIN SLIDESHOW" : "NOW SHOWING"}</div><h3 className={fileName ? "selectable" : undefined}>{fileName || "A blank canvas."}</h3><p className={imagePath ? "selectable" : undefined}>{imagePath ? imagePath : "Add a folder to bring your collection to life."}</p></div><span className="preview-number" aria-label="Image position in slideshow">{imagePosition !== null && imageTotal !== null ? `${imagePosition} / ${imageTotal}` : "— / —"}</span></div>
+          <div className="preview" style={preview ? { backgroundImage: `linear-gradient(0deg, rgba(12,13,25,.85), transparent 58%), url("${preview}")` } : undefined}><div className="preview-content"><div className="preview-tag"><span className="local-dot"/> {!imagePath ? "YOUR NEXT FAVORITE" : ownMonitors ? "MAIN SLIDESHOW" : "NOW SHOWING"}</div><h3 className={fileName ? "selectable" : undefined}>{fileName || "A blank canvas."}{combined.length > 0 && <span className="combined-badge" title={combined.join("\n")}>+{combined.length} {combined.length === 1 ? "image" : "images"}</span>}</h3><p className={imagePath ? "selectable" : undefined}>{imagePath ? imagePath : "Add a folder to bring your collection to life."}</p></div><span className="preview-number" aria-label="Image position in slideshow">{imagePosition !== null && imageTotal !== null ? `${imagePosition} / ${imageTotal}` : "— / —"}</span></div>
           <MonitorStrip config={config}/>
           <div className="footnote overview-collection">{filtersActive && <>Image filters or exclusions are active. <button className="text-link" onClick={() => navigatePage("settings")}>Review settings <ArrowRight size={14}/></button></>}{status !== "stopped" && <button className="text-link" disabled={busy} onClick={() => act("reload")} title="Rescans enabled folders and keeps the current cycle"><RefreshCw size={14}/> Rescan collection</button>}</div>
           <div className="player"><div><strong>Slideshow</strong><small>{status === "stopped" ? "Ready when you are" : `Changing every ${config.interval_seconds / 60} minutes`}</small></div><div className="player-actions"><button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("previous")} aria-label="Previous wallpaper"><ArrowLeft size={17}/></button>{status === "stopped" ? <button className="primary" disabled={busy || !config.folders.some(f => f.enabled)} onClick={() => act("start")}><Play size={16}/> Start slideshow</button> : <button className="primary" disabled={busy} onClick={() => act(running ? "pause" : "resume")}>{running ? <Pause size={16}/> : <Play size={16}/>} {running ? "Pause" : "Resume"}</button>}<button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("next")} aria-label="Next wallpaper"><ArrowRight size={17}/></button></div></div>
@@ -188,6 +194,8 @@ function UtilitySettings({ config, busy, save }: { config: Config; busy: boolean
     <div className="setting-row"><div><strong>Aspect ratio</strong><small>Allow a 5% difference from the selected ratio.</small></div><Select label="Image aspect ratio" value={config.filter.aspect_ratio} disabled={busy} onChange={aspect_ratio => save({ ...config, filter: { ...config.filter, aspect_ratio } })} options={[{ value: "any", label: "Any" }, { value: "wide", label: "16:9" }, { value: "wide_ten", label: "16:10" }, { value: "standard", label: "4:3" }, { value: "square", label: "1:1" }]}/></div>
     <div className="setting-row"><div><strong>Minimum resolution</strong><small>Use 0 to accept any width or height.</small></div><div className="resolution"><input aria-label="Minimum width" type="number" min="0" max="100000" value={width} onChange={e => setWidth(e.target.value)}/><span>×</span><input aria-label="Minimum height" type="number" min="0" max="100000" value={height} onChange={e => setHeight(e.target.value)}/><button className="secondary" disabled={busy} onClick={applyFilter}>Apply</button></div></div>
     <div className="setting-row"><div><strong>Log file</strong><small className="log-path">{logPath ? maskUserName(logPath) : "Log location unavailable."}</small>{logPath && <small>The user name is hidden; <b>Copy path</b> copies the full path.</small>}</div><button className="secondary" disabled={!logPath} onClick={copyLogPath}>Copy path</button></div>
+    <div className="setting-row"><div><strong>Combine portrait images</strong><small>On a landscape monitor, show portrait images side by side over a blurred background. Works with every fit mode.</small></div><label className="switch" title="Combine portrait images"><input type="checkbox" aria-label="Combine portrait images" checked={config.collage.enabled} disabled={busy} onChange={e => save({ ...config, collage: { ...config.collage, enabled: e.target.checked } })}/><span/></label></div>
+    <div className="setting-row"><div><strong>Space between images</strong><small>Used when portrait images are combined.</small></div><Select label="Space between combined images" value={config.collage.gap} disabled={busy || !config.collage.enabled} onChange={gap => save({ ...config, collage: { ...config.collage, gap } })} options={[0, 2, 4, 8, 12, 16, 24, 32].map(gap => ({ value: gap, label: gap === 0 ? "None" : `${gap} px` }))}/></div>
     <div className="setting-row"><div><strong>Excluded images</strong><small>{config.excluded.length} images excluded from your collection.</small></div><button className="secondary" disabled={busy || config.excluded.length === 0} onClick={() => save({ ...config, excluded: [] })}>Restore all</button></div>
   </div></>;
 }

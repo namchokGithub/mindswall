@@ -13,6 +13,9 @@ pub struct HistoryEntry {
     pub path: PathBuf,
     pub timestamp: u64,
     pub monitor: Option<String>,
+    /// Images shown next to `path` in a combined wallpaper.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub combined: Vec<PathBuf>,
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct History {
@@ -69,6 +72,14 @@ impl History {
         Ok(())
     }
     pub fn record(path: &Path, monitor: Option<String>) -> io::Result<()> {
+        Self::record_combined(path, monitor, Vec::new())
+    }
+    /// Record a wallpaper made from `path` and the images combined with it.
+    pub fn record_combined(
+        path: &Path,
+        monitor: Option<String>,
+        combined: Vec<PathBuf>,
+    ) -> io::Result<()> {
         let file = Self::default_path()?;
         let parent = file
             .parent()
@@ -88,6 +99,7 @@ impl History {
                 .unwrap_or_default()
                 .as_secs(),
             monitor,
+            combined,
         });
         history.save(&file)?;
         Ok(())
