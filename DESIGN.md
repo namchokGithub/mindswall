@@ -14,4 +14,6 @@ and make the current slideshow state easy to understand at a glance.
   empty, error, and saved states explicitly; do not present planned features as
   working controls.
 - Support keyboard navigation, visible focus, accessible labels, and reduced motion.
+- Show transient feedback in a floating snackbar scoped to the active page;
+  discard feedback from an earlier page when navigation changes.
 - Keep image paths and settings local to the device.

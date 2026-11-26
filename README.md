@@ -86,6 +86,9 @@ startup option. The app and the CLI use the same local configuration and control
 pipe. Desktop interactions and startup behavior still require interactive
 Windows verification.
 
+Feedback appears in a temporary snackbar on the page where the action was made.
+Notifications are cleared when navigating to another page.
+
 The desktop **Gallery** loads images in pages and keeps local thumbnails. You
 can set or exclude an image, and restore exclusions in **Settings**. Settings
 also contains fit, resolution, orientation, and aspect-ratio filters. **History**
