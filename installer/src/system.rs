@@ -115,6 +115,11 @@ fn delete_data() -> Result<(), String> {
     Ok(())
 }
 
+/// Whether `dir` holds an installed MindsWall: the app or its uninstaller.
+pub fn is_installed_in(dir: &Path) -> bool {
+    dir.join(APP_EXE).is_file() || dir.join(UNINSTALLER).is_file()
+}
+
 /// The installed version and folder, from the entry in Settings > Apps.
 pub fn installed() -> Option<(String, PathBuf)> {
     win::installed()
@@ -177,7 +182,7 @@ pub fn install(
     if options.desktop_shortcut {
         win::create_shortcut(win::Place::Desktop, &exe, &dir)?;
     } else {
-        win::remove_shortcut(win::Place::Desktop);
+        win::remove_shortcut(win::Place::Desktop, &dir);
     }
     steps.start("Registering with Windows");
     let size_kb = ((payload.len()
@@ -212,13 +217,16 @@ pub fn uninstall(
     options: &UninstallOptions,
     steps: &mut Steps,
 ) -> Result<Vec<Leftover>, String> {
+    if !is_installed_in(dir) {
+        return Err(format!("MindsWall is not installed in {}.", dir.display()));
+    }
     steps.start("Closing MindsWall");
     close_app(dir)?;
     steps.start("Removing Start with Windows");
     set_start_with_windows(dir, false)?;
     steps.start("Removing shortcuts");
-    win::remove_shortcut(win::Place::StartMenu);
-    win::remove_shortcut(win::Place::Desktop);
+    win::remove_shortcut(win::Place::StartMenu, dir);
+    win::remove_shortcut(win::Place::Desktop, dir);
     steps.start("Removing MindsWall.exe");
     let leftovers = remove_program(dir)?;
     if options.delete_data {
@@ -226,7 +234,7 @@ pub fn uninstall(
         delete_data()?;
     }
     steps.start("Removing the Windows entry");
-    win::unregister();
+    win::unregister(dir);
     steps.finish();
     Ok(leftovers)
 }
@@ -295,7 +303,7 @@ mod win {
     use windows::Win32::Foundation::{CloseHandle, HANDLE};
     use windows::Win32::System::Com::{
         CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
-        CoTaskMemFree, CoUninitialize, IPersistFile,
+        CoTaskMemFree, CoUninitialize, IPersistFile, STGM_READ,
     };
     use windows::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
@@ -307,7 +315,7 @@ mod win {
     };
     use windows::Win32::UI::Shell::{
         FOLDERID_Desktop, FOLDERID_Programs, IShellLinkW, KNOWN_FOLDER_FLAG, SHGetKnownFolderPath,
-        ShellLink,
+        SLGP_RAWPATH, ShellLink,
     };
     use windows::core::{HSTRING, Interface, PWSTR};
     use windows_registry::CURRENT_USER;
@@ -339,8 +347,16 @@ mod win {
         Ok(())
     }
 
-    pub fn unregister() {
-        let _ = CURRENT_USER.remove_tree(plan::UNINSTALL_KEY);
+    /// Remove the Settings > Apps entry if it is for the install in `dir`,
+    /// not for another one such as the NSIS installer's.
+    pub fn unregister(dir: &Path) {
+        let ours = CURRENT_USER
+            .open(plan::UNINSTALL_KEY)
+            .and_then(|key| key.get_string("InstallLocation"))
+            .is_ok_and(|location| plan::same_folder(&location, dir));
+        if ours {
+            let _ = CURRENT_USER.remove_tree(plan::UNINSTALL_KEY);
+        }
     }
 
     pub fn run_entry() -> Option<String> {
@@ -502,9 +518,41 @@ mod win {
         }
     }
 
-    pub fn remove_shortcut(place: Place) {
-        if let Some(folder) = folder(&place) {
-            let _ = std::fs::remove_file(folder.join(SHORTCUT));
+    /// The program a shortcut opens.
+    fn shortcut_target(link: &Path) -> Option<String> {
+        // SAFETY: COM is initialized for this thread for the calls below and
+        // uninitialized afterwards when this call initialized it; `buffer`
+        // outlives the call that fills it.
+        unsafe {
+            let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+            let result = (|| -> windows::core::Result<String> {
+                let shell: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)?;
+                shell
+                    .cast::<IPersistFile>()?
+                    .Load(&HSTRING::from(link), STGM_READ)?;
+                let mut buffer = [0u16; 1024];
+                shell.GetPath(&mut buffer, std::ptr::null_mut(), SLGP_RAWPATH.0 as u32)?;
+                let length = buffer
+                    .iter()
+                    .position(|&unit| unit == 0)
+                    .unwrap_or(buffer.len());
+                Ok(String::from_utf16_lossy(&buffer[..length]))
+            })();
+            if initialized {
+                CoUninitialize();
+            }
+            result.ok()
+        }
+    }
+
+    /// Delete MindsWall's shortcut in `place` if it opens the app in `dir`.
+    /// A shortcut to another copy, or one that cannot be read, is kept.
+    pub fn remove_shortcut(place: Place, dir: &Path) {
+        let Some(link) = folder(&place).map(|folder| folder.join(SHORTCUT)) else {
+            return;
+        };
+        if shortcut_target(&link).is_some_and(|target| plan::runs_app_in(&target, dir)) {
+            let _ = std::fs::remove_file(link);
         }
     }
 
@@ -542,7 +590,7 @@ mod win {
     pub fn register(_: &[(&str, Value)]) -> Result<(), String> {
         Err(ONLY_WINDOWS.into())
     }
-    pub fn unregister() {}
+    pub fn unregister(_: &Path) {}
     pub fn run_entry() -> Option<String> {
         None
     }
@@ -559,7 +607,7 @@ mod win {
     pub fn create_shortcut(_: Place, _: &Path, _: &Path) -> Result<(), String> {
         Err(ONLY_WINDOWS.into())
     }
-    pub fn remove_shortcut(_: Place) {
+    pub fn remove_shortcut(_: Place, _: &Path) {
         let _ = (Place::StartMenu, Place::Desktop);
     }
     pub fn delete_after_exit(_: &[Leftover]) {}
@@ -629,6 +677,20 @@ mod tests {
         let report = |_| {};
         let error = install(&options, &[], "1.0.0", &mut Steps::new(7, &report)).unwrap_err();
         assert!(error.contains("does not contain MindsWall"), "{error}");
+    }
+
+    #[test]
+    fn uninstalling_from_a_folder_without_mindswall_does_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("notes.txt"), b"").unwrap();
+        let report = |_| {};
+        let options = UninstallOptions { delete_data: true };
+        let error = uninstall(dir.path(), &options, &mut Steps::new(6, &report)).unwrap_err();
+        assert!(error.contains("not installed"), "{error}");
+        assert!(dir.path().join("notes.txt").exists());
+        assert!(!is_installed_in(dir.path()));
+        fs::write(dir.path().join(UNINSTALLER), b"").unwrap();
+        assert!(is_installed_in(dir.path()));
     }
 
     #[test]

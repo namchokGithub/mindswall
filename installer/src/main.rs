@@ -51,11 +51,18 @@ fn main() {
         }
         Some(dir)
     } else {
-        let dir = system::installed().map(|(_, dir)| dir).or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|exe| exe.parent().map(Path::to_path_buf))
-        });
+        // The folder in Settings > Apps, or else the folder of this program
+        // when it is the uninstaller next to MindsWall.exe. A setup started
+        // with --uninstall anywhere else has nothing to remove.
+        let dir = system::installed()
+            .map(|(_, dir)| dir)
+            .filter(|dir| system::is_installed_in(dir))
+            .or_else(|| {
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|exe| exe.parent().map(Path::to_path_buf))
+                    .filter(|dir| system::is_installed_in(dir))
+            });
         // Continue from a temporary copy so this file can be deleted. If the
         // copy cannot start, uninstall from here; this file is then deleted
         // after exit.

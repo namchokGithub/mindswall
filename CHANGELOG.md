@@ -7,6 +7,8 @@ All notable changes to MindsWall are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-28
+
 ### Added
 
 - MindsWall Setup, a per-user installer and uninstaller with its own window

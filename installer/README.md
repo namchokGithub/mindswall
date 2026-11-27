@@ -52,9 +52,10 @@ Installing (`src/system.rs`, `install`):
 
 Uninstalling (`uninstall.exe --uninstall`): the uninstaller copies itself to
 the temporary folder and continues from there, so it can delete
-`uninstall.exe`. It ends MindsWall, removes Start with Windows (only if it
-points at this install), both shortcuts, the program files, and the **Apps**
-entry, and optionally `%APPDATA%\MindsWall`, `%LOCALAPPDATA%\MindsWall`, and
+`uninstall.exe`. It refuses to run where MindsWall is not installed. It ends
+MindsWall and removes the program files and, only when they point at this
+install, Start with Windows, both shortcuts, and the **Apps** entry, and
+optionally `%APPDATA%\MindsWall`, `%LOCALAPPDATA%\MindsWall`, and
 `%LOCALAPPDATA%\com.mindswall.desktop`. Files the user added to the install
 folder are kept. The temporary copy, the emptied folder, and the setup
 window's WebView data (`%TEMP%\MindsWall Setup WebView`) are deleted a few

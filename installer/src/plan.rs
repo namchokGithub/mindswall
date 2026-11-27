@@ -204,6 +204,17 @@ pub fn runs_app_in(command: &str, dir: &Path) -> bool {
     normalize(command_program(command)) == normalize(&dir.join(APP_EXE).to_string_lossy())
 }
 
+/// Whether `recorded`, a folder as stored in the registry, is `dir`.
+pub fn same_folder(recorded: &str, dir: &Path) -> bool {
+    let normalize = |text: &str| {
+        text.trim()
+            .replace('/', "\\")
+            .trim_end_matches('\\')
+            .to_lowercase()
+    };
+    !recorded.trim().is_empty() && normalize(recorded) == normalize(&dir.to_string_lossy())
+}
+
 /// A registry value in the uninstall entry.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -325,6 +336,17 @@ mod tests {
         assert!(runs_app_in(&ours.to_uppercase(), dir));
         assert!(!runs_app_in(r#""D:\Portable\MindsWall.exe" --hidden"#, dir));
         assert!(!runs_app_in("", dir));
+    }
+
+    #[test]
+    fn recorded_folders_are_compared_as_windows_does() {
+        let dir = Path::new(r"C:\Users\You\AppData\Local\Programs\MindsWall");
+        assert!(same_folder(
+            r"c:\users\you\appdata\local\programs\mindswall\",
+            dir
+        ));
+        assert!(!same_folder(r"C:\Users\You\AppData\Local\MindsWall", dir));
+        assert!(!same_folder("", dir));
     }
 
     #[test]
