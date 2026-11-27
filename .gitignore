@@ -26,6 +26,7 @@ rustc-ice-*.txt
 
 .vscode
 example.wallpaper
+*.DS_Store
 
 # Frontend
 ui/node_modules/

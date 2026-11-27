@@ -250,7 +250,9 @@ is drawn one image at a time and scaled with `fast_image_resize`, which works
 on 8-bit pixels instead of a large floating point copy. About two seconds after
 image work stops, and when the window closes to the tray, the app returns
 unused memory to Windows and logs `memory returned to Windows` (`before_mb`,
-`ram_mb`, `commit_mb`). Images are not kept in memory;
+`ram_mb`, `commit_mb`). The desktop app's manifest asks Windows for the
+segment heap (Windows 10 version 2004 and later), which hands freed memory
+back more readily than the default heap. Images are not kept in memory;
 the disk caches above are used instead. A scan resolves each folder once instead of opening
 every image, so adding a large folder stays quick; the same image reached
 through another spelling of a folder, a nested folder, or a link to a folder is

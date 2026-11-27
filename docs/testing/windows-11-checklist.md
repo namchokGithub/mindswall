@@ -325,6 +325,9 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
       changes with combining on and off, and while scrolling a Gallery of
       large photos; copy the `ram_mb` / `peak_mb` values from the timing log
       lines; WebView2 runs as separate `msedgewebview2.exe` processes
+- [ ] Leave the app in the tray for 6–8 hours with combining on and confirm
+      `commit_mb` in `memory returned to Windows` lines levels off instead of
+      rising steadily (the manifest requests the segment heap)
 - [ ] Press Next several times and copy the timing lines from the log
       (`wallpaper change timing`, `wallpaper changed`, `combined wallpaper
       prepared`, `preview created` / `preview read from cache`); note whether
