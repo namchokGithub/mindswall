@@ -45,7 +45,7 @@ Prepare test data:
 Useful paths:
 
 - Config: `%APPDATA%\MindsWall\config\config.json`
-- Log: `%APPDATA%\MindsWall\data\mindswall.log`
+- Logs: `%APPDATA%\MindsWall\data\logs\mindswall-<date>_<time>.log`
 - History: `%APPDATA%\MindsWall\data\history.json`
 - Cache: `%LOCALAPPDATA%\MindsWall\cache`
 
@@ -344,11 +344,22 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
       is needed)
 - [x] Toggling **Shuffle wallpapers** takes effect
 - [x] Settings persist after quitting and reopening the app
-- [ ] **Settings** > **Log file** shows `%APPDATA%\MindsWall\data\mindswall.log`
-      (expanded) with the user name shown as `******` and no tooltip with the name;
+- [ ] **Settings** > **Log file** shows the current file in
+      `%APPDATA%\MindsWall\data\logs` (expanded) with the user name shown as `******` and no tooltip with the name;
       **Copy path** copies the full, unmasked path to the clipboard
 - [ ] **Open folder** opens the log folder in File Explorer; before the
       slideshow has ever run, it says there is no log yet
+- [ ] Each start of the app (and of `mindswall run`) creates a new
+      `mindswall-<date>_<time>.log` named in local time; its first line is
+      `log started` with `app`, `version`, `os` (Windows edition, version and
+      build), `pid`, `ram_mb`, and `commit_mb`; line times show the local UTC
+      offset (for example `+07:00`)
+- [ ] An existing `%APPDATA%\MindsWall\data\mindswall.log` moves to
+      `logs\mindswall-legacy.log` on the first start
+- [ ] Leaving the slideshow running past midnight continues in a new file
+      that starts with `log continued after midnight`
+- [ ] With more than 100 log files, or files older than 30 days, the oldest
+      are deleted at the next start
 - [ ] **View log** shows the last 100 lines, scrolled to the newest, with user
       names in paths shown as `******`; **Reload** shows new lines; Escape
       closes it; with a large log (several MB) it still opens quickly

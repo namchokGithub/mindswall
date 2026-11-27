@@ -379,14 +379,6 @@ fn earliest(waits: [Option<Duration>; 3]) -> Option<Duration> {
 }
 
 /// Run the slideshow from the CLI. It stops when the desktop app takes over.
-const LOG_FILE: &str = "mindswall.log";
-
-/// The slideshow log file in the per-user data directory. The file exists
-/// only after a slideshow has started.
-pub fn log_path() -> Option<PathBuf> {
-    directories::ProjectDirs::from("", "", "MindsWall").map(|dirs| dirs.data_dir().join(LOG_FILE))
-}
-
 pub fn run_slideshow() -> Result<(), Box<dyn std::error::Error>> {
     run_slideshow_with(
         ServiceOptions {
@@ -405,16 +397,22 @@ pub fn run_slideshow_with(
     options: ServiceOptions,
     on_change: impl Fn(&PlaybackStatus, Change),
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let log = log_path().ok_or("user data directory unavailable")?;
-    let log_dir = log.parent().ok_or("user data directory unavailable")?;
-    std::fs::create_dir_all(log_dir)?;
-    let appender = tracing_appender::rolling::never(log_dir, LOG_FILE);
-    let (writer, _guard) = tracing_appender::non_blocking(appender);
-    tracing_subscriber::fmt()
-        .with_ansi(false)
-        .with_writer(writer)
-        .try_init()
-        .ok();
+    // Logging is set up once per process; a slideshow started again in the
+    // same process keeps writing to the same file.
+    let _guard = if tracing::dispatcher::has_been_set() {
+        None
+    } else {
+        let (writer, guard) = tracing_appender::non_blocking(crate::logs::LaunchLog::start()?);
+        tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_timer(tracing_subscriber::fmt::time::ChronoLocal::new(
+                crate::logs::TIME_FORMAT.to_owned(),
+            ))
+            .with_writer(writer)
+            .try_init()
+            .ok();
+        Some(guard)
+    };
     let path = Config::default_path()?;
     let mut config = Config::load(&path)?;
     let mut playback = Playback::new(&config, Instant::now())?;

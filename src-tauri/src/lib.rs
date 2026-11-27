@@ -1168,20 +1168,20 @@ fn preview_cache() -> Result<PathBuf, String> {
         .ok_or_else(|| "Cache directory unavailable".into())
 }
 
+/// The log file being written, or the logs folder before any log exists.
 #[tauri::command]
 fn log_location() -> Result<String, String> {
-    mindswall_core::service::log_path()
+    mindswall_core::logs::latest_log()
+        .or_else(mindswall_core::logs::logs_dir)
         .map(|path| path.display().to_string())
         .ok_or_else(|| "User data directory unavailable".into())
 }
 
-/// Open the folder that holds the slideshow log in File Explorer.
+/// Open the folder that holds the slideshow logs in File Explorer.
 #[tauri::command]
 async fn open_log_folder() -> Result<(), String> {
     blocking(|| {
-        let folder = mindswall_core::service::log_path()
-            .and_then(|path| path.parent().map(PathBuf::from))
-            .ok_or("User data directory unavailable")?;
+        let folder = mindswall_core::logs::logs_dir().ok_or("User data directory unavailable")?;
         if !folder.is_dir() {
             return Err("There is no log yet. Start the slideshow first.".into());
         }
@@ -1190,12 +1190,12 @@ async fn open_log_folder() -> Result<(), String> {
     .await
 }
 
-/// The last 100 lines of the slideshow log, oldest first.
+/// The last 100 lines of the newest log file, oldest first.
 #[tauri::command]
 async fn recent_log() -> Result<Vec<String>, String> {
-    blocking(|| {
-        let path = mindswall_core::service::log_path().ok_or("User data directory unavailable")?;
-        mindswall_core::utilities::tail_lines(&path, 100).map_err(|e| e.to_string())
+    blocking(|| match mindswall_core::logs::latest_log() {
+        Some(path) => mindswall_core::utilities::tail_lines(&path, 100).map_err(|e| e.to_string()),
+        None => Ok(Vec::new()),
     })
     .await
 }

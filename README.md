@@ -76,12 +76,19 @@ cargo run -p mindswall-cli -- config show
 
 Press Ctrl+C in the slideshow terminal to stop it. When the desktop app starts
 its slideshow while `run` is active, the CLI hands over: it prints a message
-and exits, and the app continues with the same image and paused state. Logs are stored under
-`%APPDATA%\MindsWall\data\mindswall.log`. The desktop app shows this path under
+and exits, and the app continues with the same image and paused state. Logs are stored in
+`%APPDATA%\MindsWall\data\logs`, one file each time the slideshow starts, named
+after the local start time (`mindswall-2026-11-27_10-34-58.log`); a slideshow
+still running at midnight continues in a new file. Each file starts with a
+`log started` line naming the program, its version, the Windows version, and
+its memory use, and every line is stamped with local time and its UTC offset.
+The newest 100 files are kept, and files not written for 30 days are deleted.
+The single `mindswall.log` used by earlier versions is moved into the folder as
+`mindswall-legacy.log`. The desktop app shows the current file under
 **Settings** > **Log file**, with the Windows user name hidden as `******`;
-the **Copy path** button copies the full path, **Open folder** opens the log
-folder in File Explorer, and **View log** shows the last 100 lines (user names
-in paths hidden), with a button to read them again. The slideshow and Windows wallpaper
+the **Copy path** button copies the full path, **Open folder** opens the logs
+folder in File Explorer, and **View log** shows the last 100 lines of the newest
+file (user names in paths hidden), with a button to read them again. The slideshow and Windows wallpaper
 integration still need end-to-end testing in an interactive Windows session.
 
 ### Desktop app (development)
