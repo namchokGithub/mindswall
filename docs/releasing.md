@@ -37,7 +37,8 @@ The UI footer in `ui/src/main.tsx` also shows the version; update it too.
 3. Builds the per-user NSIS installer with `npm --prefix ui run tauri build`
    and the CLI with `cargo build --release -p mindswall-cli`.
 4. Packages `MindsWall_<version>_x64_portable.zip` with `MindsWall.exe`,
-   `mindswall.exe`, `LICENSE`, and `README.md`, and writes `SHA256SUMS.txt`.
+   `mindswall.exe`, `portable.txt`, `LICENSE`, and `README.md`, and writes
+   `SHA256SUMS.txt`. The installer does not include the CLI.
 5. Uploads the files as a workflow artifact and attaches them to a draft
    release. Its notes are the changelog section followed by a fixed
    **Downloads** section that lists the files (GitHub adds the source code
@@ -45,9 +46,16 @@ The UI footer in `ui/src/main.tsx` also shows the version; update it too.
    by SmartScreen, Smart App Control, or antivirus software, linking to the
    README steps.
 
-The portable build needs the Microsoft Edge WebView2 Runtime, which Windows 11
-includes. It stores settings in the same per-user folders as the installed
-build. Neither build needs administrator rights.
+The installer embeds the WebView2 bootstrapper (`webviewInstallMode`
+`embedBootstrapper` in `src-tauri/tauri.conf.json`), so it can install the
+runtime where it is missing without downloading the bootstrapper first; the
+runtime itself still comes from Microsoft. Windows 11 includes the runtime. The
+portable build needs it already installed.
+
+`portable.txt` next to the programs makes the build portable: settings,
+history, logs, caches, and the WebView profile are kept in `config`, `data`,
+and `cache` folders beside it (see `crates/core/src/paths.rs`). Neither build
+needs administrator rights. Neither build is code-signed.
 
 Before publishing the draft, install the NSIS build and run the portable ZIP on
 Windows 11 as a standard user and follow `docs/testing/windows-11-checklist.md`.

@@ -355,8 +355,8 @@ impl Config {
         Ok(())
     }
     pub fn default_path() -> io::Result<PathBuf> {
-        directories::ProjectDirs::from("", "", "MindsWall")
-            .map(|d| d.config_dir().join("config.json"))
+        crate::paths::config_dir()
+            .map(|dir| dir.join("config.json"))
             .ok_or_else(|| {
                 io::Error::new(io::ErrorKind::NotFound, "user config directory unavailable")
             })

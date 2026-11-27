@@ -2479,7 +2479,6 @@ dependencies = [
 name = "mindswall-desktop"
 version = "0.1.0"
 dependencies = [
- "directories",
  "image",
  "mindswall-core",
  "serde",

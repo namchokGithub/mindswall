@@ -6,6 +6,7 @@ pub mod history;
 pub mod ipc;
 pub mod logs;
 pub mod monitors;
+pub mod paths;
 pub mod playback;
 pub mod scanner;
 pub mod scheduler;

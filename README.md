@@ -332,13 +332,29 @@ elevation (UAC) prompt is not expected.
 
    Then extract it to a folder in your user profile and run `MindsWall.exe`.
 
+The installer adds MindsWall for the current user, with an uninstaller in
+**Settings** > **Apps**; it includes the WebView2 setup in case a computer
+does not have it (Windows 11 already does), so it does not download it. The
+CLI (`mindswall.exe`) ships only in the portable ZIP.
+
+The portable ZIP contains `MindsWall.exe`, `mindswall.exe`, and
+`portable.txt`. While `portable.txt` is next to the programs, both keep their
+settings, history, logs, caches, and WebView data in `config`, `data`, and
+`cache` folders in that folder instead of `%APPDATA%` and `%LOCALAPPDATA%`, so
+the paths elsewhere in this README move there too. Delete `portable.txt` to use
+the per-user folders. Keep the folder somewhere you can write to (not
+`Program Files`). Combined wallpapers are stored in the `cache` folder, so a
+folder on a removable drive must stay connected. **Start with Windows**
+remembers where `MindsWall.exe` is; after moving the folder, turn it off and on
+again. Run either the installed or the portable app, not both at once.
+
 **Run anyway** is not offered when Smart App Control is on (Windows Security >
 App & browser control > Smart App Control), because it blocks unsigned apps.
 Turning Smart App Control off cannot be undone without resetting Windows, so
 consider building from source instead (see
 [Desktop app (development)](#desktop-app-development)). Some antivirus products
 may also scan or quarantine new unsigned executables; check the file hash
-before allowing it. Code signing is planned to remove these warnings.
+before allowing it. Code signing is not planned for now, so these warnings remain.
 
 ### Continuous integration and performance
 

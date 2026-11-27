@@ -20,13 +20,9 @@ const SUFFIX: &str = ".log";
 const LEGACY_FILE: &str = "mindswall.log";
 const LEGACY_MOVED: &str = "mindswall-legacy.log";
 
-fn data_dir() -> Option<PathBuf> {
-    directories::ProjectDirs::from("", "", "MindsWall").map(|dirs| dirs.data_dir().to_path_buf())
-}
-
 /// The folder that holds the log files, in the per-user data directory.
 pub fn logs_dir() -> Option<PathBuf> {
-    data_dir().map(|dir| dir.join("logs"))
+    crate::paths::data_dir().map(|dir| dir.join("logs"))
 }
 
 /// The most recently written log file, if any.
@@ -130,7 +126,7 @@ impl LaunchLog {
     /// old single log file there and deleting old files.
     pub fn start() -> io::Result<Self> {
         let unavailable = || io::Error::other("user data directory unavailable");
-        let data = data_dir().ok_or_else(unavailable)?;
+        let data = crate::paths::data_dir().ok_or_else(unavailable)?;
         let dir = logs_dir().ok_or_else(unavailable)?;
         fs::create_dir_all(&dir)?;
         move_legacy(&data, &dir);
@@ -165,11 +161,12 @@ impl LaunchLog {
             })
             .unwrap_or_default();
         let mut line = format!(
-            "{}  INFO mindswall_core::logs: {message} app={app:?} version={} os={:?} pid={}",
+            "{}  INFO mindswall_core::logs: {message} app={app:?} version={} os={:?} pid={} portable={}",
             now.format(TIME_FORMAT),
             env!("CARGO_PKG_VERSION"),
             os_version(),
             std::process::id(),
+            crate::paths::is_portable(),
         );
         if let Some(memory) = memory {
             line.push_str(&format!(

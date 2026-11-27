@@ -404,8 +404,7 @@ impl Collages {
         Self {
             settings: Cell::new(config.collage),
             span: Cell::new(config.fit_mode == crate::utilities::FitMode::Span),
-            cache: directories::ProjectDirs::from("", "", "MindsWall")
-                .map(|dirs| dirs.cache_dir().join("collages")),
+            cache: crate::paths::cache_dir().map(|dir| dir.join("collages")),
             shown: RefCell::new(VecDeque::new()),
         }
     }

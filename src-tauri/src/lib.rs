@@ -460,14 +460,14 @@ fn edited_copy(path: &std::path::Path) -> Result<PathBuf, String> {
 }
 
 fn edited_cache() -> Result<PathBuf, String> {
-    directories::ProjectDirs::from("", "", "MindsWall")
-        .map(|d| d.cache_dir().join("edits"))
+    mindswall_core::paths::cache_dir()
+        .map(|dir| dir.join("edits"))
         .ok_or_else(|| "Cache directory unavailable".into())
 }
 
 fn thumbnail_cache() -> Result<PathBuf, String> {
-    directories::ProjectDirs::from("", "", "MindsWall")
-        .map(|d| d.cache_dir().join("thumbnails"))
+    mindswall_core::paths::cache_dir()
+        .map(|dir| dir.join("thumbnails"))
         .ok_or_else(|| "Cache directory unavailable".into())
 }
 
@@ -1163,8 +1163,8 @@ fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
 }
 
 fn preview_cache() -> Result<PathBuf, String> {
-    directories::ProjectDirs::from("", "", "MindsWall")
-        .map(|d| d.cache_dir().join("previews"))
+    mindswall_core::paths::cache_dir()
+        .map(|dir| dir.join("previews"))
         .ok_or_else(|| "Cache directory unavailable".into())
 }
 
@@ -1249,7 +1249,12 @@ fn create_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     else {
         return Ok(());
     };
-    match tauri::WebviewWindowBuilder::from_config(app, &config)?.build() {
+    let mut builder = tauri::WebviewWindowBuilder::from_config(app, &config)?;
+    // A portable build keeps the WebView's profile next to the program too.
+    if let Some(dir) = mindswall_core::paths::webview_dir() {
+        builder = builder.data_directory(dir);
+    }
+    match builder.build() {
         Ok(window) => {
             mindswall_core::utilities::log_memory("window opened");
             let _ = window.set_focus();

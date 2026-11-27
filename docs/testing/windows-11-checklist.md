@@ -671,8 +671,21 @@ Hotkeys are empty by default; configure them in **Settings**.
       and no draft release is made
 - [ ] Push a matching `v<version>` tag: the workflow passes, and the draft
       release has the NSIS installer, the portable ZIP, and `SHA256SUMS.txt`
-- [ ] The portable ZIP runs from a user folder as a standard user and uses the
-      same settings as the installed build
+- [ ] The installer's file properties (right-click > **Properties** >
+      **Details**) and **Settings** > **Apps** show the publisher, copyright,
+      and description; no elevation prompt appears
+- [ ] Installing on a Windows 11 computer with WebView2 does not download
+      anything; uninstalling removes the program and keeps the settings unless
+      the uninstaller is asked to delete app data
+- [ ] The portable ZIP runs from a user folder as a standard user; `config`,
+      `data` (with `logs` and `webview`), and `cache` folders appear next to
+      `MindsWall.exe`, and nothing new is written to `%APPDATA%\MindsWall` or
+      `%LOCALAPPDATA%\MindsWall`; the first log line shows `portable=true`
+- [ ] `mindswall.exe` from the portable folder uses the same portable
+      settings as `MindsWall.exe`
+- [ ] Deleting `portable.txt` makes the next start use the per-user folders
+- [ ] Moving the portable folder keeps its settings; **Start with Windows**
+      works again after turning it off and on
 
 ## 6. Local-first checks
 

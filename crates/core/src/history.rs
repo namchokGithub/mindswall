@@ -23,8 +23,8 @@ pub struct History {
 }
 impl History {
     pub fn default_path() -> io::Result<PathBuf> {
-        directories::ProjectDirs::from("", "", "MindsWall")
-            .map(|d| d.data_dir().join("history.json"))
+        crate::paths::data_dir()
+            .map(|dir| dir.join("history.json"))
             .ok_or_else(|| {
                 io::Error::new(io::ErrorKind::NotFound, "user data directory unavailable")
             })

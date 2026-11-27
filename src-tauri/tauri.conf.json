@@ -32,7 +32,16 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "publisher": "Namchok Singhachai",
+    "copyright": "© 2026 Namchok Singhachai. MIT License.",
+    "category": "Utility",
+    "shortDescription": "Local-first wallpaper manager for Windows",
+    "longDescription": "MindsWall changes your Windows wallpaper from your own folders, with a slideshow, per-monitor wallpapers, combined layouts, and a tray icon. It works offline and needs no administrator rights.",
+    "homepage": "https://github.com/namchokGithub/mindswall",
     "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
       "nsis": {
         "installMode": "currentUser"
       }

@@ -82,6 +82,16 @@ jobs:
           Copy-Item target/release/mindswall-desktop.exe dist/portable/MindsWall.exe
           Copy-Item target/release/mindswall.exe dist/portable/mindswall.exe
           Copy-Item LICENSE, README.md dist/portable/
+          # This file makes the build portable: settings, history, logs, and
+          # caches are kept in config, data, and cache folders next to it.
+          @(
+            'MindsWall portable build.'
+            ''
+            'While this file is next to MindsWall.exe, the app keeps its settings,'
+            'history, logs, and caches in the config, data, and cache folders here'
+            'instead of %APPDATA% and %LOCALAPPDATA%. Delete this file to use the'
+            'per-user folders instead. Keep the folder somewhere you can write to.'
+          ) | Set-Content dist/portable/portable.txt -Encoding utf8
           Compress-Archive -Path dist/portable/* -DestinationPath "dist/release/MindsWall_${version}_x64_portable.zip"
           Copy-Item target/release/bundle/nsis/*.exe dist/release/
           Get-ChildItem dist/release -File | ForEach-Object {
