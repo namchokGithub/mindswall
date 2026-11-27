@@ -32,7 +32,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "publisher": "Namchok Singhachai",
+    "publisher": "NamchokGithub",
     "copyright": "© 2026 Namchok Singhachai. MIT License.",
     "category": "Utility",
     "shortDescription": "Local-first wallpaper manager for Windows",

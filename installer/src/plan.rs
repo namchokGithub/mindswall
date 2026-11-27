@@ -8,7 +8,7 @@ pub const APP_NAME: &str = "MindsWall";
 pub const APP_EXE: &str = "MindsWall.exe";
 pub const UNINSTALLER: &str = "uninstall.exe";
 pub const SHORTCUT: &str = "MindsWall.lnk";
-pub const PUBLISHER: &str = "Namchok Singhachai";
+pub const PUBLISHER: &str = "NamchokGithub";
 pub const HOMEPAGE: &str = "https://github.com/namchokGithub/mindswall";
 /// The setup and the app's argument for starting the app in the tray, as
 /// "Start with Windows" does.
