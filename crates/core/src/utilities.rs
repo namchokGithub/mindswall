@@ -320,8 +320,9 @@ pub fn elapsed_ms(started: std::time::Instant) -> u64 {
 pub const PREVIEW_SIZE: (u32, u32) = (1600, 900);
 
 /// A JPEG copy of `path` that fits in [`PREVIEW_SIZE`] (smaller images keep
-/// their size), cached in `cache` by path, size, and modification time.
-/// Returns the file and whether it was already cached.
+/// their size), cached in `cache` by path, size, and modification time. A
+/// cached copy gets a new modification time each time it is used. Returns the
+/// file and whether it was already cached.
 pub fn preview(
     path: &Path,
     cache: &Path,
@@ -336,6 +337,15 @@ pub fn preview(
     PREVIEW_SIZE.hash(&mut hash);
     let target = cache.join(format!("{:016x}.jpg", hash.finish()));
     if target.is_file() {
+        // Mark it as recently used, so cleaning the cache (oldest first)
+        // removes previews that are no longer shown, not this one.
+        let touched = fs::File::options()
+            .write(true)
+            .open(&target)
+            .and_then(|file| file.set_modified(std::time::SystemTime::now()));
+        if let Err(error) = touched {
+            tracing::debug!(path = ?target, %error, "could not mark a cached preview as used");
+        }
         tracing::info!(path = ?path, ms = elapsed_ms(started), "preview read from cache");
         return Ok((target, true));
     }

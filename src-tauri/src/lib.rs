@@ -629,14 +629,14 @@ async fn history_thumbnail(path: PathBuf) -> Result<tauri::ipc::Response, String
 
 /// Gallery commands accept images in the current collection or exclusions.
 fn gallery_image(gallery: &Mutex<Vec<PathBuf>>, path: &std::path::Path) -> Result<(), String> {
-    if !gallery
+    // Release the gallery lock before reading the config or asking the
+    // slideshow, which can take a while, so other gallery commands do not wait.
+    let listed = gallery
         .lock()
         .map_err(|e| e.to_string())?
         .iter()
-        .any(|image| image == path)
-        && !get_config()?.excluded.iter().any(|image| image == path)
-        && !is_shown(path)
-    {
+        .any(|image| image == path);
+    if !listed && !get_config()?.excluded.iter().any(|image| image == path) && !is_shown(path) {
         return Err("Image is not in the current collection".into());
     }
     Ok(())
@@ -1131,9 +1131,18 @@ fn current_preview_inner(path: PathBuf) -> Result<Vec<u8>, String> {
     // A downscaled, cached copy keeps the transfer and decoding in the
     // WebView small; previews of images shown before load from the cache.
     let cache = preview_cache()?;
-    let (file, cached) =
-        mindswall_core::utilities::preview(&path, &cache).map_err(|e| e.to_string())?;
-    let bytes = std::fs::read(&file).map_err(|e| e.to_string())?;
+    let preview = || mindswall_core::utilities::preview(&path, &cache).map_err(|e| e.to_string());
+    let (mut file, mut cached) = preview()?;
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        // Another request cleaned the cache right after this one found the
+        // file; make the preview again.
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            (file, cached) = preview()?;
+            std::fs::read(&file).map_err(|e| e.to_string())?
+        }
+        Err(error) => return Err(error.to_string()),
+    };
     if !cached {
         let keep = file
             .file_name()

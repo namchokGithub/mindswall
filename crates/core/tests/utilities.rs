@@ -97,7 +97,17 @@ fn previews_are_downscaled_and_cached() {
     let (width, height) = image::image_dimensions(&file).unwrap();
     assert!(width <= PREVIEW_SIZE.0 && height <= PREVIEW_SIZE.1);
     assert_eq!((width, height), (1200, 900));
-    assert_eq!(preview(&large, &cache).unwrap(), (file, true));
+    // Using a cached preview marks it as recent, so cache cleaning keeps it.
+    let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    std::fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(old)
+        .unwrap();
+    assert_eq!(preview(&large, &cache).unwrap(), (file.clone(), true));
+    let used = std::fs::metadata(&file).unwrap().modified().unwrap();
+    assert!(used > old + std::time::Duration::from_secs(60));
 
     // Small images keep their size.
     let small = dir.path().join("small.png");
