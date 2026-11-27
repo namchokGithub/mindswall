@@ -5,8 +5,6 @@ All notable changes to MindsWall are recorded here. The format follows
 [Semantic Versioning](https://semver.org/). See
 [docs/releasing.md](docs/releasing.md) for the release process.
 
-## [Unreleased]
-
 ## [1.0.0] - 2026-11-28
 
 ### Added
