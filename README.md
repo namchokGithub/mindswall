@@ -101,6 +101,12 @@ npm.cmd --prefix ui install
 npm.cmd --prefix ui run tauri dev
 ```
 
+To build the desktop executable and NSIS installer, run
+`npm.cmd --prefix ui run tauri build`. The separate custom MindsWall Setup
+screens in `installer/ui` have their own dependencies; install those with
+`npm.cmd --prefix installer/ui install` when working on that setup. See
+[installer/README.md](installer/README.md) for its build steps.
+
 Use **Folders** to select image directories, then start the slideshow from
 **Overview**. Folder paths on **Folders** and **Monitors** show only the last
 folder (for example `******\wallpapers`) so the rest stays out of screenshots;
