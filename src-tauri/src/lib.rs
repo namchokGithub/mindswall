@@ -1251,6 +1251,7 @@ fn create_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     };
     match tauri::WebviewWindowBuilder::from_config(app, &config)?.build() {
         Ok(window) => {
+            mindswall_core::utilities::log_memory("window opened");
             let _ = window.set_focus();
             Ok(())
         }
@@ -1453,7 +1454,10 @@ pub fn run() {
             tauri::RunEvent::WindowEvent {
                 event: tauri::WindowEvent::Destroyed,
                 ..
-            } => mindswall_core::utilities::trim_memory_soon(),
+            } => {
+                mindswall_core::utilities::log_memory("window closed");
+                mindswall_core::utilities::trim_memory_soon();
+            }
             _ => {}
         });
 }

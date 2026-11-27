@@ -292,6 +292,17 @@ pub fn commit_mb() -> Option<u64> {
     memory_mb().map(|memory| memory.commit)
 }
 
+/// Log this process's memory with `event`, for example to compare it before
+/// and after the window's WebView exists.
+pub fn log_memory(event: &str) {
+    let memory = memory_mb();
+    tracing::info!(
+        ram_mb = memory.map(|memory| memory.working),
+        commit_mb = memory.map(|memory| memory.commit),
+        "{event}"
+    );
+}
+
 /// Give memory that is no longer used back to Windows: compact the process
 /// heap and trim the working set. Pages still in use come back when touched.
 /// Does nothing on other systems.
