@@ -94,7 +94,15 @@ jobs:
           $version = '${{ github.ref_name }}'.TrimStart('v')
           New-Item -ItemType Directory -Force dist/portable, dist/release | Out-Null
           Copy-Item target/release/mindswall-desktop.exe dist/portable/MindsWall.exe
-          Copy-Item target/release/mindswall.exe dist/portable/mindswall.exe
+          Copy-Item target/release/mindswall.exe dist/portable/mindswall-cli.exe
+          foreach ($file in @(
+            @{ source = 'target/release/mindswall-desktop.exe'; packaged = 'dist/portable/MindsWall.exe' },
+            @{ source = 'target/release/mindswall.exe'; packaged = 'dist/portable/mindswall-cli.exe' }
+          )) {
+            if ((Get-FileHash $file.source).Hash -ne (Get-FileHash $file.packaged).Hash) {
+              throw "Portable executable does not match $($file.source)"
+            }
+          }
           Copy-Item LICENSE, README.md dist/portable/
           # This file makes the build portable: settings, history, logs, and
           # caches are kept in config, data, and cache folders next to it.

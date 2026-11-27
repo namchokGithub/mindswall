@@ -47,7 +47,7 @@ The UI footer in `ui/src/main.tsx` also shows the version; update it too.
 4. Names MindsWall Setup `MindsWall_<version>_x64-setup.exe` and the NSIS
    installer `MindsWall_<version>_x64-nsis-setup.exe`, packages
    `MindsWall_<version>_x64_portable.zip` with `MindsWall.exe`,
-   `mindswall.exe`, `portable.txt`, `LICENSE`, and `README.md`, and writes
+   `mindswall-cli.exe`, `portable.txt`, `LICENSE`, and `README.md`, and writes
    `SHA256SUMS.txt`. Neither installer includes the CLI.
 5. Uploads the files as a workflow artifact and attaches them to a draft
    release. Its notes are the changelog section followed by a fixed

@@ -13,7 +13,7 @@ files; see [releasing.md](releasing.md) for how they are built.
 | --- | --- |
 | `MindsWall_<version>_x64-setup.exe` | You want MindsWall installed for your user, with an entry in **Settings** > **Apps**. |
 | `MindsWall_<version>_x64-nsis-setup.exe` | MindsWall Setup does not work for you. It is the previous installer; use one installer or the other, not both. |
-| `MindsWall_<version>_x64_portable.zip` | You want everything in one folder that you can move or delete, or you want the CLI (`mindswall.exe`). |
+| `MindsWall_<version>_x64_portable.zip` | You want everything in one folder that you can move or delete, or you want the CLI (`mindswall-cli.exe`). |
 | `SHA256SUMS.txt` | Checking that a download is complete and unchanged. |
 
 Use one build at a time. The installed and portable apps cannot run at the
@@ -80,13 +80,13 @@ The installers do not include the CLI; use the portable ZIP for it.
    `%USERPROFILE%\Apps\MindsWall`. Do not use `Program Files`.
 3. Run `MindsWall.exe`.
 
-The folder contains `MindsWall.exe` (the app), `mindswall.exe` (the CLI),
+The folder contains `MindsWall.exe` (the app), `mindswall-cli.exe` (the CLI),
 `portable.txt`, `LICENSE`, and `README.md`. While `portable.txt` is there, both
 programs keep their files in folders next to them:
 
 ```
 MindsWall\
-  MindsWall.exe  mindswall.exe  portable.txt
+  MindsWall.exe  mindswall-cli.exe  portable.txt
   config\   config.json
   data\     history.json, logs\, webview\
   cache\    thumbnails, previews, combined wallpapers, edited images
