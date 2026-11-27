@@ -3,7 +3,8 @@ import { createRoot } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ArrowLeft, ArrowRight, ChevronRight, FolderOpen, History, Image, LayoutGrid, Layers, Monitor, Paintbrush, Pause, Play, Plus, RefreshCw, Settings, Trash2, ExternalLink, Info } from "lucide-react";
-import { TitleBar } from "./TitleBar";
+import { WindowControls } from "./WindowControls";
+import logo from "./assets/mindswall.png";
 import { Select } from "./Select";
 import { applyTheme, type ThemeSetting } from "./theme";
 import { Gallery, HistoryPage, type UtilityConfig } from "./Utilities";
@@ -164,12 +165,13 @@ function App() {
   const nav: { id: Page; label: string; icon: typeof LayoutGrid }[] = [
     { id: "overview", label: "Overview", icon: LayoutGrid }, { id: "folders", label: "Folders", icon: FolderOpen }, { id: "gallery", label: "Gallery", icon: Image }, { id: "monitors", label: "Monitors", icon: Monitor }, { id: "history", label: "History", icon: History }, { id: "profiles", label: "Profiles", icon: Layers }, { id: "editor", label: "Editor", icon: Paintbrush }, { id: "settings", label: "Settings", icon: Settings }, { id: "about", label: "About", icon: Info },
   ];
-  return <div className="app-frame"><TitleBar/><div className="app-shell">
-    <aside className="sidebar">
+  return <div className="app-frame"><WindowControls/><div className="app-shell">
+    <aside className="sidebar" data-tauri-drag-region>
+      <div className="brand" data-tauri-drag-region><img className="brand-logo" src={logo} alt="" draggable={false} data-tauri-drag-region/><strong data-tauri-drag-region>MindsWall</strong></div>
       <div className="nav-caption">WORKSPACE</div><nav aria-label="Main navigation">{nav.map(({ id, label, icon: Icon }) => <button key={id} className={page === id ? "nav active" : "nav"} onClick={() => navigatePage(id)} aria-current={page === id ? "page" : undefined}><Icon size={17}/>{label}{page === id && <ChevronRight size={15} className="nav-arrow"/>}</button>)}</nav>
       <div className="sidebar-bottom"><span className="local-dot"/> LOCAL MODE <small>Made for your space.</small></div>
     </aside>
-    <main><header className="topline"><span>YOUR PERSONAL WALLPAPER MANAGER</span>{config && config.profiles.length > 0 && <button className={`profile-pill${profileStatus.changed ? " changed" : ""}`} onClick={() => navigatePage("profiles")} title={profileStatus.changed ? "Settings differ from the saved profile. Open Profiles to update it." : "Open Profiles"}><Layers size={13}/>{profileStatus.active ? <>Profile: <strong>{profileStatus.active}</strong>{profileStatus.changed && <em>· changed</em>}</> : "No profile"}</button>}<span className="topline-right"><span className="local-dot"/> Offline by design</span></header>
+    <main><header className="topline" data-tauri-drag-region><span data-tauri-drag-region>YOUR PERSONAL WALLPAPER MANAGER</span>{config && config.profiles.length > 0 && <button className={`profile-pill${profileStatus.changed ? " changed" : ""}`} onClick={() => navigatePage("profiles")} title={profileStatus.changed ? "Settings differ from the saved profile. Open Profiles to update it." : "Open Profiles"}><Layers size={13}/>{profileStatus.active ? <>Profile: <strong>{profileStatus.active}</strong>{profileStatus.changed && <em>· changed</em>}</> : "No profile"}</button>}<span className="topline-right" data-tauri-drag-region><span className="local-dot"/> Offline by design</span></header>
       <div className="content"><div className="heading"><div><div className="eyebrow">{page === "overview" ? "YOUR SPACE" : page === "settings" ? "PREFERENCES" : page === "about" ? "ABOUT" : "YOUR COLLECTION"}</div><h1>{page === "overview" ? "A little change of scenery." : page === "folders" ? "Your folders." : page === "gallery" ? "A collection of moments." : page === "history" ? "Take another look." : page === "monitors" ? "Your screens." : page === "about" ? "A little space of your own." : "Make it yours."}</h1><p>{page === "overview" ? "A fresh perspective, right on your desktop." : page === "folders" ? "Choose the places where your wallpapers live." : page === "gallery" ? "Find a favorite for your desktop." : page === "history" ? "Revisit wallpapers you have enjoyed." : page === "monitors" ? "Give each display its own view." : page === "about" ? "Local, open, and made for your desktop." : "Set the rhythm that feels right for you."}</p></div><span className={`status ${status}`}><span/> {status === "running" ? "Playing" : status === "paused" ? "Paused" : "Stopped"}</span></div>
         {!config ? <div className="panel empty"><LoadingBlock label="Loading your workspace"/></div> : <>
         {page === "overview" && <><div className="section-title"><div><span className="eyebrow">CURRENT WALLPAPER</span><h2>Your desktop, right now</h2></div><span className="subtle">A moment for yourself</span></div>

@@ -116,9 +116,12 @@ startup entry made by an earlier build. The app and the CLI use the same local c
 pipe. Desktop interactions and startup behavior still require interactive
 Windows verification.
 
-The window uses its own minimal title bar in the app's colors, with minimize,
-maximize, and close buttons; drag it to move the window and double-click it to
-maximize. **Settings** > **Theme** chooses Light, Dark, or System (follows the
+The window has no separate title bar: the sidebar runs to the top edge, and
+minimize, maximize, and close buttons in the Windows 11 style float over the
+top-right corner, follow the Light/Dark theme, and dim while the window is not
+focused. Drag the sidebar or the top line of the page to move the window, and
+double-click them to maximize or restore; the top line stays in place while the
+page scrolls. **Settings** > **Theme** chooses Light, Dark, or System (follows the
 Windows app mode; stored as `theme` in the config). The sidebar stays in place
 while the page scrolls, scroll bars are hidden, dropdowns use the app's own
 style, and only file names and paths can be selected and copied.

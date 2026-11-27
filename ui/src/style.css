@@ -57,15 +57,25 @@ body{background:var(--c-11121a);user-select:none;-webkit-user-select:none}
 /* main is a fixed-height flex column that scrolls: without this, the top bar
    and footer shrink on long pages, so their height differed between pages. */
 .app-shell>main>*{flex-shrink:0}
-.titlebar{height:36px;flex:none;display:flex;align-items:center;justify-content:space-between;background:var(--c-171821);border-bottom:1px solid var(--c-292a35)}
-.titlebar-brand{display:flex;align-items:center;gap:9px;padding-left:14px;font-size:12px;font-weight:650;color:var(--c-eaeaf3);height:100%;flex:1}
-.titlebar-brand img{width:18px;height:18px;object-fit:contain;pointer-events:none}
-.titlebar-controls{display:flex;height:100%}
-.titlebar-controls button{width:46px;height:100%;border:0;border-radius:0;background:transparent;color:var(--c-9697aa);display:grid;place-items:center;cursor:default}
-.titlebar-controls svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:1}
-.titlebar-controls button:hover{background:var(--c-232430);color:var(--c-eaeaf3)}
-.titlebar-controls .titlebar-close:hover{background:#c42b1c;color:#fff}
-.titlebar-controls button:focus-visible{outline-offset:-2px}
+/* No title bar: the sidebar runs to the top edge and the caption buttons float
+   over the top-right corner, styled like Windows 11 and following the theme. */
+.app-frame{position:relative}
+.window-controls{position:absolute;top:0;right:0;z-index:50;display:flex;height:32px}
+.window-controls button{width:46px;height:32px;border:0;border-radius:0;background:transparent;color:var(--c-eaeaf3);display:grid;place-items:center;cursor:default;transition:background .1s,color .1s}
+.window-controls svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:1}
+.window-controls button:hover{background:color-mix(in srgb,var(--c-eaeaf3) 9%,transparent)}
+.window-controls button:active{background:color-mix(in srgb,var(--c-eaeaf3) 5%,transparent);color:var(--c-9697aa)}
+.window-controls .window-close:hover{background:#c42b1c;color:#fff}
+.window-controls .window-close:active{background:#c42b1ce6;color:#ffffffb3}
+.window-controls.is-inactive button:not(:hover){color:var(--c-77788a)}
+.window-controls button:focus-visible{outline-offset:-2px}
+.app-shell>.sidebar{padding-top:18px}
+.sidebar>.brand{margin:0 9px 26px;min-height:32px}
+.sidebar>.brand .brand-logo{width:26px;height:26px;pointer-events:none}
+.sidebar>.brand strong{font-size:15px}
+.app-shell>main>.topline{position:sticky;top:0;z-index:40;padding-right:162px;background:color-mix(in srgb,var(--c-11121a) 84%,transparent);backdrop-filter:blur(14px)}
+@media(max-width:760px){.app-shell>main>.topline{padding-right:150px}.sidebar>.brand{justify-content:center;margin:0 0 26px}.sidebar>.brand strong{display:none}.sidebar-bottom small{display:none}}
+@media(max-height:620px){.sidebar>.brand{margin-bottom:12px}.sidebar>.nav-caption{margin-bottom:8px}.sidebar .nav{padding:10px 12px}}
 /* Custom dropdown. */
 .select{position:relative;display:inline-block;min-width:130px}
 .select-button{width:100%;min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 10px 0 12px;border:1px solid var(--c-3b3c4b);border-radius:7px;background:var(--c-262733);color:var(--c-e3e3ee);font-size:12px;text-align:left}

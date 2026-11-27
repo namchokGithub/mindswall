@@ -257,10 +257,15 @@ Start with `npm.cmd --prefix ui run tauri dev` (stop any CLI `run` first).
 - [x] The app opens and every page loads: Overview, Folders, Gallery, Monitors,
       History, Profiles, Editor, Settings
 - [x] Logo and tray icon display correctly
-- [ ] The custom title bar shows the logo and name once (not repeated in the
-      sidebar), matches the app background, and follows Light/Dark
-- [ ] Dragging the title bar moves the window; double-click maximizes and
-      restores; Windows+Arrow snapping works
+- [ ] There is no separate title bar: the logo and name sit at the top of the
+      sidebar, and the minimize, maximize, and close buttons float over the
+      top-right corner, follow Light/Dark, and dim when another window is
+      focused; Close turns red on hover
+- [ ] Dragging the sidebar's empty space or the top line moves the window
+      (also after scrolling a page); double-click maximizes and restores;
+      dragging to a screen edge and Windows+Arrow snapping work; buttons and
+      the profile pill in those areas still respond to clicks
+- [ ] At the smallest window size (680 × 540) the whole sidebar is visible
 - [ ] Minimize, Maximize/Restore, and Close work; Close keeps the app in the
       tray; the edges resize the window and the window has a shadow
 - [ ] **Settings** > **Theme**: Light, Dark, and System each apply immediately;
