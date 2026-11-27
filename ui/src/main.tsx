@@ -194,7 +194,7 @@ function App() {
         {page === "settings" && <UtilitySettings config={config} busy={busy} save={save}/>}
         {page === "settings" && <HotkeySettings hotkeys={config.hotkeys} refresh={async () => { setConfig(await invoke<Config>("get_config")); }}/>}
         </>}
-      </div><footer>MINDSWALL <span>•</span> A LITTLE SPACE OF YOUR OWN <span className="footer-version">VERSION 0.1.0</span></footer>
+      </div><footer>MINDSWALL <span>•</span> A LITTLE SPACE OF YOUR OWN <span className="footer-version">VERSION 1.0.0</span></footer>
     </main>
   </div></div>;
 }

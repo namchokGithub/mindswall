@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "MindsWall",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.mindswall.desktop",
   "build": {
     "frontendDist": "../ui/dist",
@@ -43,7 +43,8 @@
         "type": "embedBootstrapper"
       },
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
       }
     },
     "icon": [

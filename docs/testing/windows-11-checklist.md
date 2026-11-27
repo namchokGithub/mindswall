@@ -671,6 +671,9 @@ Hotkeys are empty by default; configure them in **Settings**.
       and no draft release is made
 - [ ] Push a matching `v<version>` tag: the workflow passes, and the draft
       release has the NSIS installer, the portable ZIP, and `SHA256SUMS.txt`
+- [ ] The installer, `MindsWall.exe`, and `mindswall.exe` show the MindsWall
+      logo in File Explorer (large icons too) and version 1.0.0 under
+      **Properties** > **Details**
 - [ ] The installer's file properties (right-click > **Properties** >
       **Details**) and **Settings** > **Apps** show the publisher, copyright,
       and description; no elevation prompt appears
