@@ -12,6 +12,7 @@ files; see [releasing.md](releasing.md) for how they are built.
 | File | Use it when |
 | --- | --- |
 | `MindsWall_<version>_x64-setup.exe` | You want MindsWall installed for your user, with an entry in **Settings** > **Apps**. |
+| `MindsWall_<version>_x64-nsis-setup.exe` | MindsWall Setup does not work for you. It is the previous installer; use one installer or the other, not both. |
 | `MindsWall_<version>_x64_portable.zip` | You want everything in one folder that you can move or delete, or you want the CLI (`mindswall.exe`). |
 | `SHA256SUMS.txt` | Checking that a download is complete and unchanged. |
 
@@ -46,16 +47,24 @@ The builds are not code-signed, so Windows may warn about them:
 
 Code signing is not planned for now, so these warnings remain.
 
-## 3a. Install with the installer
+## 3a. Install with MindsWall Setup
 
-1. Run `MindsWall_<version>_x64-setup.exe` and follow the steps.
-2. Start MindsWall from the Start menu.
+1. Run `MindsWall_<version>_x64-setup.exe`.
+2. Select **Next**, then choose the options:
+   - **Installation location**: by default
+     `%LOCALAPPDATA%\Programs\MindsWall`. **Browse** adds a `MindsWall`
+     folder inside the folder you pick. Folders that need administrator
+     rights, such as `Program Files`, are not accepted.
+   - **Create desktop shortcut**, **Launch MindsWall after installation**,
+     and **Start MindsWall with Windows** (starts in the tray; it is the same
+     setting as in MindsWall's **Settings**).
+3. Select **Install**. Setup adds a Start menu shortcut and an entry in
+   **Settings** > **Apps**.
 
-The installer includes the WebView2 setup. Windows 11 already has the WebView2
-Runtime, so nothing is downloaded. On a computer without it, the setup installs
-the runtime from Microsoft, which needs an internet connection once.
+MindsWall Setup needs the WebView2 Runtime, which Windows 11 includes. The
+NSIS installer can install the runtime on computers without it.
 
-The installer does not include the CLI; use the portable ZIP for it.
+The installers do not include the CLI; use the portable ZIP for it.
 
 ## 3b. Use the portable ZIP
 
@@ -108,28 +117,34 @@ The first line of each log file shows `portable=true` or `portable=false`.
 
 ## Upgrade
 
-- **Installer:** quit MindsWall from the tray, then run the new
-  `MindsWall_<version>_x64-setup.exe`. Settings and history are kept.
+- **Installer:** run the new `MindsWall_<version>_x64-setup.exe`. It shows
+  the installed version, keeps the location, and closes MindsWall if it is
+  open. Settings and history are kept.
 - **Portable:** quit MindsWall, then extract the new ZIP over the old folder,
   replacing the programs. The `config`, `data`, and `cache` folders are kept.
 
 ## Uninstall
 
-1. In MindsWall, turn off **Start with Windows** in **Settings**, then quit it
-   from the tray. The uninstaller does not remove the startup entry.
-2. Remove the program:
-   - **Installer:** **Settings** > **Apps** > **Installed apps** > MindsWall >
-     **Uninstall**. The uninstaller's option to delete app data removes only
-     the WebView data, not your settings.
-   - **Portable:** delete the folder.
-3. For the installed build, delete your settings, history, logs, and caches if
-   you no longer want them:
+- **MindsWall Setup:** **Settings** > **Apps** > **Installed apps** >
+  MindsWall > **Uninstall**, or run `uninstall.exe` in the install folder.
+  It closes MindsWall and removes the program, its shortcuts, Start with
+  Windows, and the **Apps** entry. Tick **Also delete my settings, history,
+  logs, and caches** to remove those too; otherwise they are kept for a later
+  install. Files you added to the install folder are kept.
+- **NSIS installer:** turn off **Start with Windows** in MindsWall's
+  **Settings** and quit it from the tray first, because this uninstaller does
+  not remove the startup entry. Its option to delete app data removes only the
+  WebView data, not your settings.
+- **Portable:** quit MindsWall and delete the folder.
 
-   ```powershell
-   Remove-Item -Recurse "$env:APPDATA\MindsWall", "$env:LOCALAPPDATA\MindsWall"
-   ```
+To delete the settings, history, logs, and caches of an installed build by
+hand:
 
-   This cannot be undone. Your image folders are not touched.
+```powershell
+Remove-Item -Recurse "$env:APPDATA\MindsWall", "$env:LOCALAPPDATA\MindsWall"
+```
+
+This cannot be undone. Your image folders are not touched.
 
 The Windows wallpaper stays as it was last set. If it was a combined or edited
 image from the deleted cache, choose a new wallpaper in Windows Settings.

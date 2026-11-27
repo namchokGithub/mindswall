@@ -1,0 +1,26 @@
+[package]
+name = "mindswall-setup"
+version = "1.0.0"
+description = "MindsWall Setup"
+license = "MIT"
+repository = "https://github.com/namchokGithub/mindswall"
+edition = "2024"
+rust-version = "1.90"
+
+[build-dependencies]
+tauri-build = { version = "2.7.6", features = [] }
+
+[dependencies]
+directories = "6.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# The setup window always shows the screens built into the program.
+tauri = { version = "2.12.7", features = ["custom-protocol"] }
+tauri-plugin-dialog = "2"
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_UI_Shell"] }
+windows-registry = "0.6.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"

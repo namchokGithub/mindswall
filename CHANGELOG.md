@@ -9,6 +9,12 @@ All notable changes to MindsWall are recorded here. The format follows
 
 ### Added
 
+- MindsWall Setup, a per-user installer and uninstaller with its own window
+  (install location, shortcuts, launch after installing, Start with Windows,
+  updates, and an option to delete settings when uninstalling). The NSIS
+  installer remains as a fallback.
+- Portable mode: `portable.txt` next to the programs keeps all files in that
+  folder.
 - Desktop app (Tauri 2) with tray controls, folders, gallery, history,
   monitors, profiles, editor, hotkeys, and start with Windows.
 - CLI for scanning, setting wallpapers, running the slideshow, and

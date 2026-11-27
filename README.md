@@ -305,7 +305,8 @@ running slideshow may replace an edited wallpaper at its next change.
 ### Installing a release build
 
 No release has been published yet. Release builds are planned as a per-user
-NSIS installer and a portable ZIP, both unsigned. See
+installer (MindsWall Setup, with the NSIS installer as a fallback) and a
+portable ZIP, all unsigned. See
 [docs/installing.md](docs/installing.md) for downloading, checking, and
 allowing them past SmartScreen, the portable mode, where files are kept, and
 how to upgrade and uninstall.
@@ -315,8 +316,9 @@ how to upgrade and uninstall.
 The GitHub Actions workflow in `.github/workflows/ci.yml` runs on Windows for
 pushes and pull requests. It builds the frontend, then runs `cargo fmt --check`,
 Clippy with warnings denied, and the Rust tests, and builds the NSIS installer
-as a downloadable workflow artifact. Pushing a `v*.*.*` tag runs
-`.github/workflows/release.yml`, which builds the installer and a portable ZIP
+and MindsWall Setup (`installer/`) as downloadable workflow artifacts. Pushing a
+`v*.*.*` tag runs `.github/workflows/release.yml`, which builds both installers
+and a portable ZIP
 and attaches them to a draft GitHub Release; see
 [docs/releasing.md](docs/releasing.md) for the version bump and changelog
 steps. See

@@ -35,3 +35,6 @@ src-tauri/gen/
 
 # Raw performance measurements (summarize results in docs/performance.md)
 docs/performance/raw/
+installer/ui/node_modules/
+installer/ui/dist/
+installer/gen/

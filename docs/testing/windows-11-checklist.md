@@ -694,6 +694,43 @@ Hotkeys are empty by default; configure them in **Settings**.
 - [ ] Moving the portable folder keeps its settings; **Start with Windows**
       works again after turning it off and on
 
+### MindsWall Setup
+
+Use `mindswall-setup.exe` from the CI artifact or a release, as a standard
+user, and note any step that differs from [docs/installing.md](../installing.md).
+
+- [ ] Running the setup shows no elevation (UAC) prompt; File Explorer shows
+      the MindsWall logo on it
+- [ ] The window is 760 × 480 without a Windows title bar, can be dragged by
+      its sidebar and header, minimized, and closed; it follows Light/Dark
+- [ ] A fresh install proposes `%LOCALAPPDATA%\Programs\MindsWall`; **Browse**
+      adds `\MindsWall` to the picked folder; `C:\Program Files\MindsWall`
+      is refused with a message
+- [ ] Installing creates `MindsWall.exe` and `uninstall.exe` there, a Start
+      menu shortcut, a desktop shortcut only when ticked, and a MindsWall entry
+      in **Settings** > **Apps** with the version, publisher, icon, and size
+- [ ] **Launch MindsWall after installation** starts the app on **Finish**;
+      **Start MindsWall with Windows** makes MindsWall's own **Settings**
+      switch show on, and signing in again starts it in the tray
+- [ ] Running the setup again with MindsWall open shows the update screen,
+      the open-app notice, and the current location (read-only); updating
+      closes MindsWall, keeps settings and history, and keeps the Start with
+      Windows choice
+- [ ] A portable copy running elsewhere is not closed by the setup or the
+      uninstaller, and its Start with Windows entry is kept
+- [ ] Uninstalling from **Settings** > **Apps** opens the uninstall screen;
+      it removes the program, `uninstall.exe`, both shortcuts, the Start with
+      Windows entry, and the **Apps** entry, and the folder too if nothing
+      else is in it; files added to the folder are kept
+- [ ] Without **Also delete my settings…**, `%APPDATA%\MindsWall` is kept and
+      a new install picks up the settings; with it, `%APPDATA%\MindsWall`,
+      `%LOCALAPPDATA%\MindsWall`, and `%LOCALAPPDATA%\com.mindswall.desktop`
+      are gone
+- [ ] A few seconds after the uninstaller closes, no `MindsWall Uninstall
+      *.exe` or `MindsWall Setup WebView` remains in `%TEMP%`
+- [ ] A setup built without `MINDSWALL_APP_EXE` stops with "This setup does
+      not contain MindsWall"
+
 ## 6. Local-first checks
 
 - [ ] With the network adapter disabled, every check above that passed still

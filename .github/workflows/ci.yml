@@ -39,14 +39,21 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ui/package-lock.json
+          cache-dependency-path: |
+            ui/package-lock.json
+            installer/ui/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci --prefix ui
+        run: |
+          npm ci --prefix ui
+          npm ci --prefix installer/ui
 
-      # Type-checks and builds ui/dist, which src-tauri requires to compile.
+      # Type-checks and builds ui/dist and installer/ui/dist, which src-tauri
+      # and the setup require to compile.
       - name: Build frontend
-        run: npm --prefix ui run build
+        run: |
+          npm --prefix ui run build
+          npm --prefix installer/ui run build
 
       - name: Check formatting
         run: cargo fmt --all --check
@@ -58,7 +65,7 @@ jobs:
         run: cargo test --workspace
 
   installer:
-    name: Build NSIS installer
+    name: Build installers
     needs: check
     if: ${{ !inputs.skip_installer }}
     runs-on: windows-latest
@@ -77,7 +84,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ui/package-lock.json
+          cache-dependency-path: |
+            ui/package-lock.json
+            installer/ui/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci --prefix ui
@@ -92,4 +101,20 @@ jobs:
         with:
           name: mindswall-nsis-installer
           path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      # MindsWall Setup embeds the release app built above.
+      - name: Build MindsWall Setup
+        shell: pwsh
+        run: |
+          npm ci --prefix installer/ui
+          npm --prefix installer/ui run build
+          $env:MINDSWALL_APP_EXE = (Resolve-Path target/release/mindswall-desktop.exe).Path
+          cargo build --release --locked -p mindswall-setup
+
+      - name: Upload MindsWall Setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: mindswall-setup
+          path: target/release/mindswall-setup.exe
           if-no-files-found: error
