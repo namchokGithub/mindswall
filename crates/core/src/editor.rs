@@ -74,7 +74,11 @@ pub fn render(
         .prefix("mindswall-")
         .suffix(".png")
         .tempfile_in(cache)?;
-    output.write_to(&mut file, image::ImageFormat::Png)?;
+    // The encoder makes many small writes; buffer them.
+    let mut writer = std::io::BufWriter::new(file.as_file_mut());
+    output.write_to(&mut writer, image::ImageFormat::Png)?;
+    std::io::Write::flush(&mut writer)?;
+    drop(writer);
     let (_, path) = file.keep().map_err(|e| e.error)?;
     Ok(path)
 }

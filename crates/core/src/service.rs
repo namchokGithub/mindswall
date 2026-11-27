@@ -4,7 +4,7 @@ use crate::{
     ipc::{self, Command as Control, MonitorPlayback, PlaybackStatus, Response},
     monitors::{MonitorShows, SharedTarget},
     playback::Playback,
-    utilities::{elapsed_ms, peak_ram_mb, ram_mb},
+    utilities::{commit_mb, elapsed_ms, peak_ram_mb, ram_mb},
     wallpaper::{SystemWallpaper, WallpaperSetter, default_wallpaper_path},
 };
 use notify::{RecursiveMode, Watcher};
@@ -285,6 +285,7 @@ fn show_shared(
         total_ms = elapsed_ms(started),
         ram_mb = ram_mb(),
         peak_mb = peak_ram_mb(),
+        commit_mb = commit_mb(),
         "wallpaper change timing"
     );
     Ok(used)
@@ -307,6 +308,7 @@ fn show_monitor(
     apply_monitor(monitor, path, shown)?;
     tracing::info!(%monitor, combine_ms, total_ms = elapsed_ms(started), ram_mb = ram_mb(),
                             peak_mb = peak_ram_mb(),
+                            commit_mb = commit_mb(),
                             "monitor wallpaper change timing");
     Ok(used)
 }
@@ -575,6 +577,7 @@ pub fn run_slideshow_with(
                             total_ms = elapsed_ms(started),
                             ram_mb = ram_mb(),
                             peak_mb = peak_ram_mb(),
+                            commit_mb = commit_mb(),
                             "settings reloaded"
                         );
                         reloaded = Some(new_config);

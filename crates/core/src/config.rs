@@ -474,6 +474,7 @@ impl Config {
             total_ms,
             ram_mb = crate::utilities::ram_mb(),
             peak_mb = crate::utilities::peak_ram_mb(),
+            commit_mb = crate::utilities::commit_mb(),
             "collection scanned"
         );
         Ok(images)

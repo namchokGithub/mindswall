@@ -153,3 +153,31 @@ fn jpeg_images_decode_at_a_reduced_size_when_shown_small() {
     std::fs::write(&broken, b"not a jpeg").unwrap();
     assert!(open_scaled(&broken, (240, 150)).is_err());
 }
+
+#[test]
+fn resize_rgb_scales_to_the_exact_size_and_keeps_colours() {
+    use mindswall_core::utilities::resize_rgb;
+    let mut resizer = fast_image_resize::Resizer::new();
+    let filter = fast_image_resize::FilterType::CatmullRom;
+    let source = image::RgbImage::from_pixel(300, 200, image::Rgb([200, 100, 50]));
+
+    let down = resize_rgb(&mut resizer, source.clone().into(), (75, 40), filter).unwrap();
+    assert_eq!(down.dimensions(), (75, 40));
+    let up = resize_rgb(&mut resizer, source.clone().into(), (600, 450), filter).unwrap();
+    assert_eq!(up.dimensions(), (600, 450));
+    for image in [&down, &up] {
+        let pixel = image.get_pixel(image.width() / 2, image.height() / 2).0;
+        assert!(
+            pixel
+                .iter()
+                .zip([200u8, 100, 50])
+                .all(|(a, b)| a.abs_diff(b) <= 1),
+            "{pixel:?}"
+        );
+    }
+
+    // Grayscale images become RGB; the same size is returned unchanged.
+    let gray = image::GrayImage::from_pixel(10, 10, image::Luma([90]));
+    let same = resize_rgb(&mut resizer, gray.into(), (10, 10), filter).unwrap();
+    assert_eq!(same.get_pixel(5, 5).0, [90, 90, 90]);
+}

@@ -224,15 +224,34 @@ pub fn thumbnail(
     fs::create_dir_all(cache)?;
     let img = open_scaled(path, (240, 150))?.thumbnail(240, 150);
     let mut file = tempfile::NamedTempFile::new_in(cache)?;
-    img.write_to(&mut file, image::ImageFormat::Png)?;
+    // The encoder makes many small writes; buffer them.
+    let mut writer = io::BufWriter::new(file.as_file_mut());
+    img.write_to(&mut writer, image::ImageFormat::Png)?;
+    io::Write::flush(&mut writer)?;
+    drop(writer);
+    drop(img);
     file.persist(&target)
         .map_err(|e| io::Error::other(e.error))?;
+    trim_memory_soon();
     Ok(target)
 }
 
-/// This process's working set and its peak so far, in MB, for timing logs.
-/// `None` where the system does not report them.
-pub fn memory_mb() -> Option<(u64, u64)> {
+/// This process's memory in MB, for timing logs.
+#[derive(Debug, Clone, Copy)]
+pub struct Memory {
+    /// Physical memory in use now (the working set; Task Manager shows a
+    /// similar number).
+    pub working: u64,
+    /// The highest working set so far.
+    pub peak: u64,
+    /// Private memory the process has committed. Unlike the working set, it
+    /// does not drop when Windows trims the process, so a steady rise here
+    /// points to memory that is never freed.
+    pub commit: u64,
+}
+
+/// This process's memory; `None` where the system does not report it.
+pub fn memory_mb() -> Option<Memory> {
     #[cfg(windows)]
     {
         use windows::Win32::System::{
@@ -245,7 +264,12 @@ pub fn memory_mb() -> Option<(u64, u64)> {
         // size, and the pseudo handle of the current process needs no closing.
         unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, size) }.ok()?;
         let mb = |bytes: usize| u64::try_from(bytes / (1024 * 1024)).unwrap_or(u64::MAX);
-        Some((mb(counters.WorkingSetSize), mb(counters.PeakWorkingSetSize)))
+        Some(Memory {
+            working: mb(counters.WorkingSetSize),
+            peak: mb(counters.PeakWorkingSetSize),
+            // For a process, the pagefile usage is its private commit charge.
+            commit: mb(counters.PagefileUsage),
+        })
     }
     #[cfg(not(windows))]
     {
@@ -255,12 +279,126 @@ pub fn memory_mb() -> Option<(u64, u64)> {
 
 /// The current working set in MB, for timing logs.
 pub fn ram_mb() -> Option<u64> {
-    memory_mb().map(|(current, _)| current)
+    memory_mb().map(|memory| memory.working)
 }
 
 /// The highest working set so far in MB, for timing logs.
 pub fn peak_ram_mb() -> Option<u64> {
-    memory_mb().map(|(_, peak)| peak)
+    memory_mb().map(|memory| memory.peak)
+}
+
+/// The committed private memory in MB, for timing logs.
+pub fn commit_mb() -> Option<u64> {
+    memory_mb().map(|memory| memory.commit)
+}
+
+/// Give memory that is no longer used back to Windows: compact the process
+/// heap and trim the working set. Pages still in use come back when touched.
+/// Does nothing on other systems.
+pub fn trim_memory() {
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::{
+            Memory::{GetProcessHeap, HEAP_FLAGS, HeapCompact},
+            Threading::{GetCurrentProcess, SetProcessWorkingSetSize},
+        };
+        let before = memory_mb();
+        // SAFETY: both calls take the pseudo handle of this process or its
+        // default heap, which need no closing; `usize::MAX` for both sizes
+        // asks Windows to trim the working set.
+        unsafe {
+            if let Ok(heap) = GetProcessHeap() {
+                HeapCompact(heap, HEAP_FLAGS(0));
+            }
+            if let Err(error) =
+                SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX)
+            {
+                tracing::debug!(%error, "could not trim the working set");
+            }
+        }
+        let after = memory_mb();
+        tracing::info!(
+            before_mb = before.map(|memory| memory.working),
+            ram_mb = after.map(|memory| memory.working),
+            commit_mb = after.map(|memory| memory.commit),
+            "memory returned to Windows"
+        );
+    }
+}
+
+/// How long [`trim_memory_soon`] waits after the last request.
+const TRIM_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Call [`trim_memory`] once image work has been quiet for two seconds, so
+/// a burst of thumbnails trims once, after the last one.
+pub fn trim_memory_soon() {
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    };
+    static SCHEDULED: AtomicBool = AtomicBool::new(false);
+    static LAST: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+    let now = std::time::Instant::now();
+    if let Ok(mut last) = LAST.lock() {
+        *last = Some(now);
+    }
+    if SCHEDULED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("trim-memory".into())
+        .spawn(|| {
+            loop {
+                let last = LAST.lock().ok().and_then(|last| *last);
+                let wait = last
+                    .map(|last| {
+                        (last + TRIM_DELAY).saturating_duration_since(std::time::Instant::now())
+                    })
+                    .unwrap_or_default();
+                if wait.is_zero() {
+                    break;
+                }
+                std::thread::sleep(wait);
+            }
+            SCHEDULED.store(false, Ordering::Release);
+            trim_memory();
+        });
+    if spawned.is_err() {
+        SCHEDULED.store(false, Ordering::Release);
+    }
+}
+
+/// Resize `image` to exactly `width` × `height` RGB pixels with a
+/// convolution `filter`. Unlike `image`'s resize, this works on the 8-bit
+/// pixels directly instead of a full-size floating point copy, which needs far
+/// less memory for large images and is faster.
+pub fn resize_rgb(
+    resizer: &mut fast_image_resize::Resizer,
+    image: image::DynamicImage,
+    (width, height): (u32, u32),
+    filter: fast_image_resize::FilterType,
+) -> Result<image::RgbImage, Box<dyn std::error::Error + Send + Sync>> {
+    use fast_image_resize::{PixelType, ResizeAlg, ResizeOptions, images::Image};
+    let source = image.into_rgb8();
+    if source.dimensions() == (width, height) {
+        return Ok(source);
+    }
+    let (source_width, source_height) = source.dimensions();
+    let source = Image::from_vec_u8(
+        source_width,
+        source_height,
+        source.into_raw(),
+        PixelType::U8x3,
+    )?;
+    let mut target = Image::new(width, height, PixelType::U8x3);
+    resizer.resize(
+        &source,
+        &mut target,
+        &ResizeOptions::new().resize_alg(ResizeAlg::Convolution(filter)),
+    )?;
+    drop(source);
+    image::RgbImage::from_raw(width, height, target.into_vec())
+        .ok_or_else(|| io::Error::other("resized image has the wrong size").into())
 }
 
 /// Open an image that will be shown no larger than `max` (it is fitted inside
@@ -360,12 +498,16 @@ pub fn preview(
     };
     let rgb = image.to_rgb8();
     let mut file = tempfile::NamedTempFile::new_in(cache)?;
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut file, 85).write_image(
+    // The encoder makes many small writes; buffer them.
+    let mut writer = io::BufWriter::new(file.as_file_mut());
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 85).write_image(
         rgb.as_raw(),
         rgb.width(),
         rgb.height(),
         image::ExtendedColorType::Rgb8,
     )?;
+    io::Write::flush(&mut writer)?;
+    drop(writer);
     file.persist(&target)
         .map_err(|e| io::Error::other(e.error))?;
     tracing::info!(
@@ -375,8 +517,10 @@ pub fn preview(
         ms = elapsed_ms(started),
         ram_mb = ram_mb(),
         peak_mb = peak_ram_mb(),
+        commit_mb = commit_mb(),
         "preview created"
     );
+    trim_memory_soon();
     Ok((target, false))
 }
 

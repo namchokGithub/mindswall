@@ -1438,14 +1438,18 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building MindsWall")
-        .run(|_, event| {
+        .run(|_, event| match event {
             // Closing the last window must not quit: the app keeps running
             // in the tray. Quit from the tray passes an exit code.
-            if let tauri::RunEvent::ExitRequested {
+            tauri::RunEvent::ExitRequested {
                 api, code: None, ..
-            } = event
-            {
-                api.prevent_exit();
-            }
+            } => api.prevent_exit(),
+            // The window's WebView is gone; give its memory back to Windows
+            // while the app waits in the tray.
+            tauri::RunEvent::WindowEvent {
+                event: tauri::WindowEvent::Destroyed,
+                ..
+            } => mindswall_core::utilities::trim_memory_soon(),
+            _ => {}
         });
 }

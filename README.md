@@ -233,10 +233,16 @@ combined, `combined wallpaper prepared`, with `monitor_ms`, `sizes_ms`,
 read from cache`). Scanning folders logs `collection scanned` (images,
 `scan_ms`, `filter_ms`), and saving settings logs `settings reloaded`
 (`scan_ms`, `apply_ms`). On Windows these timing lines also record the app's
-memory (`ram_mb`, the current working set, and `peak_mb`, the highest so far).
-To keep memory low, thumbnails, previews, and combined wallpapers decode JPEG
-images at 1/2, 1/4, or 1/8 size when the result is shown smaller, and the
-Gallery builds at most two thumbnails at a time. Images are not kept in memory;
+memory (`ram_mb`, the current working set; `peak_mb`, the highest so far; and
+`commit_mb`, the private memory committed, which keeps rising only if memory is
+never freed). To keep memory low, thumbnails, previews, and combined wallpapers
+decode JPEG images at 1/2, 1/4, or 1/8 size when the result is shown smaller,
+and the Gallery builds at most two thumbnails at a time. A combined wallpaper
+is drawn one image at a time and scaled with `fast_image_resize`, which works
+on 8-bit pixels instead of a large floating point copy. About two seconds after
+image work stops, and when the window closes to the tray, the app returns
+unused memory to Windows and logs `memory returned to Windows` (`before_mb`,
+`ram_mb`, `commit_mb`). Images are not kept in memory;
 the disk caches above are used instead. A scan resolves each folder once instead of opening
 every image, so adding a large folder stays quick; the same image reached
 through another spelling of a folder, a nested folder, or a link to a folder is

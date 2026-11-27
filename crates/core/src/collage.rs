@@ -309,35 +309,52 @@ pub fn render(
         return Ok(file);
     }
 
-    // Each image is only needed at its tile's size.
-    let decoded = images
-        .iter()
-        .zip(tiles)
-        .map(|(path, tile)| crate::utilities::open_scaled(path, (tile.width, tile.height)))
-        .collect::<Result<Vec<DynamicImage>, _>>()?;
-    let mut canvas = background(&decoded[0], target);
-    for (image, tile) in decoded.iter().zip(tiles) {
-        let scaled = image
-            .resize_exact(tile.width, tile.height, FilterType::CatmullRom)
-            .to_rgb8();
-        image::imageops::overlay(&mut canvas, &scaled, i64::from(tile.x), i64::from(tile.y));
+    // Decode, scale, and draw one image at a time, each only at its tile's
+    // size, so at most one source image is in memory next to the canvas.
+    let mut resizer = fast_image_resize::Resizer::new();
+    let mut canvas: Option<RgbImage> = None;
+    for (path, tile) in images.iter().zip(tiles) {
+        let image = crate::utilities::open_scaled(path, (tile.width, tile.height))?;
+        if canvas.is_none() {
+            canvas = Some(background(&mut resizer, &image, target)?);
+        }
+        let scaled = crate::utilities::resize_rgb(
+            &mut resizer,
+            image,
+            (tile.width, tile.height),
+            fast_image_resize::FilterType::CatmullRom,
+        )?;
+        if let Some(canvas) = canvas.as_mut() {
+            image::imageops::overlay(canvas, &scaled, i64::from(tile.x), i64::from(tile.y));
+        }
     }
+    let canvas = canvas.ok_or_else(invalid)?;
 
     fs::create_dir_all(cache)?;
     let mut temp = tempfile::NamedTempFile::new_in(cache)?;
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut temp, 90).write_image(
+    // The encoder makes many small writes; buffer them.
+    let mut writer = io::BufWriter::new(temp.as_file_mut());
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 90).write_image(
         canvas.as_raw(),
         width,
         height,
         image::ExtendedColorType::Rgb8,
     )?;
+    io::Write::flush(&mut writer)?;
+    drop(writer);
+    drop(canvas);
     temp.persist(&file).map_err(|e| io::Error::other(e.error))?;
+    crate::utilities::trim_memory_soon();
     Ok(file)
 }
 
 /// A blurred, darkened copy of `image` that covers `target`. Blurring a
 /// small copy and scaling it up keeps this fast for large monitors.
-fn background(image: &DynamicImage, (width, height): (u32, u32)) -> RgbImage {
+fn background(
+    resizer: &mut fast_image_resize::Resizer,
+    image: &DynamicImage,
+    (width, height): (u32, u32),
+) -> Result<RgbImage, Box<dyn std::error::Error + Send + Sync>> {
     let small = image
         .resize_to_fill(
             (width / 16).max(1),
@@ -345,15 +362,18 @@ fn background(image: &DynamicImage, (width, height): (u32, u32)) -> RgbImage {
             FilterType::Triangle,
         )
         .blur(3.0);
-    let mut canvas = small
-        .resize_exact(width, height, FilterType::Triangle)
-        .to_rgb8();
+    let mut canvas = crate::utilities::resize_rgb(
+        resizer,
+        small,
+        (width, height),
+        fast_image_resize::FilterType::Bilinear,
+    )?;
     for pixel in canvas.pixels_mut() {
         for channel in &mut pixel.0 {
             *channel = (u16::from(*channel) * 65 / 100) as u8;
         }
     }
-    canvas
+    Ok(canvas)
 }
 
 /// A combined wallpaper that was shown, so Previous and reapplying can show
@@ -498,6 +518,7 @@ impl Collages {
                     render_ms = elapsed_ms(render_started),
                     ram_mb = crate::utilities::ram_mb(),
                     peak_mb = crate::utilities::peak_ram_mb(),
+                    commit_mb = crate::utilities::commit_mb(),
                     "combined wallpaper prepared"
                 );
                 file
