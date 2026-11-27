@@ -14,7 +14,7 @@ fn profile_switch_preserves_saved_settings() {
     assert_eq!(config.profiles.len(), 2);
     assert!(config.save_profile(" ").is_err());
     assert!(config.save_profile("work").is_err());
-    // Names are limited to 50 characters, counted as characters, not bytes.
+    // Names are limited to 26 characters, counted as characters, not bytes.
     let limit = mindswall_core::config::MAX_PROFILE_NAME;
     assert!(config.save_profile(&"ก".repeat(limit)).is_ok());
     assert!(config.save_profile(&"x".repeat(limit + 1)).is_err());

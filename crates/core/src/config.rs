@@ -68,7 +68,7 @@ pub enum Theme {
     Dark,
 }
 /// Longest name, in characters, for a new profile.
-pub const MAX_PROFILE_NAME: usize = 50;
+pub const MAX_PROFILE_NAME: usize = 26;
 
 /// How combined wallpapers arrange their images.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

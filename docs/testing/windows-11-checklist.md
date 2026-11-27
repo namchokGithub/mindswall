@@ -568,7 +568,7 @@ some landscape images.
 ### Profiles
 
 - [ ] Save the current folders and settings as a named profile
-- [ ] The profile name box stops at 50 characters, including Thai text; a
+- [ ] The profile name box stops at 26 characters, including Thai text; a
       profile with a longer name saved before this change still loads
 - [ ] Switching profiles in the app changes folders and settings
 - [ ] The tray **Profiles** submenu lists profiles and switches them

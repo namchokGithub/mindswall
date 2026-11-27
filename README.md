@@ -257,7 +257,7 @@ large collection still need interactive Windows verification.
 the source code, releases, issue tracker, and license on GitHub in your
 browser; only these fixed project addresses can be opened, and nothing is sent
 from the app. **Profiles** saves named collections and can import or export settings and
-profiles as JSON. Profile names have 1–50 characters (names up to 80
+profiles as JSON. Profile names have 1–26 characters (names up to 80
 characters saved by earlier versions still load). A profile stores folders, interval, shuffle, filters,
 exclusions, and fit mode. The active profile is shown at the top of every page
 and checked in the tray **Profiles** submenu. When those settings change after
