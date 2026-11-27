@@ -23,7 +23,7 @@ The project is in early development. The Rust CLI can scan folders and set or ra
 - **Planned distribution:** source code, a portable ZIP (with `MindsWall.exe`),
   and a per-user installer through GitHub Releases. Builds are not
   code-signed, so Windows may block them; see
-  [Installing a release build](#installing-a-release-build-windows-smartscreen).
+  [Installing MindsWall](docs/installing.md).
 
 ## Getting started
 
@@ -302,59 +302,13 @@ can be recorded using the keyboard in **Settings**, and saved profiles are avail
 system tray. These features still need interactive Windows verification. A
 running slideshow may replace an edited wallpaper at its next change.
 
-### Installing a release build (Windows SmartScreen)
+### Installing a release build
 
 No release has been published yet. Release builds are planned as a per-user
-NSIS installer (`MindsWall_<version>_x64-setup.exe`) and a portable ZIP
-(`MindsWall_<version>_x64_portable.zip`), with `SHA256SUMS.txt`. They are not
-code-signed, so Windows SmartScreen may show **Windows protected your PC** the
-first time you run them. Installing does not need administrator rights; an
-elevation (UAC) prompt is not expected.
-
-1. Download the files only from this repository's GitHub Releases page.
-2. Check the file against `SHA256SUMS.txt` before running it:
-
-   ```powershell
-   Get-FileHash .\MindsWall_<version>_x64-setup.exe -Algorithm SHA256
-   ```
-
-   The hash must match the line for that file. If it does not, delete the file
-   and do not run it.
-3. Run the installer. If SmartScreen appears, select **More info**, check that
-   the app name is MindsWall, then select **Run anyway**.
-4. For the portable ZIP, unblock it before extracting so the extracted
-   executable does not trigger the warning again: right-click the ZIP, select
-   **Properties**, tick **Unblock**, and select **OK**. Alternatively run:
-
-   ```powershell
-   Unblock-File .\MindsWall_<version>_x64_portable.zip
-   ```
-
-   Then extract it to a folder in your user profile and run `MindsWall.exe`.
-
-The installer adds MindsWall for the current user, with an uninstaller in
-**Settings** > **Apps**; it includes the WebView2 setup in case a computer
-does not have it (Windows 11 already does), so it does not download it. The
-CLI (`mindswall.exe`) ships only in the portable ZIP.
-
-The portable ZIP contains `MindsWall.exe`, `mindswall.exe`, and
-`portable.txt`. While `portable.txt` is next to the programs, both keep their
-settings, history, logs, caches, and WebView data in `config`, `data`, and
-`cache` folders in that folder instead of `%APPDATA%` and `%LOCALAPPDATA%`, so
-the paths elsewhere in this README move there too. Delete `portable.txt` to use
-the per-user folders. Keep the folder somewhere you can write to (not
-`Program Files`). Combined wallpapers are stored in the `cache` folder, so a
-folder on a removable drive must stay connected. **Start with Windows**
-remembers where `MindsWall.exe` is; after moving the folder, turn it off and on
-again. Run either the installed or the portable app, not both at once.
-
-**Run anyway** is not offered when Smart App Control is on (Windows Security >
-App & browser control > Smart App Control), because it blocks unsigned apps.
-Turning Smart App Control off cannot be undone without resetting Windows, so
-consider building from source instead (see
-[Desktop app (development)](#desktop-app-development)). Some antivirus products
-may also scan or quarantine new unsigned executables; check the file hash
-before allowing it. Code signing is not planned for now, so these warnings remain.
+NSIS installer and a portable ZIP, both unsigned. See
+[docs/installing.md](docs/installing.md) for downloading, checking, and
+allowing them past SmartScreen, the portable mode, where files are kept, and
+how to upgrade and uninstall.
 
 ### Continuous integration and performance
 

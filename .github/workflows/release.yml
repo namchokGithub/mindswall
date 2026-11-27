@@ -121,7 +121,7 @@ jobs:
           > "Windows protected your PC", Smart App Control may block them, and
           > antivirus software may scan or quarantine them. Check the SHA-256
           > checksum first, then select **More info** > **Run anyway**. See
-          > [Installing a release build]($repo#installing-a-release-build-windows-smartscreen)
+          > [Installing MindsWall]($repo/blob/main/docs/installing.md)
           > for the steps, or build from source.
           "@ -replace '<version>', '${{ github.ref_name }}'.TrimStart('v') -replace '(?m)^          ', ''
           "$changes`n`n$download" | Set-Content dist/notes.md

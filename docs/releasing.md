@@ -57,5 +57,8 @@ history, logs, caches, and the WebView profile are kept in `config`, `data`,
 and `cache` folders beside it (see `crates/core/src/paths.rs`). Neither build
 needs administrator rights. Neither build is code-signed.
 
+The user guide for these files is [installing.md](installing.md); update it
+when the files or their behavior change.
+
 Before publishing the draft, install the NSIS build and run the portable ZIP on
 Windows 11 as a standard user and follow `docs/testing/windows-11-checklist.md`.

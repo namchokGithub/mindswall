@@ -675,8 +675,12 @@ Hotkeys are empty by default; configure them in **Settings**.
       **Details**) and **Settings** > **Apps** show the publisher, copyright,
       and description; no elevation prompt appears
 - [ ] Installing on a Windows 11 computer with WebView2 does not download
-      anything; uninstalling removes the program and keeps the settings unless
-      the uninstaller is asked to delete app data
+      anything; installing a newer version over a running app closes it or
+      asks to; uninstalling removes the program and keeps
+      `%APPDATA%\MindsWall`, and its delete-app-data option removes only
+      `%LOCALAPPDATA%\com.mindswall.desktop`; follow
+      [docs/installing.md](../installing.md) end to end and note any step
+      that differs
 - [ ] The portable ZIP runs from a user folder as a standard user; `config`,
       `data` (with `logs` and `webview`), and `cache` folders appear next to
       `MindsWall.exe`, and nothing new is written to `%APPDATA%\MindsWall` or
