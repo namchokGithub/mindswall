@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowRightLeft, ExternalLink, FolderOpen, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowRightLeft, ExternalLink, FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import { RefreshButton } from "./RefreshButton";
 import { useSnackbar } from "./Snackbar";
 import { createThumbnailQueue } from "./thumbnailQueue";
 import { useLoadedImage } from "./useLoadedImage";
@@ -166,7 +167,7 @@ export function MonitorsPage({ config, busy, saveMonitors }: { config: UtilityCo
   }, [config.monitor_folders, config.monitor_names, monitors]);
   const moveTargets = monitors.filter(monitor => foldersOf(monitor.id).length === 0);
 
-  return <>{confirm && <ConfirmDialog request={confirm} close={() => setConfirm(null)}/>}<div className="section-title"><div><span className="eyebrow">YOUR SCREENS</span><h2>Connected monitors</h2></div><button className="icon-button" aria-label="Refresh monitors" disabled={loading} onClick={refresh}><RefreshCw size={16}/></button></div>
+  return <>{confirm && <ConfirmDialog request={confirm} close={() => setConfirm(null)}/>}<div className="section-title"><div><span className="eyebrow">YOUR SCREENS</span><h2>Connected monitors</h2></div><RefreshButton label="Refresh monitors" disabled={loading} onRefresh={refresh}/></div>
     {loading && monitors.length === 0 ? <LoadingBlock label="Finding monitors"/> : error && monitors.length === 0 ? <div className="panel empty"><h3>Could not load monitors.</h3><p>Try refreshing the list.</p><button className="secondary" onClick={refresh}>Try again</button></div> : monitors.length === 0 ? <div className="panel empty"><h3>No monitors found.</h3><p>Connect a monitor, then refresh this page.</p></div> : <>
       <MonitorLayout monitors={monitors} names={config.monitor_names} selected={selected} select={select}/>
       <div className="panel">{monitors.map((monitor, index) => <div className={`history-row monitor-card${selected === monitor.id ? " selected" : ""}`} key={monitor.id} ref={element => { cards.current[monitor.id] = element; }}>
