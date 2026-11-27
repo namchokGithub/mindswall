@@ -262,13 +262,13 @@ fn monitor_size(id: &str) -> Option<(u32, u32)> {
 }
 
 /// Show an image of the main slideshow, combined with some of the `upcoming`
-/// images when portrait images are combined. Without `upcoming`, the last
-/// combination shown for the image is reused. Returns the combined images.
+/// images when images are combined. With `None`, the image is shown again
+/// with the last combination shown for it. Returns the combined images.
 fn show_shared(
     collages: &Collages,
     target: &SharedTarget,
     path: &Path,
-    upcoming: &[PathBuf],
+    upcoming: Option<&[PathBuf]>,
 ) -> Result<Vec<PathBuf>, String> {
     let started = Instant::now();
     let shown = collages.combine(MAIN, path, upcoming, || {
@@ -295,7 +295,7 @@ fn show_monitor(
     collages: &Collages,
     monitor: &str,
     path: &Path,
-    upcoming: &[PathBuf],
+    upcoming: Option<&[PathBuf]>,
 ) -> Result<Vec<PathBuf>, String> {
     let started = Instant::now();
     let shown = collages.combine(monitor, path, upcoming, || monitor_size(monitor));
@@ -320,7 +320,7 @@ fn reapply_shared(playback: &Playback, target: &SharedTarget, collages: &Collage
         .and_then(|show| show.current().map(Path::to_path_buf))
         .or_else(|| playback.default_image.clone());
     if let Some(path) = current
-        && let Err(error) = show_shared(collages, target, &path, &[])
+        && let Err(error) = show_shared(collages, target, &path, None)
     {
         tracing::warn!(%error, "could not apply wallpaper to the shared monitors");
     }
@@ -401,11 +401,11 @@ pub fn run_slideshow_with(
     let collages = Collages::new(&config);
     // Monitor slideshows: `monitor_next` may combine upcoming images, and
     // `monitor_again` shows an image again with its last combination.
-    let monitor_next = |monitor: &str, path: &Path, upcoming: &[PathBuf]| {
+    let monitor_next = |monitor: &str, path: &Path, upcoming: Option<&[PathBuf]>| {
         show_monitor(&collages, monitor, path, upcoming)
     };
     let monitor_again =
-        |monitor: &str, path: &Path| show_monitor(&collages, monitor, path, &[]).map(|_| ());
+        |monitor: &str, path: &Path| show_monitor(&collages, monitor, path, None).map(|_| ());
     let (control_tx, control_rx) = mpsc::channel();
     let listen_until = Instant::now() + options.listen_retry;
     loop {
@@ -515,7 +515,7 @@ pub fn run_slideshow_with(
                     None
                 };
                 let target = monitors.shared_target();
-                let shared = |path: &Path| show_shared(&collages, &target, path, &[]).map(|_| ());
+                let shared = |path: &Path| show_shared(&collages, &target, path, None).map(|_| ());
                 let result: Result<String, String> = match command {
                     Control::Pause => {
                         if playback.show.is_none() {
@@ -559,7 +559,7 @@ pub fn run_slideshow_with(
                         playback.reload(
                             &new_config,
                             now,
-                            &|path| show_shared(&collages, &new_target, path, &[]).map(|_| ()),
+                            &|path| show_shared(&collages, &new_target, path, None).map(|_| ()),
                             &default_wallpaper_path,
                         )?;
                         // Monitors may have moved between the main slideshow
@@ -689,7 +689,7 @@ pub fn run_slideshow_with(
                     let mut updated = false;
                     let target = monitors.shared_target();
                     match playback.apply_file_changes(&config, &paths, now, &|path| {
-                        show_shared(&collages, &target, path, &[]).map(|_| ())
+                        show_shared(&collages, &target, path, None).map(|_| ())
                     }) {
                         Ok(true) => {
                             tracing::info!(

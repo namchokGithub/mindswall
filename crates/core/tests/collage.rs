@@ -278,7 +278,7 @@ fn combined_images_count_as_played_in_the_cycle() {
     let mut seen = Vec::new();
     let first = show
         .next_available_with(|path, upcoming| {
-            seen = upcoming.to_vec();
+            seen = upcoming.unwrap().to_vec();
             assert_eq!(path, p("a"));
             Ok::<_, ()>(vec![p("c"), p("d")])
         })
@@ -291,13 +291,95 @@ fn combined_images_count_as_played_in_the_cycle() {
     // A new cycle starts with every image again.
     assert_eq!(show.next().to_owned(), p("a"));
 
-    // Moving forward through history after Previous offers no upcoming images.
+    // Moving forward through history after Previous is a replay.
     show.previous();
     show.next_available_with(|_, upcoming| {
-        assert!(upcoming.is_empty());
+        assert!(upcoming.is_none());
         Ok::<_, ()>(Vec::new())
     })
     .unwrap();
+}
+
+#[test]
+fn the_last_image_of_a_cycle_is_not_a_replay() {
+    let mut show = Slideshow::new(["a", "b"].map(p).to_vec(), false).unwrap();
+    show.next_available_with(|_, _| Ok::<_, ()>(Vec::new()))
+        .unwrap();
+    // "b" ends the cycle: nothing is left to combine with, but it is new.
+    show.next_available_with(|path, upcoming| {
+        assert_eq!(path, p("b"));
+        assert_eq!(upcoming, Some(&[][..]));
+        Ok::<_, ()>(Vec::new())
+    })
+    .unwrap();
+}
+
+/// Portrait PNG files that combine into a mosaic on a 400 × 200 monitor.
+fn portraits(dir: &std::path::Path, count: usize) -> Vec<PathBuf> {
+    (0..count)
+        .map(|index| {
+            let path = dir.join(format!("{index}.png"));
+            image::RgbImage::from_pixel(100, 200, image::Rgb([(index * 17 % 256) as u8, 90, 160]))
+                .save(&path)
+                .unwrap();
+            path
+        })
+        .collect()
+}
+
+fn collages(dir: &std::path::Path) -> collage::Collages {
+    let mut config = mindswall_core::config::Config::default();
+    config.collage.enabled = true;
+    collage::Collages::with_cache(&config, dir.join("cache"))
+}
+
+#[test]
+fn an_image_shown_alone_forgets_its_older_combination() {
+    let dir = tempfile::tempdir().unwrap();
+    let images = portraits(dir.path(), 3);
+    let collages = collages(dir.path());
+    let size = || Some((400, 200));
+    let combined = collages
+        .combine("main", &images[0], Some(&images[1..]), size)
+        .unwrap();
+    assert_eq!(combined.combined.len(), 2);
+    assert!(collages.remembered("main", &images[0]).is_some());
+    // Later the image comes up with nothing to combine with: it is shown
+    // alone, so the old combination is neither reported nor replayed.
+    assert!(
+        collages
+            .combine("main", &images[0], Some(&[]), size)
+            .is_none()
+    );
+    assert!(collages.remembered("main", &images[0]).is_none());
+    assert!(collages.combine("main", &images[0], None, size).is_none());
+}
+
+#[test]
+fn each_monitor_keeps_its_current_combination() {
+    let dir = tempfile::tempdir().unwrap();
+    let images = portraits(dir.path(), 14);
+    let collages = collages(dir.path());
+    let size = || Some((400, 200));
+    let left = collages
+        .combine("left", &images[0], Some(&images[1..3]), size)
+        .unwrap();
+    // Many changes on another monitor must not remove the left monitor's
+    // wallpaper file or its remembered combination.
+    for first in 3..14 {
+        let others: Vec<PathBuf> = images
+            .iter()
+            .filter(|path| **path != images[first])
+            .take(2)
+            .cloned()
+            .collect();
+        collages
+            .combine("right", &images[first], Some(&others), size)
+            .unwrap();
+    }
+    let kept = collages.remembered("left", &images[0]).unwrap();
+    assert_eq!(kept.file, left.file);
+    assert!(left.file.is_file());
 }
 
 #[test]

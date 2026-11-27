@@ -390,6 +390,14 @@ impl Collages {
         }
     }
 
+    /// Like [`Collages::new`], with combined wallpapers kept in `cache`.
+    pub fn with_cache(config: &crate::config::Config, cache: PathBuf) -> Self {
+        Self {
+            cache: Some(cache),
+            ..Self::new(config)
+        }
+    }
+
     /// Use the settings of a reloaded configuration. Remembered combinations
     /// are dropped when the collage settings or the fit mode change.
     pub fn configure(&self, config: &crate::config::Config) {
@@ -411,23 +419,40 @@ impl Collages {
     }
 
     /// The combined wallpaper for `first` on the monitor named `target`.
-    /// With `upcoming` images, a new combination is planned from them;
-    /// without, the last combination shown for `first` is reused. Returns
-    /// `None` when `first` should be shown alone. `size` is called only
-    /// when a new combination is planned.
+    /// With `upcoming` images (possibly none), a new combination is planned
+    /// from them; with `None`, the last combination shown for `first` is
+    /// reused. Returns `None` when `first` should be shown alone. `size` is
+    /// called only when a new combination is planned.
     pub fn combine(
+        &self,
+        target: &str,
+        first: &Path,
+        upcoming: Option<&[PathBuf]>,
+        size: impl FnOnce() -> Option<(u32, u32)>,
+    ) -> Option<Combined> {
+        if !self.enabled() {
+            return None;
+        }
+        let Some(upcoming) = upcoming else {
+            return self.remembered(target, first);
+        };
+        let combined = self.combine_new(target, first, upcoming, size);
+        if combined.is_none() {
+            // `first` is shown alone now, so an older combination must not
+            // be reported or shown again for it.
+            self.forget(target, first);
+        }
+        combined
+    }
+
+    /// Plan, render, and remember a new combination; see [`Collages::combine`].
+    fn combine_new(
         &self,
         target: &str,
         first: &Path,
         upcoming: &[PathBuf],
         size: impl FnOnce() -> Option<(u32, u32)>,
     ) -> Option<Combined> {
-        if !self.enabled() {
-            return None;
-        }
-        if upcoming.is_empty() {
-            return self.remembered(target, first);
-        }
         let elapsed_ms = crate::utilities::elapsed_ms;
         let started = std::time::Instant::now();
         let first_size = crate::utilities::dimensions(first).ok()?;
@@ -507,12 +532,28 @@ impl Collages {
             })
     }
 
+    fn forget(&self, target: &str, first: &Path) {
+        self.shown
+            .borrow_mut()
+            .retain(|entry| !(entry.target == target && entry.first == first));
+    }
+
     fn remember(&self, shown: Shown) {
         let mut list = self.shown.borrow_mut();
         list.retain(|entry| !(entry.target == shown.target && entry.first == shown.first));
         list.push_back(shown);
+        // Drop the oldest entries beyond KEEP, but never the newest entry of a
+        // monitor: its file may be the wallpaper on screen right now.
         while list.len() > KEEP {
-            list.pop_front();
+            let replaced = (0..list.len()).find(|&index| {
+                list.iter()
+                    .skip(index + 1)
+                    .any(|later| later.target == list[index].target)
+            });
+            let Some(index) = replaced else {
+                break;
+            };
+            list.remove(index);
         }
         let keep = list
             .iter()

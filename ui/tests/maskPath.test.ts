@@ -8,6 +8,13 @@ test("masks the user name in a profile path", () => {
   assert.equal(maskUserName("\\\\?\\C:\\Users\\Long Name\\x"), "\\\\?\\C:\\Users\\******\\x");
 });
 
+test("masks user names anywhere in a log line", () => {
+  const line = String.raw`2026-11-27T10:00:00Z  INFO mindswall_core::service: wallpaper changed path="C:\\Users\\Namchok\\Pictures\\a.jpg" ram_mb=17`;
+  assert.equal(maskUserName(line), String.raw`2026-11-27T10:00:00Z  INFO mindswall_core::service: wallpaper changed path="C:\\Users\\******\\Pictures\\a.jpg" ram_mb=17`);
+  assert.equal(maskUserName(String.raw`from C:\Users\a\x to D:/Users/b/y`), String.raw`from C:\Users\******\x to D:/Users/******/y`);
+  assert.equal(maskUserName(String.raw`path="C:\Users\Long Name"`), String.raw`path="C:\Users\******"`);
+});
+
 test("leaves other paths unchanged", () => {
   assert.equal(maskUserName("D:\\Logs\\mindswall.log"), "D:\\Logs\\mindswall.log");
   assert.equal(maskUserName("/home/user/.local/share/mindswall.log"), "/home/user/.local/share/mindswall.log");

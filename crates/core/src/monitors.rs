@@ -132,7 +132,7 @@ impl MonitorShows {
     /// the new image (see [`Slideshow::next_available_with`]).
     pub fn advance_with(
         &mut self,
-        apply: &impl Fn(&str, &Path, &[PathBuf]) -> Result<Vec<PathBuf>, String>,
+        apply: &impl Fn(&str, &Path, Option<&[PathBuf]>) -> Result<Vec<PathBuf>, String>,
     ) {
         for monitor in self.active() {
             if let Some(show) = self.shows.get_mut(&monitor)
@@ -170,7 +170,7 @@ impl MonitorShows {
     pub fn advance_one(
         &mut self,
         monitor: &str,
-        apply: &impl Fn(&str, &Path, &[PathBuf]) -> Result<Vec<PathBuf>, String>,
+        apply: &impl Fn(&str, &Path, Option<&[PathBuf]>) -> Result<Vec<PathBuf>, String>,
     ) -> Result<PathBuf, String> {
         self.active_show(monitor)?
             .next_available_with(|path, upcoming| apply(monitor, path, upcoming))

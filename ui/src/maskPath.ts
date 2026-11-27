@@ -1,11 +1,13 @@
 /**
- * Hide the user name in a profile path, such as
- * `C:\Users\name\AppData\...` -> `C:\Users\******\AppData\...`, so the path
- * can be shown on screen or in a screenshot. The mask has a fixed length so it
- * does not reveal the length of the name.
+ * Hide the user name in every profile path in `text`, such as
+ * `C:\Users\name\AppData\...` -> `C:\Users\******\AppData\...`, so the text
+ * can be shown on screen or in a screenshot. Paths may appear anywhere, for
+ * example inside a log line, and may use `/` or doubled backslashes as in
+ * debug output. The mask has a fixed length so it does not reveal the length
+ * of the name.
  */
-export function maskUserName(path: string): string {
-  return path.replace(/^((?:\\\\\?\\)?[A-Za-z]:[\\/]Users[\\/])[^\\/]+/i, "$1******");
+export function maskUserName(text: string): string {
+  return text.replace(/((?<![A-Za-z])[A-Za-z]:(?:\\{1,2}|\/)Users(?:\\{1,2}|\/))[^\\/"']+/gi, "$1******");
 }
 
 /**

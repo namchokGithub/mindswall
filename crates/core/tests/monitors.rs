@@ -165,7 +165,7 @@ fn one_monitor_moves_without_the_others() {
     let mut shows = MonitorShows::default();
     shows.configure(&config);
     let applied = Applied::default();
-    let next = |monitor: &str, path: &Path, _: &[PathBuf]| {
+    let next = |monitor: &str, path: &Path, _: Option<&[PathBuf]>| {
         recorder(&applied)(monitor, path).map(|()| Vec::new())
     };
 

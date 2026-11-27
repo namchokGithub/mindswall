@@ -98,12 +98,14 @@ impl Slideshow {
     }
 
     /// Like [`Slideshow::next_available`], but `apply` also receives the
-    /// unplayed images of the current cycle in order (empty when moving
-    /// forward through history after Previous). Images it returns were shown
-    /// together with the new image and count as played in this cycle.
+    /// unplayed images of the current cycle in order, which may be empty for
+    /// the last image of a cycle, or `None` when moving forward through
+    /// history after Previous (the image was shown before). Images it returns
+    /// were shown together with the new image and count as played in this
+    /// cycle.
     pub fn next_available_with<E>(
         &mut self,
-        mut apply: impl FnMut(&Path, &[PathBuf]) -> Result<Vec<PathBuf>, E>,
+        mut apply: impl FnMut(&Path, Option<&[PathBuf]>) -> Result<Vec<PathBuf>, E>,
     ) -> Result<PathBuf, E> {
         let mut candidate = self.clone();
         loop {
@@ -111,10 +113,10 @@ impl Slideshow {
                 .cursor
                 .is_some_and(|cursor| cursor + 1 < candidate.history.len());
             let path = candidate.next().to_owned();
-            let upcoming: &[PathBuf] = if replay {
-                &[]
+            let upcoming = if replay {
+                None
             } else {
-                &candidate.queue[candidate.index.min(candidate.queue.len())..]
+                Some(&candidate.queue[candidate.index.min(candidate.queue.len())..])
             };
             match apply(path.as_path(), upcoming) {
                 Ok(used) => {
