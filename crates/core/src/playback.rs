@@ -8,6 +8,9 @@ pub struct Playback {
     pub show: Option<Slideshow>,
     pub timer: Scheduler,
     pub default_image: Option<PathBuf>,
+    /// Why the slideshow paused itself, such as the wallpaper being changed
+    /// in Windows. `None` when it runs or the user paused it.
+    pub paused_reason: Option<String>,
     paused_before_empty: bool,
     fit_mode: FitMode,
 }
@@ -20,6 +23,7 @@ impl Playback {
             show: Some(show),
             timer: Scheduler::new(Duration::from_secs(config.interval_seconds), now),
             default_image: None,
+            paused_reason: None,
             paused_before_empty: false,
             fit_mode: config.fit_mode,
         })

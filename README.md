@@ -123,6 +123,14 @@ it stays paused. When the slideshow service is not running, use **Start
 slideshow** after enabling a folder. The app reports an error if the Windows
 image cannot be applied.
 
+When the wallpaper is changed outside MindsWall, for example a picture, solid
+colour, slideshow, or Spotlight chosen in the Windows Settings app, the
+slideshow pauses at its next scheduled change instead of replacing it. Overview
+then explains why it paused, and **Resume** continues the slideshow. Only
+changes made after the slideshow started are noticed; a wallpaper set by
+another program that MindsWall does not track, such as the CLI `set` command,
+also pauses it.
+
 Overview shows the current file name and its position and total in the active
 slideshow cycle. Select the preview to open the image details (location, size,
 and dates); for a combined wallpaper, arrows or the Left and Right keys move

@@ -43,6 +43,9 @@ pub struct PlaybackStatus {
     /// Connected monitors that run their own slideshow.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub monitors: Vec<MonitorPlayback>,
+    /// Why the slideshow paused itself, when it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_reason: Option<String>,
 }
 
 /// The slideshow of one monitor with its own folders.

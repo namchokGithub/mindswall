@@ -16,6 +16,7 @@ fn legacy_and_structured_status_are_compatible() {
             combined: Vec::new(),
             display: None,
             monitors: Vec::new(),
+            paused_reason: None,
         }),
     };
     let json = serde_json::to_string(&response).unwrap();
@@ -45,6 +46,7 @@ fn per_monitor_commands_and_status_round_trip() {
         serde_json::from_str(r#"{"state":"running","current":null,"position":null,"total":0}"#)
             .unwrap();
     assert!(old.monitors.is_empty());
+    assert!(old.paused_reason.is_none());
     let status = PlaybackStatus {
         monitors: vec![MonitorPlayback {
             monitor: "left".into(),
@@ -60,4 +62,13 @@ fn per_monitor_commands_and_status_round_trip() {
         serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
     assert_eq!(parsed.monitors[0].monitor, "left");
     assert_eq!(parsed.monitors[0].total, 2);
+
+    let paused = PlaybackStatus {
+        state: "paused".into(),
+        paused_reason: Some("changed in Windows".into()),
+        ..parsed
+    };
+    let parsed: PlaybackStatus =
+        serde_json::from_str(&serde_json::to_string(&paused).unwrap()).unwrap();
+    assert_eq!(parsed.paused_reason.as_deref(), Some("changed in Windows"));
 }

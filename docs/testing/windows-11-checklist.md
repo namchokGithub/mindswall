@@ -156,6 +156,16 @@ example from the log.
 - [x] Lock and unlock the session: the slideshow keeps running
 - [x] Task Manager shows near-zero CPU between changes (note values; formal
       benchmarks are Phase 5)
+- [ ] Choose a picture in **Settings > Personalization > Background**: at
+      the next due time the slideshow pauses instead of replacing it, the log
+      shows `wallpaper changed outside MindsWall`, and Overview says why
+- [ ] The same with **Solid color**, **Slideshow**, and **Windows spotlight**
+- [ ] **Resume** continues the slideshow with the next image
+- [ ] With two monitors, a picture set on one monitor from Settings also pauses
+- [ ] Gallery **Set wallpaper**, History **Apply again**, and Monitors changes
+      made in the app do not pause the slideshow
+- [ ] Handing a CLI `run` slideshow over to the app does not pause it at the
+      next change
 
 ### Errors
 

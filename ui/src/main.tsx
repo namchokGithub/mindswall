@@ -26,7 +26,7 @@ type Folder = { path: string; enabled: boolean; recursive: boolean };
 type ProfileStatus = { active: string | null; changed: boolean };
 type Config = { theme: ThemeSetting; collage: { enabled: boolean; gap: number; layout: "row" | "mosaic" } } & { version: number; folders: Folder[]; interval_seconds: number; shuffle: boolean; profiles: { name: string }[]; active_profile: string | null; hotkeys: { next: string; previous: string; pause: string } } & UtilityConfig;
 type Page = "overview" | "folders" | "gallery" | "monitors" | "history" | "profiles" | "editor" | "settings" | "about";
-type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null; combined: string[]; display: string | null; monitors?: MonitorPlayback[] };
+type OverviewStatus = { state: string; current: string | null; position: number | null; total: number | null; combined: string[]; display: string | null; monitors?: MonitorPlayback[]; paused_reason?: string | null };
 
 /** The notice shown when the folder watcher adds or removes images. */
 function collectionNotice(change: { added: number; removed: number } | null) {
@@ -58,6 +58,8 @@ function App() {
   const [imagePosition, setImagePosition] = useState<number | null>(null);
   const [imageTotal, setImageTotal] = useState<number | null>(null);
   const [monitorShows, setMonitorShows] = useState<MonitorPlayback[]>([]);
+  // Why the slideshow paused itself, such as a wallpaper chosen in Windows.
+  const [pausedReason, setPausedReason] = useState("");
   // Image details opened from Overview: the image and the images shown with it.
   const [details, setDetails] = useState<{ path: string; combined: string[] } | null>(null);
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
@@ -75,7 +77,8 @@ function App() {
       setImagePosition(value.position);
       setImageTotal(value.total);
       setMonitorShows(value.monitors ?? []);
-    } catch { if (request === statusRequest.current) { setStatus("stopped"); setImagePath(""); setCombined([]); setDisplayPath(""); setImagePosition(null); setImageTotal(null); setMonitorShows([]); } }
+      setPausedReason(value.paused_reason ?? "");
+    } catch { if (request === statusRequest.current) { setStatus("stopped"); setPausedReason(""); setImagePath(""); setCombined([]); setDisplayPath(""); setImagePosition(null); setImageTotal(null); setMonitorShows([]); } }
   }, []);
 
   useEffect(() => {
@@ -173,7 +176,7 @@ function App() {
           {details && <GalleryPreview key={details.path} path={details.path} combined={details.combined} close={() => setDetails(null)}/>}
           <ScreenCards config={config} main={{ current: imagePath, display: displayPath, position: imagePosition, total: imageTotal, combined }} shows={monitorShows} stopped={status === "stopped"} busy={busy} step={stepMonitor} openDetails={(path, combined) => setDetails({ path, combined })}/>
           <div className="footnote overview-collection">{filtersActive && <>Image filters or exclusions are active. <button className="text-link" onClick={() => navigatePage("settings")}>Review settings <ArrowRight size={14}/></button></>}{status !== "stopped" && <button className="text-link" disabled={busy || rescan.running} aria-busy={rescan.running} onClick={rescan.run} title="Rescans enabled folders and keeps the current cycle">{rescan.running ? <Spinner size="small"/> : <RefreshCw size={14}/>} Rescan collection</button>}</div>
-          <div className="player"><div><strong>Slideshow</strong><small>{status === "stopped" ? "Ready when you are" : `Changing every ${config.interval_seconds / 60} minutes`}</small></div><div className="player-actions"><button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("previous")} aria-label="Previous wallpaper"><ArrowLeft size={17}/></button>{status === "stopped" ? <button className="primary" disabled={busy || !config.folders.some(f => f.enabled)} onClick={() => act("start")}><Play size={16}/> Start slideshow</button> : <button className="primary" disabled={busy} onClick={() => act(running ? "pause" : "resume")}>{running ? <Pause size={16}/> : <Play size={16}/>} {running ? "Pause" : "Resume"}</button>}<button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("next")} aria-label="Next wallpaper"><ArrowRight size={17}/></button></div></div>
+          <div className="player"><div><strong>Slideshow</strong><small>{status === "stopped" ? "Ready when you are" : status === "paused" && pausedReason ? pausedReason : `Changing every ${config.interval_seconds / 60} minutes`}</small></div><div className="player-actions"><button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("previous")} aria-label="Previous wallpaper"><ArrowLeft size={17}/></button>{status === "stopped" ? <button className="primary" disabled={busy || !config.folders.some(f => f.enabled)} onClick={() => act("start")}><Play size={16}/> Start slideshow</button> : <button className="primary" disabled={busy} onClick={() => act(running ? "pause" : "resume")}>{running ? <Pause size={16}/> : <Play size={16}/>} {running ? "Pause" : "Resume"}</button>}<button className="icon-button" disabled={busy || status === "stopped"} onClick={() => act("next")} aria-label="Next wallpaper"><ArrowRight size={17}/></button></div></div>
           <section className="quick-settings" aria-labelledby="quick-settings-title"><div className="section-title"><div><span className="eyebrow">SLIDESHOW</span><h2 id="quick-settings-title">Quick settings</h2></div></div><div className="panel settings-panel"><div className="setting-row"><div><strong>Change picture every</strong><small>Set the time between wallpapers.</small></div><IntervalSelect value={config.interval_seconds} disabled={busy} onChange={interval_seconds => save({ ...config, interval_seconds })}/></div><div className="setting-row"><div><strong>Fit mode</strong><small>Choose how wallpapers fit your screen.</small></div><FitModeSelect value={config.fit_mode} disabled={busy} onChange={fit_mode => save({ ...config, fit_mode })}/></div></div></section>
           <div className="overview-grid"><div className="summary-card"><div className="summary-icon"><FolderOpen size={18}/></div><span>YOUR COLLECTION</span><strong>{config.folders.filter(f => f.enabled).length} <small>active folders</small></strong><button className="text-link" onClick={() => navigatePage("folders")}>Manage folders <ArrowRight size={14}/></button></div><div className="summary-card"><div className="summary-icon"><RefreshCw size={18}/></div><span>THE FLOW</span><strong>{config.shuffle ? "Shuffle" : "In order"} <small>every {config.interval_seconds / 60} min</small></strong><button className="text-link" onClick={() => navigatePage("settings")}>Adjust settings <ArrowRight size={14}/></button></div></div></>}
         {page === "folders" && <>{confirm && <ConfirmDialog request={confirm} close={() => setConfirm(null)}/>}<div className="section-title"><div><span className="eyebrow">COLLECTION SOURCES</span><h2>Folders <span className="count-pill">{config.folders.length}</span></h2></div><button className="primary" disabled={busy} onClick={addFolder}><Plus size={16}/> Add folder</button></div>

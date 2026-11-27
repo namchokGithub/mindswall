@@ -103,7 +103,25 @@ fn snapshot(playback: &Playback, collages: &Collages, monitors: &MonitorShows) -
                 })
             })
             .collect(),
+        paused_reason: playback
+            .timer
+            .is_paused()
+            .then(|| playback.paused_reason.clone())
+            .flatten(),
     }
+}
+
+/// What the Windows Settings app shows when the wallpaper there replaced
+/// MindsWall's.
+const PAUSED_FOR_WINDOWS: &str =
+    "The wallpaper was changed in Windows, so the slideshow paused. Resume to continue.";
+
+/// Whether the wallpaper was changed outside MindsWall, for example in the
+/// Windows Settings app. Then the next change would replace the user's
+/// choice, so the slideshow pauses instead.
+fn wallpaper_changed_outside() -> Option<String> {
+    let monitors = crate::wallpaper::list_monitors().ok()?;
+    crate::wallpaper::changed_outside(&monitors)
 }
 
 /// Watch the enabled folders and forward file events to the slideshow loop.
@@ -466,6 +484,14 @@ pub fn run_slideshow_with(
         playback.timer.pause(Instant::now());
     }
     monitors.reapply(&monitors.active(), &monitor_again);
+    // A slideshow handed over from the CLI continues with a wallpaper set
+    // by another process; count what is shown now as MindsWall's, so only
+    // later changes in Windows pause the slideshow.
+    if let Ok(list) = crate::wallpaper::list_monitors() {
+        for current in list.iter().filter_map(|monitor| monitor.current.as_deref()) {
+            crate::wallpaper::remember_applied(current);
+        }
+    }
     on_change(&snapshot(&playback, &collages, &monitors), Change::Playback);
     println!("Slideshow running. Press Ctrl+C to stop.");
 
@@ -523,6 +549,7 @@ pub fn run_slideshow_with(
                         if playback.show.is_none() {
                             Err("No enabled folders".into())
                         } else {
+                            playback.paused_reason = None;
                             playback.timer.pause(now);
                             Ok("paused".into())
                         }
@@ -531,6 +558,7 @@ pub fn run_slideshow_with(
                         if playback.show.is_none() {
                             Err("No enabled folders".into())
                         } else {
+                            playback.paused_reason = None;
                             playback.timer.resume(now);
                             Ok("running".into())
                         }
@@ -716,7 +744,15 @@ pub fn run_slideshow_with(
                         });
                     }
                 }
-                if playback.timer.is_due(now)
+                let outside = (playback.timer.is_due(now) && playback.show.is_some())
+                    .then(wallpaper_changed_outside)
+                    .flatten();
+                if let Some(wallpaper) = outside {
+                    tracing::info!(%wallpaper, "wallpaper changed outside MindsWall; slideshow paused");
+                    playback.timer.pause(now);
+                    playback.paused_reason = Some(PAUSED_FOR_WINDOWS.to_owned());
+                    changed = true;
+                } else if playback.timer.is_due(now)
                     && let Some(show) = playback.show.as_mut()
                 {
                     let target = monitors.shared_target();

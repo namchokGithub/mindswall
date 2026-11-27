@@ -989,6 +989,8 @@ struct OverviewStatus {
     display: Option<PathBuf>,
     /// Connected monitors that run their own slideshow.
     monitors: Vec<ipc::MonitorPlayback>,
+    /// Why the slideshow paused itself, such as a wallpaper chosen in Windows.
+    paused_reason: Option<String>,
 }
 
 #[tauri::command]
@@ -1010,6 +1012,7 @@ fn overview_status_inner() -> Result<OverviewStatus, String> {
             combined: status.combined,
             display: status.display,
             monitors: status.monitors,
+            paused_reason: status.paused_reason,
         })
     } else {
         let (state, path) = response
@@ -1024,6 +1027,7 @@ fn overview_status_inner() -> Result<OverviewStatus, String> {
             combined: Vec::new(),
             display: None,
             monitors: Vec::new(),
+            paused_reason: None,
         })
     }
 }

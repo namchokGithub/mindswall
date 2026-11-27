@@ -197,7 +197,9 @@ pub fn set_monitor_wallpaper(monitor: &str, path: &Path) -> Result<(), String> {
         desktop
             .SetWallpaper(PCWSTR(monitor.as_ptr()), PCWSTR(wide.as_ptr()))
             .map_err(|e| format!("Could not set wallpaper for this monitor: {e}"))
-    })
+    })?;
+    crate::wallpaper::remember_applied(&path);
+    Ok(())
 }
 
 impl WallpaperSetter for SystemWallpaper {
@@ -232,6 +234,7 @@ impl WallpaperSetter for SystemWallpaper {
             result
         };
         if primary.is_ok() {
+            crate::wallpaper::remember_applied(&absolute);
             return Ok(());
         }
         if mode != crate::utilities::FitMode::Fill {
@@ -254,6 +257,8 @@ impl WallpaperSetter for SystemWallpaper {
         .map_err(|err| Error::Wallpaper {
             path: path.to_owned(),
             message: format!("desktop API: {}; fallback: {err}", primary.unwrap_err()),
-        })
+        })?;
+        crate::wallpaper::remember_applied(&absolute);
+        Ok(())
     }
 }
